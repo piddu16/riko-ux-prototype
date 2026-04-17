@@ -37,50 +37,55 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     <aside
       className="hidden md:flex flex-col items-center py-4 fixed left-0 top-0 h-full z-40"
       style={{
-        width: 56,
+        width: 72,
         background: "var(--bg-secondary)",
         borderRight: "1px solid var(--border)",
       }}
     >
       {/* Logo */}
       <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center mb-6 flex-shrink-0"
+        className="w-9 h-9 rounded-lg flex items-center justify-center mb-5 flex-shrink-0"
         style={{
           background: "linear-gradient(135deg, var(--green), var(--green-dark))",
         }}
       >
-        <span className="text-white text-sm font-bold">R</span>
+        <span className="text-white text-base font-extrabold">R</span>
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 flex flex-col items-center gap-1 w-full px-1.5">
+      <nav className="flex-1 flex flex-col items-center gap-0.5 w-full px-2">
         {navItems.map(({ id, label, icon: Icon }) => {
           const active = activeTab === id;
           return (
             <button
               key={id}
               onClick={() => onTabChange(id)}
-              className="relative flex flex-col items-center justify-center w-full py-2 rounded-lg transition-colors cursor-pointer group"
+              className="relative flex flex-col items-center justify-center w-full py-2.5 rounded-lg transition-colors cursor-pointer"
               style={{
                 background: active
                   ? "color-mix(in srgb, var(--green) 15%, transparent)"
                   : "transparent",
               }}
               title={label}
+              onMouseEnter={(e) => {
+                if (!active) (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+              }}
+              onMouseLeave={(e) => {
+                if (!active) (e.currentTarget as HTMLElement).style.background = "transparent";
+              }}
             >
-              {/* Active left border */}
               {active && (
                 <div
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r"
                   style={{ background: "var(--green)" }}
                 />
               )}
               <Icon
-                size={18}
+                size={20}
                 style={{ color: active ? "var(--green)" : "var(--text-3)" }}
               />
               <span
-                className="text-[9px] mt-0.5 leading-tight"
+                className="text-[10px] mt-1 leading-none font-medium"
                 style={{ color: active ? "var(--green)" : "var(--text-4)" }}
               >
                 {label}

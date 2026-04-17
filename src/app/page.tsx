@@ -34,7 +34,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar activeTab={tab} onTabChange={(id) => setTab(id as TabId)} />
 
-      <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+      <main className="flex-1 overflow-y-auto pb-16 md:pb-0 md:pl-[72px]">
         <header
           className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 backdrop-blur-lg md:px-6"
           style={{
