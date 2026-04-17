@@ -6,6 +6,29 @@ import { Pill } from "@/components/ui/pill";
 import { RECEIVABLES, K, fL } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
+/*  Desktop enrichment data                                           */
+/* ------------------------------------------------------------------ */
+const agingDetailed = [
+  { label: "0-30 days", amount: "0.43L", pct: 5, color: "var(--green)", border: "var(--green)" },
+  { label: "30-90 days", amount: "0.87L", pct: 10, color: "var(--blue)", border: "var(--blue)" },
+  { label: "90-365 days", amount: "1.30L", pct: 15, color: "var(--yellow)", border: "var(--yellow)" },
+  { label: "365+ days", amount: "6.08L", pct: 70, color: "var(--red)", border: "var(--red)" },
+];
+
+const collectionInsights = [
+  { num: 1, text: "Reconcile Nykaa accounts \u2014 \u20B912.6L across 298 bills may include contra-settled amounts" },
+  { num: 2, text: "Escalate Paytm settlement \u2014 \u20B93.55L pending 2,132 days, likely requires relationship manager contact" },
+  { num: 3, text: "Batch-send WhatsApp reminders to P2/P3 parties \u2014 \u20B910.8L recoverable" },
+];
+
+const riskMatrix = {
+  topRight:   { label: "High Amount + Long Overdue", color: "var(--red)", parties: ["Nykaa E-Retail", "One97 (Paytm)"] },
+  topLeft:    { label: "High Amount + Recent", color: "var(--yellow)", parties: ["Website Debtors"] },
+  bottomRight:{ label: "Low Amount + Long Overdue", color: "var(--orange)", parties: ["LLC Olimpiya"] },
+  bottomLeft: { label: "Low Amount + Recent", color: "var(--green)", parties: ["Scale Global"] },
+};
+
+/* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
 const fmt = (v: number) =>
@@ -74,7 +97,7 @@ export default function OutstandingsScreen() {
       className="min-h-screen pb-24"
       style={{ background: "var(--bg-primary)" }}
     >
-      <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-5">
+      <div className="max-w-3xl md:max-w-5xl mx-auto px-4 py-6 flex flex-col gap-5">
         {/* -------------------------------------------------------- */}
         {/*  1. Tab Bar                                              */}
         {/* -------------------------------------------------------- */}
@@ -186,6 +209,47 @@ export default function OutstandingsScreen() {
                 />
                 {a.label} ({a.pct}%)
               </span>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* -------------------------------------------------------- */}
+        {/*  Desktop: Aging Analysis Cards                           */}
+        {/* -------------------------------------------------------- */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="hidden md:block rounded-xl p-4"
+          style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
+            Aging Analysis
+          </p>
+          <div className="grid grid-cols-4 gap-3">
+            {agingDetailed.map((a) => (
+              <div
+                key={a.label}
+                className="rounded-lg p-3 relative overflow-hidden"
+                style={{
+                  background: `color-mix(in srgb, ${a.color} 8%, var(--bg-secondary))`,
+                  borderLeft: `3px solid ${a.border}`,
+                }}
+              >
+                <p className="text-[10px] font-medium mb-1" style={{ color: "var(--text-4)" }}>
+                  {a.label}
+                </p>
+                <p
+                  className="text-lg font-bold tabular-nums"
+                  style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+                >
+                  {"\u20B9"}{a.amount}
+                </p>
+                <p className="text-[10px] font-semibold mt-0.5" style={{ color: a.color }}>
+                  {a.pct}% of total
+                </p>
+              </div>
             ))}
           </div>
         </motion.div>
@@ -467,6 +531,128 @@ export default function OutstandingsScreen() {
             ))}
           </div>
         </div>
+
+        {/* -------------------------------------------------------- */}
+        {/*  Desktop: Collection Insights                            */}
+        {/* -------------------------------------------------------- */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="hidden md:block rounded-xl p-4"
+          style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-xs font-semibold mb-1" style={{ color: "var(--text-2)" }}>
+            Collection Insights
+          </p>
+          <p className="text-[10px] mb-3" style={{ color: "var(--text-4)" }}>
+            Top 3 actions to reduce DSO
+          </p>
+          <div className="flex flex-col gap-2">
+            {collectionInsights.map((item) => (
+              <div
+                key={item.num}
+                className="flex items-start gap-3 rounded-lg px-3 py-2.5"
+                style={{
+                  background: "color-mix(in srgb, var(--green) 5%, var(--bg-secondary))",
+                  borderLeft: "3px solid var(--green)",
+                }}
+              >
+                <span
+                  className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5"
+                  style={{
+                    background: "color-mix(in srgb, var(--green) 20%, transparent)",
+                    color: "var(--green)",
+                  }}
+                >
+                  {item.num}
+                </span>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-2)" }}>
+                  {item.text}
+                </p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* -------------------------------------------------------- */}
+        {/*  Desktop: Party Risk Matrix                              */}
+        {/* -------------------------------------------------------- */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+          className="hidden md:block rounded-xl p-4"
+          style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
+            Party Risk Matrix
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Top-left: High Amount + Recent (yellow) */}
+            <div
+              className="rounded-lg p-3"
+              style={{
+                background: "color-mix(in srgb, var(--yellow) 8%, var(--bg-secondary))",
+                border: "1px solid color-mix(in srgb, var(--yellow) 20%, transparent)",
+              }}
+            >
+              <p className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--yellow)" }}>
+                {riskMatrix.topLeft.label}
+              </p>
+              {riskMatrix.topLeft.parties.map((p) => (
+                <p key={p} className="text-xs" style={{ color: "var(--text-2)" }}>{p}</p>
+              ))}
+            </div>
+            {/* Top-right: High Amount + Long Overdue (red) */}
+            <div
+              className="rounded-lg p-3"
+              style={{
+                background: "color-mix(in srgb, var(--red) 8%, var(--bg-secondary))",
+                border: "1px solid color-mix(in srgb, var(--red) 20%, transparent)",
+              }}
+            >
+              <p className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--red)" }}>
+                {riskMatrix.topRight.label}
+              </p>
+              {riskMatrix.topRight.parties.map((p) => (
+                <p key={p} className="text-xs" style={{ color: "var(--text-2)" }}>{p}</p>
+              ))}
+            </div>
+            {/* Bottom-left: Low Amount + Recent (green) */}
+            <div
+              className="rounded-lg p-3"
+              style={{
+                background: "color-mix(in srgb, var(--green) 8%, var(--bg-secondary))",
+                border: "1px solid color-mix(in srgb, var(--green) 20%, transparent)",
+              }}
+            >
+              <p className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--green)" }}>
+                {riskMatrix.bottomLeft.label}
+              </p>
+              {riskMatrix.bottomLeft.parties.map((p) => (
+                <p key={p} className="text-xs" style={{ color: "var(--text-2)" }}>{p}</p>
+              ))}
+            </div>
+            {/* Bottom-right: Low Amount + Long Overdue (orange) */}
+            <div
+              className="rounded-lg p-3"
+              style={{
+                background: "color-mix(in srgb, var(--orange) 8%, var(--bg-secondary))",
+                border: "1px solid color-mix(in srgb, var(--orange) 20%, transparent)",
+              }}
+            >
+              <p className="text-[10px] font-semibold mb-1.5" style={{ color: "var(--orange)" }}>
+                {riskMatrix.bottomRight.label}
+              </p>
+              {riskMatrix.bottomRight.parties.map((p) => (
+                <p key={p} className="text-xs" style={{ color: "var(--text-2)" }}>{p}</p>
+              ))}
+            </div>
+          </div>
+        </motion.div>
 
         {/* -------------------------------------------------------- */}
         {/*  4. Warning Note                                         */}

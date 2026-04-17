@@ -9,6 +9,7 @@ import Outstandings from "@/components/screens/outstandings";
 import { DaybookScreen as DayBook } from "@/components/screens/daybook";
 import { SalesScreen as Sales } from "@/components/screens/sales";
 import { InventoryScreen as Inventory } from "@/components/screens/inventory";
+import { ReportsScreen as Reports } from "@/components/screens/reports";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { COMPANY } from "@/lib/data";
 
@@ -78,13 +79,7 @@ export default function Home() {
           {tab === "daybook" && <DayBook />}
           {tab === "sales" && <Sales />}
           {tab === "inventory" && <Inventory />}
-          {tab === "reports" && (
-            <div className="flex flex-col items-center justify-center py-20" style={{ color: "var(--text-3)" }}>
-              <span className="text-4xl mb-4">📋</span>
-              <p className="text-lg font-semibold">Reports</p>
-              <p className="text-sm mt-1">Coming soon</p>
-            </div>
-          )}
+          {tab === "reports" && <Reports />}
           {tab === "settings" && (
             <div className="flex flex-col items-center justify-center py-20" style={{ color: "var(--text-3)" }}>
               <span className="text-4xl mb-4">⚙️</span>

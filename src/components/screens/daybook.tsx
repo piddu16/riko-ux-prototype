@@ -23,6 +23,18 @@ function fmtAmt(v: number) {
   return "\u20B9" + v.toLocaleString("en-IN");
 }
 
+/* ── Stat card accent colours ── */
+const STAT_ACCENTS: Record<string, string> = {
+  Entries: "var(--text-3)",
+  Purchase: "var(--orange)",
+  Sales: "var(--green)",
+  Receipt: "var(--blue)",
+  Payment: "var(--red)",
+};
+
+/* ── Voucher bar config ── */
+const VOUCHER_TYPES = ["Purchase", "Sales", "Receipt", "Payment", "Journal"] as const;
+
 export function DaybookScreen() {
   const [activeRange, setActiveRange] = useState<string>("This Month");
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,13 +71,27 @@ export function DaybookScreen() {
     .filter((e) => ["Sales", "Receipt"].includes(e.type))
     .reduce((s, e) => s + e.amount, 0);
 
+  /* Per-type breakdowns for desktop enrichment */
+  const voucherBreakdown = useMemo(() => {
+    return VOUCHER_TYPES.map((type) => {
+      const entries = filtered.filter((e) => e.type === type);
+      return { type, count: entries.length, total: entries.reduce((s, e) => s + e.amount, 0) };
+    });
+  }, [filtered]);
+
+  const purchaseTotal = voucherBreakdown.find((v) => v.type === "Purchase")?.total ?? 0;
+  const salesTotal = voucherBreakdown.find((v) => v.type === "Sales")?.total ?? 0;
+  const receiptTotal = voucherBreakdown.find((v) => v.type === "Receipt")?.total ?? 0;
+  const paymentTotal = voucherBreakdown.find((v) => v.type === "Payment")?.total ?? 0;
+  const maxVoucherTotal = Math.max(...voucherBreakdown.map((v) => v.total), 1);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.1 }}
       transition={{ duration: 0.4 }}
-      className="px-4 py-4 max-w-4xl mx-auto w-full"
+      className="px-4 py-4 max-w-4xl md:max-w-5xl mx-auto w-full"
     >
       {/* Header */}
       <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-1)" }}>
@@ -126,6 +152,88 @@ export function DaybookScreen() {
           <strong style={{ color: "var(--green)" }}>{fmtAmt(totalCredit)}</strong>
         </span>
       </div>
+
+      {/* ── Desktop: Summary Dashboard ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.4, delay: 0.05 }}
+        className="hidden md:grid grid-cols-5 gap-3 mb-4"
+      >
+        {[
+          { label: "Total Entries", value: String(totalEntries), accent: STAT_ACCENTS.Entries, isCurrency: false },
+          { label: "Purchases", value: fmtAmt(purchaseTotal), accent: STAT_ACCENTS.Purchase, isCurrency: true },
+          { label: "Sales", value: fmtAmt(salesTotal), accent: STAT_ACCENTS.Sales, isCurrency: true },
+          { label: "Receipts", value: fmtAmt(receiptTotal), accent: STAT_ACCENTS.Receipt, isCurrency: true },
+          { label: "Payments", value: fmtAmt(paymentTotal), accent: STAT_ACCENTS.Payment, isCurrency: true },
+        ].map((card) => (
+          <div
+            key={card.label}
+            className="rounded-xl overflow-hidden"
+            style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+          >
+            <div className="h-1" style={{ background: card.accent }} />
+            <div className="px-3 py-3">
+              <p className="text-[10px] uppercase tracking-wider font-medium mb-1" style={{ color: "var(--text-4)" }}>
+                {card.label}
+              </p>
+              <p
+                className="text-lg font-bold tabular-nums"
+                style={{ color: "var(--text-1)", fontFamily: card.isCurrency ? "'Space Grotesk', sans-serif" : "inherit" }}
+              >
+                {card.value}
+              </p>
+            </div>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* ── Desktop: Voucher Type Breakdown ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="hidden md:block rounded-xl p-4 mb-4"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
+          Voucher Type Breakdown
+        </p>
+        <div className="flex flex-col gap-2.5">
+          {voucherBreakdown.map((v) => {
+            const barColor = TYPE_COLORS[v.type] || "var(--text-3)";
+            const barWidth = maxVoucherTotal > 0 ? Math.max((v.total / maxVoucherTotal) * 100, 2) : 2;
+            return (
+              <div key={v.type} className="flex items-center gap-3">
+                <span className="text-xs font-medium w-16 flex-shrink-0" style={{ color: "var(--text-3)" }}>
+                  {v.type}
+                </span>
+                <div className="flex-1 h-5 rounded-md overflow-hidden relative" style={{ background: "var(--bg-secondary)" }}>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    whileInView={{ width: `${barWidth}%` }}
+                    viewport={{ once: true, amount: 0.5 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="h-full rounded-md"
+                    style={{ background: `color-mix(in srgb, ${barColor} 40%, transparent)` }}
+                  />
+                </div>
+                <span className="text-[10px] font-medium w-16 text-right tabular-nums" style={{ color: "var(--text-4)" }}>
+                  {v.count} {v.count === 1 ? "entry" : "entries"}
+                </span>
+                <span
+                  className="text-xs font-bold w-24 text-right tabular-nums flex-shrink-0"
+                  style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+                >
+                  {fmtAmt(v.total)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
 
       {/* ── Desktop table ── */}
       <div
