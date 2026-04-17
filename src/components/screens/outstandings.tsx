@@ -48,10 +48,26 @@ const rowVariants = {
 /* ------------------------------------------------------------------ */
 /*  Component                                                         */
 /* ------------------------------------------------------------------ */
+type Density = "compact" | "regular" | "relaxed";
+const DENSITY_PY: Record<Density, string> = { compact: "py-1.5", regular: "py-2.5", relaxed: "py-3.5" };
+
 export default function OutstandingsScreen() {
-  const [activeTab, setActiveTab] = useState<"receivables" | "payables">(
-    "receivables"
-  );
+  const [activeTab, setActiveTab] = useState<"receivables" | "payables">("receivables");
+  const [density, setDensity] = useState<Density>("regular");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+
+  const toggleSelect = (i: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  };
+  const toggleAll = () => {
+    if (selected.size === RECEIVABLES.length) setSelected(new Set());
+    else setSelected(new Set(RECEIVABLES.map((_, i) => i)));
+  };
 
   return (
     <div
@@ -175,10 +191,31 @@ export default function OutstandingsScreen() {
         </motion.div>
 
         {/* -------------------------------------------------------- */}
+        {/*  Density toggle                                          */}
+        {/* -------------------------------------------------------- */}
+        <div className="hidden sm:flex items-center justify-end gap-1 mb-2">
+          <span className="text-[10px] mr-1.5" style={{ color: "var(--text-4)" }}>Density:</span>
+          {(["compact", "regular", "relaxed"] as Density[]).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDensity(d)}
+              className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
+              style={{
+                background: density === d ? "color-mix(in srgb, var(--green) 15%, transparent)" : "transparent",
+                color: density === d ? "var(--green)" : "var(--text-4)",
+                border: `1px solid ${density === d ? "color-mix(in srgb, var(--green) 30%, transparent)" : "var(--border)"}`,
+              }}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+
+        {/* -------------------------------------------------------- */}
         {/*  3. Data Table (desktop) / Card List (mobile)            */}
         {/* -------------------------------------------------------- */}
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-hidden relative"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -189,30 +226,38 @@ export default function OutstandingsScreen() {
             <table className="w-full text-xs">
               <thead>
                 <tr
+                  className="sticky top-0 z-10"
                   style={{
                     background: "var(--bg-secondary)",
                     color: "var(--text-4)",
+                    borderBottom: "1px solid var(--border)",
                   }}
                 >
                   <th className="py-2.5 px-3 text-left w-8">
-                    <span className="sr-only">Select</span>
+                    <div
+                      onClick={toggleAll}
+                      className="w-3.5 h-3.5 rounded border cursor-pointer flex items-center justify-center"
+                      style={{
+                        borderColor: selected.size > 0 ? "var(--green)" : "var(--border)",
+                        background: selected.size === RECEIVABLES.length ? "var(--green)" : "transparent",
+                      }}
+                    >
+                      {selected.size === RECEIVABLES.length && <span className="text-[8px] text-white">✓</span>}
+                    </div>
                   </th>
-                  <th className="py-2.5 px-3 text-left font-medium">Party</th>
-                  <th className="py-2.5 px-3 text-right font-medium">
-                    Outstanding
-                  </th>
+                  <th className="py-2.5 px-3 text-left font-medium sticky left-0" style={{ background: "var(--bg-secondary)" }}>Party</th>
+                  <th className="py-2.5 px-3 text-right font-medium">Outstanding</th>
                   <th className="py-2.5 px-3 text-right font-medium">Days</th>
                   <th className="py-2.5 px-3 text-right font-medium">Bills</th>
-                  <th className="py-2.5 px-3 text-center font-medium">
-                    Priority
-                  </th>
-                  <th className="py-2.5 px-3 text-center font-medium">
-                    Action
-                  </th>
+                  <th className="py-2.5 px-3 text-center font-medium">Priority</th>
+                  <th className="py-2.5 px-3 text-center font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {RECEIVABLES.map((r, i) => (
+                {RECEIVABLES.map((r, i) => {
+                  const isSelected = selected.has(i);
+                  const isHovered = hoveredRow === i;
+                  return (
                   <motion.tr
                     key={r.name}
                     custom={i}
@@ -220,44 +265,44 @@ export default function OutstandingsScreen() {
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, amount: 0.1 }}
-                    className="transition-colors duration-150"
+                    className="transition-colors duration-150 cursor-pointer"
                     style={{
-                      background:
-                        i % 2 === 0
-                          ? "var(--bg-surface)"
-                          : "var(--bg-secondary)",
+                      background: isSelected
+                        ? "color-mix(in srgb, var(--green) 8%, transparent)"
+                        : isHovered
+                        ? "color-mix(in srgb, var(--text-1) 4%, transparent)"
+                        : "transparent",
                       borderBottom: "1px solid var(--border)",
                     }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background =
-                        "color-mix(in srgb, var(--text-1) 4%, transparent)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background =
-                        i % 2 === 0
-                          ? "var(--bg-surface)"
-                          : "var(--bg-secondary)";
-                    }}
+                    onMouseEnter={() => setHoveredRow(i)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                    onClick={() => toggleSelect(i)}
                   >
-                    {/* Checkbox */}
-                    <td className="py-2.5 px-3">
+                    {/* Checkbox — visible on hover or when selected */}
+                    <td className={`${DENSITY_PY[density]} px-3`}>
                       <div
-                        className="w-3.5 h-3.5 rounded border"
-                        style={{ borderColor: "var(--border)" }}
-                      />
+                        className="w-3.5 h-3.5 rounded border flex items-center justify-center transition-opacity"
+                        style={{
+                          borderColor: isSelected ? "var(--green)" : "var(--border)",
+                          background: isSelected ? "var(--green)" : "transparent",
+                          opacity: isHovered || isSelected ? 1 : 0,
+                        }}
+                      >
+                        {isSelected && <span className="text-[8px] text-white">✓</span>}
+                      </div>
                     </td>
 
-                    {/* Party name */}
+                    {/* Party name — frozen column */}
                     <td
-                      className="py-2.5 px-3 font-medium truncate max-w-[180px]"
-                      style={{ color: "var(--text-2)" }}
+                      className={`${DENSITY_PY[density]} px-3 font-medium truncate max-w-[180px] sticky left-0`}
+                      style={{ color: "var(--text-2)", background: "inherit" }}
                     >
                       {r.name}
                     </td>
 
-                    {/* Outstanding */}
+                    {/* Outstanding — right-aligned, monospace */}
                     <td
-                      className="py-2.5 px-3 text-right font-bold"
+                      className={`${DENSITY_PY[density]} px-3 text-right font-bold tabular-nums`}
                       style={{
                         color: "var(--text-1)",
                         fontFamily: "'Space Grotesk', sans-serif",
@@ -266,47 +311,89 @@ export default function OutstandingsScreen() {
                       {fmt(r.amount)}
                     </td>
 
-                    {/* Days */}
+                    {/* Days — color-coded */}
                     <td
-                      className="py-2.5 px-3 text-right font-semibold"
+                      className={`${DENSITY_PY[density]} px-3 text-right font-semibold tabular-nums`}
                       style={{ color: daysColor(r.days) }}
                     >
-                      {r.days}
+                      {r.days.toLocaleString()}
                     </td>
 
                     {/* Bills */}
                     <td
-                      className="py-2.5 px-3 text-right"
+                      className={`${DENSITY_PY[density]} px-3 text-right tabular-nums`}
                       style={{ color: "var(--text-3)" }}
                     >
                       {r.bills}
                     </td>
 
                     {/* Priority */}
-                    <td className="py-2.5 px-3 text-center">
+                    <td className={`${DENSITY_PY[density]} px-3 text-center`}>
                       <Pill color={priorityColor[r.priority]}>
                         {r.priority}
                       </Pill>
                     </td>
 
-                    {/* Action */}
-                    <td className="py-2.5 px-3 text-center">
+                    {/* Action — visible on hover */}
+                    <td className={`${DENSITY_PY[density]} px-3 text-center`}>
                       <button
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md transition-opacity hover:opacity-80"
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all"
                         style={{
                           color: "var(--green)",
-                          background:
-                            "color-mix(in srgb, var(--green) 12%, transparent)",
+                          background: "color-mix(in srgb, var(--green) 12%, transparent)",
+                          opacity: isHovered || isSelected ? 1 : 0.4,
                         }}
+                        onClick={(e) => { e.stopPropagation(); }}
                       >
-                        {"\uD83D\uDCF2"} Remind
+                        📲 Remind
                       </button>
                     </td>
                   </motion.tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
+
+          {/* Floating bulk action bar */}
+          {selected.size > 0 && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              className="hidden sm:flex sticky bottom-0 items-center justify-between px-4 py-2.5 rounded-b-xl z-20"
+              style={{
+                background: "var(--bg-secondary)",
+                borderTop: "1px solid var(--green)",
+                boxShadow: "0 -4px 12px rgba(0,0,0,0.2)",
+              }}
+            >
+              <span className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
+                {selected.size} {selected.size === 1 ? "party" : "parties"} selected
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-md"
+                  style={{ color: "var(--green)", background: "color-mix(in srgb, var(--green) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)" }}
+                >
+                  📲 Send Reminder to {selected.size}
+                </button>
+                <button
+                  className="text-[11px] font-semibold px-3 py-1.5 rounded-md"
+                  style={{ color: "var(--blue)", background: "color-mix(in srgb, var(--blue) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--blue) 30%, transparent)" }}
+                >
+                  📤 Export Selected
+                </button>
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="text-[11px] px-2 py-1.5 rounded-md"
+                  style={{ color: "var(--text-4)" }}
+                >
+                  ✕ Clear
+                </button>
+              </div>
+            </motion.div>
+          )}
 
           {/* Mobile card layout — shown only on small screens */}
           <div className="sm:hidden flex flex-col">

@@ -151,15 +151,17 @@ export function DaybookScreen() {
               entries.map((entry, idx) => (
                 <tr
                   key={`${entry.invoice}-${idx}`}
+                  className="transition-colors duration-100 group"
                   style={{
-                    background: idx % 2 === 0 ? "transparent" : "color-mix(in srgb, var(--bg-surface) 40%, transparent)",
-                    borderTop: idx === 0 ? "1px solid var(--border)" : undefined,
+                    borderBottom: "1px solid var(--border)",
                   }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "color-mix(in srgb, var(--text-1) 4%, transparent)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
                 >
                   <td className="px-4 py-2" style={{ color: idx === 0 ? "var(--text-2)" : "transparent" }}>
                     {date}
                   </td>
-                  <td className="px-4 py-2" style={{ color: "var(--text-3)" }}>
+                  <td className="px-4 py-2 tabular-nums" style={{ color: "var(--text-3)" }}>
                     #{entry.invoice}
                   </td>
                   <td className="px-4 py-2">
@@ -171,8 +173,8 @@ export function DaybookScreen() {
                     {entry.name}
                   </td>
                   <td
-                    className="px-4 py-2 text-right font-medium tabular-nums"
-                    style={{ color: "var(--text-1)" }}
+                    className="px-4 py-2 text-right font-semibold tabular-nums"
+                    style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
                   >
                     {fmtAmt(entry.amount)}
                   </td>
