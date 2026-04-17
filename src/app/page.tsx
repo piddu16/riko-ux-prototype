@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar, type TabId } from "@/components/layout/sidebar";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import Dashboard from "@/components/screens/dashboard";
@@ -12,9 +12,12 @@ import { InventoryScreen as Inventory } from "@/components/screens/inventory";
 import { ReportsScreen as Reports } from "@/components/screens/reports";
 import { ClientsScreen as Clients } from "@/components/screens/clients";
 import { GstScreen as Gst } from "@/components/screens/gst";
+import { SettingsScreen as Settings } from "@/components/screens/settings";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
+import { RoleSwitcher } from "@/components/role-switcher";
 import { COMPANY } from "@/lib/data";
+import { useRbac } from "@/lib/rbac-context";
 
 const BOTTOM_MAP: Record<string, TabId> = {
   dashboard: "dashboard",
@@ -26,6 +29,14 @@ const BOTTOM_MAP: Record<string, TabId> = {
 
 export default function Home() {
   const [tab, setTab] = useState<TabId>("dashboard");
+  const { role, canSee, roleConfig } = useRbac();
+
+  /* If the current tab is no longer accessible, fall back to the role's home tab */
+  useEffect(() => {
+    if (!canSee(tab)) {
+      setTab(roleConfig.homeTab as TabId);
+    }
+  }, [role, tab, canSee, roleConfig]);
 
   const handleBottomNav = (id: string) => {
     setTab(BOTTOM_MAP[id] || "dashboard");
@@ -69,6 +80,7 @@ export default function Home() {
             >
               {COMPANY.fy.replace("FY ", "FY")}
             </span>
+            <RoleSwitcher />
             <LanguageToggle />
             <div className="md:hidden">
               <ThemeToggle />
@@ -86,13 +98,7 @@ export default function Home() {
           {tab === "sales" && <Sales />}
           {tab === "inventory" && <Inventory />}
           {tab === "reports" && <Reports />}
-          {tab === "settings" && (
-            <div className="flex flex-col items-center justify-center py-20" style={{ color: "var(--text-3)" }}>
-              <span className="text-4xl mb-4">⚙️</span>
-              <p className="text-lg font-semibold">Settings</p>
-              <p className="text-sm mt-1">Coming soon</p>
-            </div>
-          )}
+          {tab === "settings" && <Settings />}
         </div>
       </main>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -7,6 +8,7 @@ import {
   ArrowDownToLine,
   FileText,
 } from "lucide-react";
+import { useRbac } from "@/lib/rbac-context";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -22,6 +24,17 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+  const { canSee } = useRbac();
+  const visibleTabs = tabs.filter((t) => canSee(t.id));
+
+  /* If current tab is hidden by role, default to first visible */
+  useEffect(() => {
+    const isHidden = !visibleTabs.some((t) => t.id === activeTab);
+    if (isHidden && visibleTabs.length > 0) {
+      onTabChange(visibleTabs[0].id);
+    }
+  }, [activeTab, visibleTabs, onTabChange]);
+
   return (
     <nav
       className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around"
@@ -32,7 +45,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
         height: 60,
       }}
     >
-      {tabs.map(({ id, label, icon: Icon }) => {
+      {visibleTabs.map(({ id, label, icon: Icon }) => {
         const active = activeTab === id;
         return (
           <button

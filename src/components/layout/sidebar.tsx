@@ -13,6 +13,7 @@ import {
   Settings,
 } from "lucide-react";
 import { ThemeToggle } from "../theme-toggle";
+import { useRbac } from "@/lib/rbac-context";
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -35,6 +36,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+  const { canSee, role, roleConfig } = useRbac();
+  const visibleItems = navItems.filter((n) => canSee(n.id));
+
   return (
     <aside
       className="hidden md:flex flex-col items-center py-4 fixed left-0 top-0 h-full z-40"
@@ -56,7 +60,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
       {/* Nav items */}
       <nav className="flex-1 flex flex-col items-center gap-0.5 w-full px-2">
-        {navItems.map(({ id, label, icon: Icon }) => {
+        {visibleItems.map(({ id, label, icon: Icon }) => {
           const active = activeTab === id;
           return (
             <button
@@ -97,9 +101,26 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
         })}
       </nav>
 
-      {/* Theme toggle at bottom */}
-      <div className="mt-auto pt-2">
-        <ThemeToggle />
+      {/* Role badge */}
+      <div className="mt-auto flex flex-col items-center gap-2">
+        <span
+          className="flex items-center justify-center rounded-full text-[12px] leading-none cursor-help transition-transform hover:scale-110"
+          style={{
+            width: 24,
+            height: 24,
+            background: `color-mix(in srgb, ${roleConfig.color} 15%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${roleConfig.color} 35%, transparent)`,
+          }}
+          title={`Viewing as ${roleConfig.name}`}
+          aria-label={`Current role: ${roleConfig.name}`}
+          data-role={role}
+        >
+          {roleConfig.icon}
+        </span>
+        {/* Theme toggle at bottom */}
+        <div className="pt-1">
+          <ThemeToggle />
+        </div>
       </div>
     </aside>
   );

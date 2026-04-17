@@ -68,6 +68,48 @@ export const MONTHS = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "
 export const fL = (v: number) => (Math.abs(v) / 1e5).toFixed(1);
 export const fCr = (v: number) => (Math.abs(v) / 1e7).toFixed(2);
 
+/**
+ * Unified Indian currency formatter.
+ * Automatically picks lakhs (L) or crores (Cr) based on magnitude.
+ * Use this everywhere for consistency — avoids mixing ₹92.52M, ₹9,25,23,800, ₹0.93Cr.
+ *
+ * Examples:
+ *   formatINR(559740)      → "₹5.6L"
+ *   formatINR(92523799)    → "₹9.25Cr"
+ *   formatINR(12450)       → "₹12,450"
+ *   formatINR(-17447190)   → "-₹1.74Cr"
+ *   formatINR(1234, {raw:true}) → "₹1,234" (forces Indian notation, no L/Cr)
+ */
+export function formatINR(
+  v: number,
+  opts: { raw?: boolean; precision?: number; showSign?: boolean } = {}
+): string {
+  const { raw = false, precision, showSign = false } = opts;
+  const sign = v < 0 ? "-" : showSign && v > 0 ? "+" : "";
+  const abs = Math.abs(v);
+
+  if (raw || abs < 1e5) {
+    return `${sign}₹${abs.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  }
+
+  if (abs < 1e7) {
+    const p = precision ?? (abs < 1e6 ? 1 : 1);
+    return `${sign}₹${(abs / 1e5).toFixed(p)}L`;
+  }
+
+  const p = precision ?? 2;
+  return `${sign}₹${(abs / 1e7).toFixed(p)}Cr`;
+}
+
+/** Shortcut: compact lakhs/crores badge without ₹ prefix (for places where ₹ is separate) */
+export function compactINR(v: number): string {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? "-" : "";
+  if (abs < 1e5) return `${sign}${abs.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+  if (abs < 1e7) return `${sign}${(abs / 1e5).toFixed(1)}L`;
+  return `${sign}${(abs / 1e7).toFixed(2)}Cr`;
+}
+
 export const RECEIVABLES = [
   { name: "Nykaa E-Retail Pvt Ltd", amount: 1261337, days: 2195, bills: 298, priority: "P1" },
   { name: "Website Debtors", amount: 1251122, days: 1431, bills: 548, priority: "P1" },
