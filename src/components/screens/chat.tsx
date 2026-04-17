@@ -437,9 +437,9 @@ export function ChatScreen() {
         <ExchangeMIS />
       </div>
 
-      {/* Input bar */}
+      {/* Input bar — bottom-16 on mobile to clear bottom nav */}
       <div
-        className="sticky bottom-0 px-4 py-3"
+        className="sticky bottom-16 md:bottom-0 px-4 py-3"
         style={{
           background: "var(--bg-primary)",
           borderTop: "1px solid var(--border)",

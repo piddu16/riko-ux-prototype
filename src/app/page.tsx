@@ -9,6 +9,7 @@ import Outstandings from "@/components/screens/outstandings";
 import { DaybookScreen as DayBook } from "@/components/screens/daybook";
 import { SalesScreen as Sales } from "@/components/screens/sales";
 import { InventoryScreen as Inventory } from "@/components/screens/inventory";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { COMPANY } from "@/lib/data";
 
 const BOTTOM_MAP: Record<string, TabId> = {
@@ -53,17 +54,20 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <span
-              className="rounded-md px-2 py-0.5 text-[10px] font-semibold"
+              className="hidden sm:inline rounded-md px-2 py-0.5 text-[10px] font-semibold"
               style={{ background: "var(--bg-surface)", color: "var(--text-3)", border: "1px solid var(--border)" }}
             >
               {COMPANY.tag}
             </span>
             <span
-              className="rounded-md px-2 py-0.5 text-[10px] font-semibold"
+              className="hidden sm:inline rounded-md px-2 py-0.5 text-[10px] font-semibold"
               style={{ background: "var(--bg-surface)", color: "var(--text-3)", border: "1px solid var(--border)" }}
             >
               {COMPANY.fy.replace("FY ", "FY")}
             </span>
+            <div className="md:hidden">
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
