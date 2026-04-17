@@ -789,11 +789,13 @@ function ContextPanel({ topic, onTopicChange }: { topic: ContextTopic; onTopicCh
   );
 }
 
-/* ── Input Bar (reusable) ── */
+/* ── Input Bar (reusable) ──
+   Mobile: sits right above the 60px bottom nav (plus iPhone notch safe-area).
+   Desktop: sticks to bottom-0 (no bottom nav on desktop). */
 function InputBar({ inputVal, setInputVal }: { inputVal: string; setInputVal: (v: string) => void }) {
   return (
     <div
-      className="sticky bottom-16 md:bottom-0 px-4 py-3"
+      className="sticky bottom-[calc(60px+env(safe-area-inset-bottom,0px))] md:bottom-0 px-4 py-3"
       style={{
         background: "var(--bg-primary)",
         borderTop: "1px solid var(--border)",

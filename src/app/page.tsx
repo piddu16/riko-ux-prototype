@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Sidebar, type TabId } from "@/components/layout/sidebar";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { MoreDrawer } from "@/components/layout/more-drawer";
 import Dashboard from "@/components/screens/dashboard";
 import { ChatScreen as Chat } from "@/components/screens/chat";
 import Outstandings from "@/components/screens/outstandings";
@@ -29,6 +30,7 @@ const BOTTOM_MAP: Record<string, TabId> = {
 
 export default function Home() {
   const [tab, setTab] = useState<TabId>("dashboard");
+  const [moreOpen, setMoreOpen] = useState(false);
   const { role, canSee, roleConfig } = useRbac();
 
   /* Only redirect when the ROLE changes, not when the tab changes.
@@ -50,7 +52,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar activeTab={tab} onTabChange={(id) => setTab(id as TabId)} />
 
-      <main className="flex-1 overflow-y-auto pb-16 md:pb-0 md:pl-[72px]">
+      <main className="flex-1 overflow-y-auto pb-[calc(60px+env(safe-area-inset-bottom,0px))] md:pb-0 md:pl-[72px]">
         <header
           className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 backdrop-blur-lg md:px-6"
           style={{
@@ -106,7 +108,18 @@ export default function Home() {
         </div>
       </main>
 
-      <BottomNav activeTab={tab} onTabChange={handleBottomNav} />
+      <BottomNav
+        activeTab={tab}
+        onTabChange={handleBottomNav}
+        onOpenMore={() => setMoreOpen(true)}
+      />
+
+      <MoreDrawer
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        activeTab={tab}
+        onTabChange={(id) => setTab(id as TabId)}
+      />
     </div>
   );
 }

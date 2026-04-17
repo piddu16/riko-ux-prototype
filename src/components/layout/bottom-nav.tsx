@@ -3,33 +3,38 @@
 import {
   LayoutDashboard,
   MessageSquare,
-  Users,
   ArrowDownToLine,
   FileText,
+  MoreHorizontal,
+  type LucideIcon,
 } from "lucide-react";
 import { useRbac } from "@/lib/rbac-context";
 
-const tabs = [
+const MORE_TAB_ID = "__more__";
+
+const tabs: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: MessageSquare },
-  { id: "clients", label: "Clients", icon: Users },
   { id: "outstanding", label: "AR/AP", icon: ArrowDownToLine },
   { id: "reports", label: "Reports", icon: FileText },
-] as const;
+  { id: MORE_TAB_ID, label: "More", icon: MoreHorizontal },
+];
 
 interface BottomNavProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  onOpenMore: () => void;
 }
 
-export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, onOpenMore }: BottomNavProps) {
   const { canSee } = useRbac();
-  const visibleTabs = tabs.filter((t) => canSee(t.id));
-  /* NOTE: No redirect effect here. BottomNav only shows a curated subset of tabs
-     on mobile, but desktop users can navigate to tabs outside this list via the
-     sidebar. Auto-redirecting if activeTab wasn't in the bottom-nav list would
-     bounce desktop users back to Dashboard whenever they picked a non-bottom-nav
-     tab. Permission-based redirects are handled in page.tsx. */
+  /* Filter by permission, but always keep the "More" drawer entry. */
+  const visibleTabs = tabs.filter((t) => t.id === MORE_TAB_ID || canSee(t.id));
+
+  /* Highlight "More" when the user is on any section that isn't one of the
+     4 quick-access tabs — so they can visually confirm their place. */
+  const quickTabIds = tabs.filter((t) => t.id !== MORE_TAB_ID).map((t) => t.id);
+  const activeInQuick = quickTabIds.includes(activeTab);
 
   return (
     <nav
@@ -42,24 +47,19 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
       }}
     >
       {visibleTabs.map(({ id, label, icon: Icon }) => {
-        const active = activeTab === id;
+        const isMore = id === MORE_TAB_ID;
+        const active = isMore ? !activeInQuick : activeTab === id;
         return (
           <button
             key={id}
-            onClick={() => onTabChange(id)}
+            onClick={() => (isMore ? onOpenMore() : onTabChange(id))}
             className="flex flex-col items-center justify-center flex-1 py-2 transition-colors cursor-pointer"
           >
-            {/* Active dot */}
             <div
               className="w-1 h-1 rounded-full mb-1"
-              style={{
-                background: active ? "var(--green)" : "transparent",
-              }}
+              style={{ background: active ? "var(--green)" : "transparent" }}
             />
-            <Icon
-              size={20}
-              style={{ color: active ? "var(--green)" : "var(--text-4)" }}
-            />
+            <Icon size={20} style={{ color: active ? "var(--green)" : "var(--text-4)" }} />
             <span
               className="text-[10px] mt-0.5"
               style={{ color: active ? "var(--green)" : "var(--text-4)" }}
