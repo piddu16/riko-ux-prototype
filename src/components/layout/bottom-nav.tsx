@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -26,14 +25,11 @@ interface BottomNavProps {
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   const { canSee } = useRbac();
   const visibleTabs = tabs.filter((t) => canSee(t.id));
-
-  /* If current tab is hidden by role, default to first visible */
-  useEffect(() => {
-    const isHidden = !visibleTabs.some((t) => t.id === activeTab);
-    if (isHidden && visibleTabs.length > 0) {
-      onTabChange(visibleTabs[0].id);
-    }
-  }, [activeTab, visibleTabs, onTabChange]);
+  /* NOTE: No redirect effect here. BottomNav only shows a curated subset of tabs
+     on mobile, but desktop users can navigate to tabs outside this list via the
+     sidebar. Auto-redirecting if activeTab wasn't in the bottom-nav list would
+     bounce desktop users back to Dashboard whenever they picked a non-bottom-nav
+     tab. Permission-based redirects are handled in page.tsx. */
 
   return (
     <nav
