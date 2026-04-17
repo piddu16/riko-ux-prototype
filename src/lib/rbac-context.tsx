@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import { ROLES, type Role, type Permission, hasPerm, hasAnyPerm, canSeeTab } from "./rbac";
 
 type RbacContextValue = {
@@ -22,19 +22,25 @@ export function RbacProvider({ children }: { children: ReactNode }) {
     if (stored && stored in ROLES) setRoleState(stored as Role);
   }, []);
 
-  const setRole = (r: Role) => {
+  const setRole = useCallback((r: Role) => {
     setRoleState(r);
     if (typeof window !== "undefined") localStorage.setItem("riko-role", r);
-  };
+  }, []);
 
-  const value: RbacContextValue = {
+  /* Stable callbacks keyed on role — prevents useEffect consumers from
+     running on every parent render. */
+  const can = useCallback((perm: Permission) => hasPerm(role, perm), [role]);
+  const canAny = useCallback((perms: Permission[]) => hasAnyPerm(role, perms), [role]);
+  const canSee = useCallback((tabId: string) => canSeeTab(role, tabId), [role]);
+
+  const value = useMemo<RbacContextValue>(() => ({
     role,
     setRole,
-    can: (perm) => hasPerm(role, perm),
-    canAny: (perms) => hasAnyPerm(role, perms),
-    canSee: (tabId) => canSeeTab(role, tabId),
+    can,
+    canAny,
+    canSee,
     roleConfig: ROLES[role],
-  };
+  }), [role, setRole, can, canAny, canSee]);
 
   return <RbacContext.Provider value={value}>{children}</RbacContext.Provider>;
 }

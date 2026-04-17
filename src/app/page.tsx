@@ -31,12 +31,16 @@ export default function Home() {
   const [tab, setTab] = useState<TabId>("dashboard");
   const { role, canSee, roleConfig } = useRbac();
 
-  /* If the current tab is no longer accessible, fall back to the role's home tab */
+  /* Only redirect when the ROLE changes, not when the tab changes.
+     When the user navigates, the sidebar already filters to visible tabs —
+     so any tab they can click is one they can see. Re-checking on tab
+     change caused a race during hydration that bounced the user back. */
   useEffect(() => {
     if (!canSee(tab)) {
       setTab(roleConfig.homeTab as TabId);
     }
-  }, [role, tab, canSee, roleConfig]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
 
   const handleBottomNav = (id: string) => {
     setTab(BOTTOM_MAP[id] || "dashboard");
