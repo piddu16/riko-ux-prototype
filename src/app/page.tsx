@@ -10,15 +10,17 @@ import { DaybookScreen as DayBook } from "@/components/screens/daybook";
 import { SalesScreen as Sales } from "@/components/screens/sales";
 import { InventoryScreen as Inventory } from "@/components/screens/inventory";
 import { ReportsScreen as Reports } from "@/components/screens/reports";
+import { ClientsScreen as Clients } from "@/components/screens/clients";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
 import { COMPANY } from "@/lib/data";
 
 const BOTTOM_MAP: Record<string, TabId> = {
   dashboard: "dashboard",
   chat: "chat",
+  clients: "clients",
   outstanding: "outstanding",
-  insights: "sales",
-  more: "dashboard",
+  reports: "reports",
 };
 
 export default function Home() {
@@ -55,17 +57,18 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <span
-              className="hidden sm:inline rounded-md px-2 py-0.5 text-[10px] font-semibold"
+              className="hidden lg:inline rounded-md px-2 py-0.5 text-[10px] font-semibold"
               style={{ background: "var(--bg-surface)", color: "var(--text-3)", border: "1px solid var(--border)" }}
             >
               {COMPANY.tag}
             </span>
             <span
-              className="hidden sm:inline rounded-md px-2 py-0.5 text-[10px] font-semibold"
+              className="hidden lg:inline rounded-md px-2 py-0.5 text-[10px] font-semibold"
               style={{ background: "var(--bg-surface)", color: "var(--text-3)", border: "1px solid var(--border)" }}
             >
               {COMPANY.fy.replace("FY ", "FY")}
             </span>
+            <LanguageToggle />
             <div className="md:hidden">
               <ThemeToggle />
             </div>
@@ -75,6 +78,7 @@ export default function Home() {
         <div className="p-4 md:p-6">
           {tab === "dashboard" && <Dashboard />}
           {tab === "chat" && <Chat />}
+          {tab === "clients" && <Clients />}
           {tab === "outstanding" && <Outstandings />}
           {tab === "daybook" && <DayBook />}
           {tab === "sales" && <Sales />}
@@ -90,7 +94,7 @@ export default function Home() {
         </div>
       </main>
 
-      <BottomNav activeTab={tab === "sales" ? "insights" : tab} onTabChange={handleBottomNav} />
+      <BottomNav activeTab={tab} onTabChange={handleBottomNav} />
     </div>
   );
 }

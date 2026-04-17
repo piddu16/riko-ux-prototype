@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Pill } from "@/components/ui/pill";
+import { WhatsAppModal } from "@/components/ui/whatsapp-modal";
 import { RECEIVABLES, K, fL } from "@/lib/data";
 
 /* ------------------------------------------------------------------ */
@@ -79,6 +80,7 @@ export default function OutstandingsScreen() {
   const [density, setDensity] = useState<Density>("regular");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+  const [whatsappTarget, setWhatsappTarget] = useState<{ name: string; amount: string; days: number } | null>(null);
 
   const toggleSelect = (i: number) => {
     setSelected((prev) => {
@@ -401,13 +403,16 @@ export default function OutstandingsScreen() {
                     {/* Action — visible on hover */}
                     <td className={`${DENSITY_PY[density]} px-3 text-center`}>
                       <button
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all"
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer"
                         style={{
                           color: "var(--green)",
                           background: "color-mix(in srgb, var(--green) 12%, transparent)",
                           opacity: isHovered || isSelected ? 1 : 0.4,
                         }}
-                        onClick={(e) => { e.stopPropagation(); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days });
+                        }}
                       >
                         📲 Remind
                       </button>
@@ -517,12 +522,15 @@ export default function OutstandingsScreen() {
                     {r.bills} bills
                   </span>
                   <button
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-md"
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer"
                     style={{
                       color: "var(--green)",
                       background:
                         "color-mix(in srgb, var(--green) 12%, transparent)",
                     }}
+                    onClick={() =>
+                      setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days })
+                    }
                   >
                     {"\uD83D\uDCF2"} Remind
                   </button>
@@ -531,6 +539,15 @@ export default function OutstandingsScreen() {
             ))}
           </div>
         </div>
+
+        {/* WhatsApp modal */}
+        <WhatsAppModal
+          open={whatsappTarget !== null}
+          onClose={() => setWhatsappTarget(null)}
+          partyName={whatsappTarget?.name ?? ""}
+          amount={whatsappTarget?.amount ?? ""}
+          days={whatsappTarget?.days ?? 0}
+        />
 
         {/* -------------------------------------------------------- */}
         {/*  Desktop: Collection Insights                            */}

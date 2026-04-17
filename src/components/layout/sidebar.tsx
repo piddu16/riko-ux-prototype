@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Package,
   FileText,
+  Users,
   Settings,
 } from "lucide-react";
 import { ThemeToggle } from "../theme-toggle";
@@ -15,6 +16,7 @@ import { ThemeToggle } from "../theme-toggle";
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: MessageSquare },
+  { id: "clients", label: "Clients", icon: Users },
   { id: "outstanding", label: "Outstanding", icon: ArrowDownToLine },
   { id: "daybook", label: "Day Book", icon: BookOpen },
   { id: "sales", label: "Sales", icon: TrendingUp },

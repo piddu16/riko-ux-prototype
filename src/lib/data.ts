@@ -149,3 +149,199 @@ export const CHAT_PROMPTS = [
   { icon: "🏛️", query: `₹${fL(K.itcEx)}L excess ITC — how to claim?` },
   { icon: "📋", query: "Generate board-ready summary" },
 ];
+
+/* ============================================================
+   CA MODE — Multi-client portfolio (NXTLVL & Associates)
+   ============================================================ */
+export const CA_FIRM = {
+  name: "NXTLVL & Associates",
+  registrationNo: "FRN 012345W",
+  principal: "CA Rajesh Sharma",
+  clientCount: 18,
+};
+
+export type ClientStatus = "critical" | "warning" | "healthy";
+
+export const CLIENTS = [
+  {
+    id: 31, name: "Bandra Soap Pvt Ltd", industry: "D2C Skincare",
+    revenue: "9.25Cr", netPL: "-2.24Cr", healthScore: 48, status: "critical" as ClientStatus,
+    issues: ["Runway 0.3mo", "GSTR-3B due in 3 days", "₹4.6L excess ITC"],
+    misStatus: "Pending", lastSync: "2h ago", contact: "+91 98765 43210",
+  },
+  {
+    id: 42, name: "Kothari Traders", industry: "Retail · Ahmedabad",
+    revenue: "4.12Cr", netPL: "+38.2L", healthScore: 76, status: "warning" as ClientStatus,
+    issues: ["MIS due in 3 days", "TDS payment pending"],
+    misStatus: "In progress", lastSync: "5h ago", contact: "+91 98765 11223",
+  },
+  {
+    id: 57, name: "Patel Industries", industry: "Manufacturing · Pune",
+    revenue: "12.8Cr", netPL: "+1.42Cr", healthScore: 88, status: "healthy" as ClientStatus,
+    issues: [],
+    misStatus: "Delivered", lastSync: "1h ago", contact: "+91 98765 33445",
+  },
+  {
+    id: 63, name: "Mumbai Distributors", industry: "FMCG · Mumbai",
+    revenue: "7.65Cr", netPL: "+52.3L", healthScore: 71, status: "warning" as ClientStatus,
+    issues: ["Advance Tax Q4 due Apr 15", "High debtor days (67)"],
+    misStatus: "Pending", lastSync: "3h ago", contact: "+91 98765 55667",
+  },
+  {
+    id: 78, name: "Sai Enterprises", industry: "Services · Bangalore",
+    revenue: "2.34Cr", netPL: "+18.7L", healthScore: 82, status: "healthy" as ClientStatus,
+    issues: [],
+    misStatus: "Delivered", lastSync: "30m ago", contact: "+91 98765 77889",
+  },
+  {
+    id: 91, name: "Surat Textiles Pvt Ltd", industry: "Manufacturing · Surat",
+    revenue: "18.4Cr", netPL: "-1.12Cr", healthScore: 54, status: "critical" as ClientStatus,
+    issues: ["Burn rate ₹24L/mo", "GSTR-1 late filing"],
+    misStatus: "Pending", lastSync: "4h ago", contact: "+91 98765 99001",
+  },
+];
+
+/* ============================================================
+   COMPLIANCE CALENDAR — Indian regulatory due dates
+   ============================================================ */
+export type ComplianceSeverity = "urgent" | "soon" | "upcoming";
+
+export const COMPLIANCE_ITEMS = [
+  { date: "10 Apr 2026", dateShort: "10 Apr", title: "TDS Payment", section: "194Q, 194J, 194C", clients: 3, amount: "₹4.82L", severity: "urgent" as ComplianceSeverity, description: "Monthly TDS deposit for March 2026" },
+  { date: "13 Apr 2026", dateShort: "13 Apr", title: "GSTR-1 Filing", section: "Outward supplies", clients: 2, amount: "—", severity: "urgent" as ComplianceSeverity, description: "Bandra Soap, Surat Textiles due" },
+  { date: "15 Apr 2026", dateShort: "15 Apr", title: "Advance Tax Q4", section: "Income Tax", clients: 4, amount: "₹12.3L", severity: "soon" as ComplianceSeverity, description: "100% advance tax payment for FY25" },
+  { date: "18 Apr 2026", dateShort: "18 Apr", title: "CMP-08 Filing", section: "Composition scheme", clients: 1, amount: "—", severity: "soon" as ComplianceSeverity, description: "Q4 payment for composition taxpayer" },
+  { date: "20 Apr 2026", dateShort: "20 Apr", title: "GSTR-3B Filing", section: "Monthly return", clients: 5, amount: "ITC ₹4.61L", severity: "soon" as ComplianceSeverity, description: "Bandra Soap ITC refund eligible" },
+  { date: "30 Apr 2026", dateShort: "30 Apr", title: "Form 16 Issuance", section: "TDS certificates", clients: 6, amount: "—", severity: "upcoming" as ComplianceSeverity, description: "Employee TDS certificates for FY25" },
+  { date: "15 May 2026", dateShort: "15 May", title: "TDS Return (Q4)", section: "24Q, 26Q", clients: 4, amount: "—", severity: "upcoming" as ComplianceSeverity, description: "Quarterly TDS return filing" },
+  { date: "31 May 2026", dateShort: "31 May", title: "Form 24Q Filing", section: "Salary TDS", clients: 6, amount: "—", severity: "upcoming" as ComplianceSeverity, description: "Annual salary TDS return" },
+];
+
+/* ============================================================
+   THIS WEEK — Action queue for founders
+   ============================================================ */
+export type ActionPriority = "urgent" | "high" | "medium";
+export type ActionCategory = "collect" | "compliance" | "cash" | "operations" | "review";
+
+export const THIS_WEEK_ACTIONS = [
+  {
+    id: "a1",
+    priority: "urgent" as ActionPriority,
+    category: "collect" as ActionCategory,
+    icon: "📞",
+    title: "Call Nykaa AR team",
+    context: "₹12.6L stuck across 298 bills, 2,195 days overdue",
+    cta: "View ledger",
+    impact: "+₹12.6L to cash",
+  },
+  {
+    id: "a2",
+    priority: "urgent" as ActionPriority,
+    category: "compliance" as ActionCategory,
+    icon: "🏛️",
+    title: "File GSTR-3B by 20 Apr",
+    context: "₹4.61L ITC refund eligible — don't leave cash with govt",
+    cta: "Generate GSTR-3B",
+    impact: "+₹4.61L refund",
+  },
+  {
+    id: "a3",
+    priority: "high" as ActionPriority,
+    category: "cash" as ActionCategory,
+    icon: "💸",
+    title: "Review Sep CAC spike",
+    context: "₹6.8L spent, ₹2.1L revenue — worst ROAS of the year",
+    cta: "Open investigation",
+    impact: "Fix burn",
+  },
+  {
+    id: "a4",
+    priority: "high" as ActionPriority,
+    category: "operations" as ActionCategory,
+    icon: "📦",
+    title: "Reorder Niacinamide Serum",
+    context: "45 days stock left at current run-rate",
+    cta: "Create PO",
+    impact: "Avoid stockout",
+  },
+  {
+    id: "a5",
+    priority: "medium" as ActionPriority,
+    category: "review" as ActionCategory,
+    icon: "📊",
+    title: "Approve March MIS for your CA",
+    context: "Rajesh Sharma sent it 2 days ago",
+    cta: "Review & approve",
+    impact: "Close books",
+  },
+];
+
+/* ============================================================
+   WHATSAPP MESSAGE TEMPLATES
+   ============================================================ */
+export const WHATSAPP_TEMPLATES = {
+  reminder: (partyName: string, amount: string, days: number) => ({
+    preview: `Hi ${partyName},\n\nFriendly reminder from Bandra Soap Pvt Ltd: an invoice of ${amount} has been pending for ${days.toLocaleString("en-IN")} days.\n\nPlease share payment status at your earliest convenience.\n\nFor any questions: +91 98765 43210\n\nBest regards,\nBandra Soap team`,
+    businessName: "Bandra Soap Pvt Ltd",
+    sentTime: new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+  }),
+};
+
+/* ============================================================
+   RUNWAY PROJECTION
+   ============================================================ */
+export const RUNWAY = {
+  currentCash: R.cash,
+  monthlyBurn: K.burn,
+  monthsLeft: R.cash / K.burn,
+  zeroDate: (() => {
+    const days = Math.floor((R.cash / K.burn) * 30);
+    const target = new Date();
+    target.setDate(target.getDate() + days);
+    return target.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  })(),
+  daysLeft: Math.floor((R.cash / K.burn) * 30),
+};
+
+/* ============================================================
+   LANGUAGE TRANSLATIONS — minimal Hindi/English pairs
+   ============================================================ */
+export const I18N = {
+  en: {
+    thisWeek: "This Week",
+    actionQueue: "Priority actions for your business",
+    runwayLeft: "Runway",
+    daysRemaining: "days left",
+    zeroCashOn: "At current burn, cash hits zero around",
+    yourDashboard: "Your Dashboard",
+    ask: "Ask Riko anything...",
+    emptyChat: "What do you want to know?",
+    sales: "Sales",
+    purchases: "Purchases",
+    cash: "Cash",
+    overdue: "Overdue",
+    healthy: "Healthy",
+    critical: "Critical",
+    warning: "Needs attention",
+  },
+  hi: {
+    thisWeek: "इस हफ्ते",
+    actionQueue: "आपके बिज़नेस के ज़रूरी काम",
+    runwayLeft: "कैश रनवे",
+    daysRemaining: "दिन बाकी",
+    zeroCashOn: "इस रफ्तार से, कैश ख़त्म होगा",
+    yourDashboard: "आपका डैशबोर्ड",
+    ask: "Riko से कुछ भी पूछो...",
+    emptyChat: "क्या जानना है?",
+    sales: "बिक्री",
+    purchases: "खरीदी",
+    cash: "कैश",
+    overdue: "बकाया",
+    healthy: "ठीक",
+    critical: "गंभीर",
+    warning: "ध्यान दें",
+  },
+} as const;
+
+export type Lang = keyof typeof I18N;
+

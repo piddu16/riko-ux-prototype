@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Gauge } from "@/components/ui/gauge";
 import { HealthScore } from "@/components/ui/health-score";
+import { ActionQueue } from "@/components/ui/action-queue";
+import { RunwayTimeline } from "@/components/ui/runway-timeline";
 import {
   R,
   K,
@@ -60,7 +62,7 @@ export default function DashboardScreen() {
       className="min-h-screen pb-24"
       style={{ background: "var(--bg-primary)" }}
     >
-      <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col gap-5">
+      <div className="max-w-3xl md:max-w-6xl mx-auto px-4 py-6 flex flex-col gap-5">
         {/* -------------------------------------------------------- */}
         {/*  1. Alert Strip                                          */}
         {/* -------------------------------------------------------- */}
@@ -96,6 +98,16 @@ export default function DashboardScreen() {
             </span>
           </div>
         </motion.div>
+
+        {/* -------------------------------------------------------- */}
+        {/*  This Week Action Queue (founder priority actions)        */}
+        {/* -------------------------------------------------------- */}
+        <ActionQueue />
+
+        {/* -------------------------------------------------------- */}
+        {/*  Runway Timeline (visceral cash projection)               */}
+        {/* -------------------------------------------------------- */}
+        <RunwayTimeline />
 
         {/* -------------------------------------------------------- */}
         {/*  2. Health Score Card                                     */}

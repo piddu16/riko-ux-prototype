@@ -3,17 +3,17 @@
 import {
   LayoutDashboard,
   MessageSquare,
+  Users,
   ArrowDownToLine,
-  Lightbulb,
-  MoreHorizontal,
+  FileText,
 } from "lucide-react";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "chat", label: "Chat", icon: MessageSquare },
-  { id: "outstanding", label: "Outstanding", icon: ArrowDownToLine },
-  { id: "insights", label: "Insights", icon: Lightbulb },
-  { id: "more", label: "More", icon: MoreHorizontal },
+  { id: "clients", label: "Clients", icon: Users },
+  { id: "outstanding", label: "AR/AP", icon: ArrowDownToLine },
+  { id: "reports", label: "Reports", icon: FileText },
 ] as const;
 
 interface BottomNavProps {

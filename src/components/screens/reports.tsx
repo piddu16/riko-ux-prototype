@@ -10,6 +10,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { R, K, fL, fCr, RECEIVABLES } from "@/lib/data";
+import { ComplianceCalendar } from "@/components/ui/compliance-calendar";
 
 /* ── Report template data ── */
 const REPORT_TEMPLATES = [
@@ -355,6 +356,11 @@ export function ReportsScreen() {
           Generate, preview, and share financial reports
         </p>
       </motion.div>
+
+      {/* Compliance Calendar — top-priority for Indian CAs */}
+      <div className="mb-6">
+        <ComplianceCalendar />
+      </div>
 
       {/* Report Templates Grid */}
       <motion.div
