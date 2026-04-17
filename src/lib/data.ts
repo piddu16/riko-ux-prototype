@@ -345,3 +345,170 @@ export const I18N = {
 
 export type Lang = keyof typeof I18N;
 
+/* ============================================================
+   GST AGENT — INFINI integration mock data
+   ============================================================ */
+
+export const GSTINS = [
+  { id: "27AAAAB1234C1Z5", label: "Maharashtra", state: "MH", primary: true, status: "Active" },
+  { id: "07AAAAB1234C1Z3", label: "Delhi", state: "DL", primary: false, status: "Active" },
+  { id: "24AAAAB1234C1Z1", label: "Gujarat", state: "GJ", primary: false, status: "Suspended" },
+];
+
+export const GST_DATA_FRESHNESS = {
+  gstr2b: { asOf: "14 Apr 2026", nextRefresh: "14 May 2026", type: "static", period: "March 2026" },
+  gstr2a: { asOf: "2 hours ago", type: "live", period: "March 2026" },
+  tallySync: { asOf: "2 hours ago", status: "healthy" },
+};
+
+export type ReconStatus = "matched" | "mismatch" | "missing_portal" | "missing_tally";
+
+export const RECONCILIATION = {
+  period: "March 2026",
+  totalTallyInvoices: 147,
+  totalPortalInvoices: 143,
+  matched: 128,
+  mismatches: 7,
+  missingFromPortal: 8,
+  missingFromTally: 4,
+  matchedValue: 4230000, // 42.3L
+  mismatchValue: 310000, // 3.1L
+  itcAtRiskValue: 570000, // 5.7L
+  lastRunAt: "12 Apr 2026, 11:42 AM",
+  lines: [
+    { id: "r1", supplier: "GOOGLE INDIA PVT LTD", gstin: "29AACCG0527D1Z8", tallyAmt: 163988, portalAmt: 163988, status: "matched" as ReconStatus, invoiceNo: "G-4412", date: "30 Mar 2026" },
+    { id: "r2", supplier: "Amazon - Creations", gstin: "29AAHCA9099B1Z4", tallyAmt: 228186, portalAmt: 228186, status: "matched" as ReconStatus, invoiceNo: "AMZ-9921", date: "28 Mar 2026" },
+    { id: "r3", supplier: "Shiprocket Logistics", gstin: "07AAGCS5867P1Z9", tallyAmt: 32100, portalAmt: 31500, status: "mismatch" as ReconStatus, invoiceNo: "SR-2301", date: "25 Mar 2026", issue: "Portal shows ₹31,500 vs Tally ₹32,100 — ₹600 tax diff" },
+    { id: "r4", supplier: "Nykaa Mumbai 2", gstin: "27AADCN7487G1ZF", tallyAmt: 146500, portalAmt: null, status: "missing_portal" as ReconStatus, invoiceNo: "NYK-MH-1182", date: "22 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
+    { id: "r5", supplier: "Paytm (One97 Communications)", gstin: "07AAACT2727Q1ZV", tallyAmt: 89000, portalAmt: null, status: "missing_portal" as ReconStatus, invoiceNo: "PYT-2245", date: "20 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
+    { id: "r6", supplier: "Raw Material Supplier Co", gstin: "24AAACR1234P1Z2", tallyAmt: 145600, portalAmt: null, status: "missing_portal" as ReconStatus, invoiceNo: "RMS-0845", date: "18 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
+    { id: "r7", supplier: "Mumbai Packaging Ltd", gstin: "27AAACM5555P1Z2", tallyAmt: null, portalAmt: 58400, status: "missing_tally" as ReconStatus, invoiceNo: "MPL-3301", date: "15 Mar 2026", issue: "Invoice in 2B but not recorded in Tally" },
+    { id: "r8", supplier: "Flipkart Marketplace", gstin: "29AACCF0123P1Z8", tallyAmt: 156800, portalAmt: 156800, status: "matched" as ReconStatus, invoiceNo: "FLP-8821", date: "28 Mar 2026" },
+  ],
+};
+
+export const PRE_FILING_TRIAGE = {
+  gstr1: {
+    total: 4,
+    blockers: 2,
+    warnings: 2,
+    items: [
+      { severity: "blocker", icon: "🔴", title: "2 buyer GSTINs cancelled/suspended", detail: "Invoices to Sai Enterprises (cancelled 10 Feb) and LLC Olimpiya (suspended) will be rejected by GST portal", fix: "Remove or amend these invoices" },
+      { severity: "blocker", icon: "🔴", title: "3 HSN codes missing on B2B invoices", detail: "HSN required for businesses with turnover > ₹5Cr. Currently missing on 3 Amazon Creations invoices", fix: "Add HSN codes in Tally" },
+      { severity: "warning", icon: "🟡", title: "Tax anomaly detected", detail: "Invoice #AMZ-9921 (₹2.28L) shows GST rate of 22% — unusual. Verify rate is correct.", fix: "Review in Tally" },
+      { severity: "warning", icon: "🟡", title: "Document series gap", detail: "Invoice series jumps from #42 to #45 — missing 43, 44. Declare cancelled series or re-issue.", fix: "Update DOCISSUED section" },
+    ],
+  },
+  gstr3b: {
+    total: 3,
+    blockers: 1,
+    warnings: 2,
+    items: [
+      { severity: "blocker", icon: "🔴", title: "₹5.7L ITC at risk — 8 suppliers haven't filed GSTR-1", detail: "If you claim this ITC now and suppliers don't file, you'll have to reverse + pay interest", fix: "Send WhatsApp reminders to suppliers OR defer claim" },
+      { severity: "warning", icon: "🟡", title: "Cash payable: ₹12,450", detail: "After ITC utilization, net cash payable. Generate challan before filing.", fix: "Auto-generated in wizard" },
+      { severity: "warning", icon: "🟡", title: "₹4.61L excess ITC available for refund", detail: "You have unused ITC sitting idle. File refund application (RFD-01) separately after 3B.", fix: "Reminder will be set" },
+    ],
+  },
+};
+
+export type FilingStatus = "draft" | "generated" | "saved" | "submitted" | "filed" | "verified" | "failed";
+
+export const FILING_STATE = {
+  gstr1: {
+    period: "March 2026",
+    dueDate: "11 Apr 2026",
+    daysLeft: -6, // overdue
+    status: "generated" as FilingStatus,
+    currentStep: 2, // 0: generate, 1: validate, 2: save, 3: submit, 4: file, 5: verify
+    summary: {
+      b2b: { count: 89, value: 6720000 },
+      b2cs: { count: 0, value: 1240000 },
+      b2cl: { count: 12, value: 580000 },
+      cdnr: { count: 3, value: -45000 },
+      exports: { count: 0, value: 0 },
+      hsnSummary: 14,
+      cgst: 480000,
+      sgst: 480000,
+      igst: 210000,
+      totalTax: 1170000,
+    },
+  },
+  gstr3b: {
+    period: "March 2026",
+    dueDate: "20 Apr 2026",
+    daysLeft: 3,
+    status: "draft" as FilingStatus,
+    currentStep: 0,
+    summary: {
+      outwardTaxable: 9252380,
+      outputTax: 1170000,
+      itcAvailable: 1080000,
+      itcUtilized: 1080000,
+      netCashPayable: 12450,
+      itcExcess: 461000,
+      reverseCharge: 0,
+    },
+  },
+};
+
+export const FILING_HISTORY = [
+  { id: "f1", period: "Feb 2026", type: "GSTR-3B", status: "filed", filedAt: "18 Mar 2026, 6:42 PM", ackNo: "AA270226892345R", signatory: "Yogesh Patel", cashPaid: 18400, itcUsed: 970000 },
+  { id: "f2", period: "Feb 2026", type: "GSTR-1", status: "filed", filedAt: "10 Mar 2026, 2:15 PM", ackNo: "AA270226551234R", signatory: "Yogesh Patel", invoices: 82 },
+  { id: "f3", period: "Jan 2026", type: "GSTR-3B", status: "filed", filedAt: "19 Feb 2026, 9:20 AM", ackNo: "AA270126334455R", signatory: "Yogesh Patel", cashPaid: 22100, itcUsed: 890000 },
+  { id: "f4", period: "Jan 2026", type: "GSTR-1", status: "filed", filedAt: "11 Feb 2026, 4:30 PM", ackNo: "AA270126112233R", signatory: "Yogesh Patel", invoices: 76 },
+  { id: "f5", period: "Dec 2025", type: "GSTR-3B", status: "filed", filedAt: "20 Jan 2026, 8:45 PM", ackNo: "AA271225998877R", signatory: "Yogesh Patel", cashPaid: 0, itcUsed: 1020000 },
+];
+
+export const GST_HEALTH = {
+  score: 72, // 0-100
+  filingStreak: 18, // months in a row
+  avgDaysBeforeDue: 3.2,
+  missedDeadlines12m: 0,
+  itcMatchRate: 87, // %
+  excessItcUnclaimed: 461000, // ₹4.61L
+};
+
+export const GST_WORKFLOWS = [
+  {
+    id: "recon",
+    icon: "🔍",
+    title: "2B Reconciliation",
+    subtitle: "Match Tally purchases with GSTR-2B",
+    cta: "Run Reconciliation",
+    cadence: "Monthly (recommended on 15th)",
+    phase: "Phase 2",
+    phaseStatus: "ready" as const,
+  },
+  {
+    id: "gstr1",
+    icon: "📤",
+    title: "File GSTR-1",
+    subtitle: "Outward supplies return",
+    cta: "Start GSTR-1 Filing",
+    cadence: "Monthly, due 11th",
+    phase: "Phase 3",
+    phaseStatus: "blocked" as const,
+    blockReason: "INFINI save/submit/file APIs pending",
+  },
+  {
+    id: "gstr3b",
+    icon: "🏛️",
+    title: "File GSTR-3B",
+    subtitle: "Summary return + tax payment",
+    cta: "Start GSTR-3B Filing",
+    cadence: "Monthly, due 20th",
+    phase: "Phase 4",
+    phaseStatus: "blocked" as const,
+    blockReason: "INFINI 3B + challan APIs pending",
+  },
+];
+
+export const BUILD_PHASES = [
+  { phase: "Phase 1", label: "Foundation", status: "ready" as const, items: ["GSTIN verification", "Filing history lookup", "INFINI proxy"], weeks: "1-2" },
+  { phase: "Phase 2", label: "Reconciliation", status: "ready" as const, items: ["2B async recon engine", "Purchase GST summary RPC", "OTP tools"], weeks: "3-4" },
+  { phase: "Phase 3", label: "GSTR-1 Filing", status: "blocked" as const, items: ["Generate JSON", "Validate parties", "Save/submit/file flow"], weeks: "5-6", blocker: "Awaiting INFINI filing API specs" },
+  { phase: "Phase 4", label: "GSTR-3B Filing", status: "blocked" as const, items: ["3B generation", "Challan creation", "ITC cross-check"], weeks: "7-8", blocker: "Awaiting INFINI filing API specs" },
+  { phase: "Phase 5", label: "Hardening", status: "future" as const, items: ["Production credentials", "MSG91 follow-ups", "Deadline reminders"], weeks: "9-10" },
+];
+
+

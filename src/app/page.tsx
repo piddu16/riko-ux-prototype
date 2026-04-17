@@ -11,6 +11,7 @@ import { SalesScreen as Sales } from "@/components/screens/sales";
 import { InventoryScreen as Inventory } from "@/components/screens/inventory";
 import { ReportsScreen as Reports } from "@/components/screens/reports";
 import { ClientsScreen as Clients } from "@/components/screens/clients";
+import { GstScreen as Gst } from "@/components/screens/gst";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { COMPANY } from "@/lib/data";
@@ -79,6 +80,7 @@ export default function Home() {
           {tab === "dashboard" && <Dashboard />}
           {tab === "chat" && <Chat />}
           {tab === "clients" && <Clients />}
+          {tab === "gst" && <Gst />}
           {tab === "outstanding" && <Outstandings />}
           {tab === "daybook" && <DayBook />}
           {tab === "sales" && <Sales />}

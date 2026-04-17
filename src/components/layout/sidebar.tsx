@@ -9,6 +9,7 @@ import {
   Package,
   FileText,
   Users,
+  Landmark,
   Settings,
 } from "lucide-react";
 import { ThemeToggle } from "../theme-toggle";
@@ -18,6 +19,7 @@ const navItems = [
   { id: "chat", label: "Chat", icon: MessageSquare },
   { id: "clients", label: "Clients", icon: Users },
   { id: "outstanding", label: "Outstanding", icon: ArrowDownToLine },
+  { id: "gst", label: "GST", icon: Landmark },
   { id: "daybook", label: "Day Book", icon: BookOpen },
   { id: "sales", label: "Sales", icon: TrendingUp },
   { id: "inventory", label: "Inventory", icon: Package },
