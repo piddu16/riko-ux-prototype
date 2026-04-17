@@ -13,12 +13,15 @@ import { InventoryScreen as Inventory } from "@/components/screens/inventory";
 import { ReportsScreen as Reports } from "@/components/screens/reports";
 import { ClientsScreen as Clients } from "@/components/screens/clients";
 import { GstScreen as Gst } from "@/components/screens/gst";
+import { TdsScreen as Tds } from "@/components/screens/tds";
+import { BankReconScreen as BankRecon } from "@/components/screens/bank-recon";
 import { SettingsScreen as Settings } from "@/components/screens/settings";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { RoleSwitcher } from "@/components/role-switcher";
-import { COMPANY } from "@/lib/data";
 import { useRbac } from "@/lib/rbac-context";
+import { useCompany } from "@/lib/company-context";
+import { ArrowLeft } from "lucide-react";
 
 const BOTTOM_MAP: Record<string, TabId> = {
   dashboard: "dashboard",
@@ -32,6 +35,7 @@ export default function Home() {
   const [tab, setTab] = useState<TabId>("dashboard");
   const [moreOpen, setMoreOpen] = useState(false);
   const { role, canSee, roleConfig } = useRbac();
+  const { current: COMPANY, resetToDefault, isCustomSelection } = useCompany();
 
   /* Only redirect when the ROLE changes, not when the tab changes.
      When the user navigates, the sidebar already filters to visible tabs —
@@ -61,6 +65,21 @@ export default function Home() {
           }}
         >
           <div className="flex items-center gap-3">
+            {isCustomSelection && (
+              <button
+                onClick={() => { resetToDefault(); setTab("clients"); }}
+                className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md cursor-pointer transition-colors"
+                style={{
+                  background: "color-mix(in srgb, var(--purple) 15%, transparent)",
+                  color: "var(--purple)",
+                  border: "1px solid color-mix(in srgb, var(--purple) 30%, transparent)",
+                }}
+                title="Back to client portfolio"
+              >
+                <ArrowLeft size={12} />
+                Portfolio
+              </button>
+            )}
             <div className="flex md:hidden h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#22C55E] to-[#15803D] text-xs font-extrabold text-white">
               R
             </div>
@@ -99,6 +118,8 @@ export default function Home() {
           {tab === "chat" && <Chat />}
           {tab === "clients" && <Clients />}
           {tab === "gst" && <Gst />}
+          {tab === "tds" && <Tds />}
+          {tab === "bankrecon" && <BankRecon />}
           {tab === "outstanding" && <Outstandings />}
           {tab === "daybook" && <DayBook />}
           {tab === "sales" && <Sales />}

@@ -24,6 +24,16 @@ import {
   Key,
   Bell,
   UserCircle,
+  Upload,
+  Download,
+  EyeOff,
+  Copy,
+  RefreshCw,
+  Camera,
+  Shield,
+  Check,
+  AlertCircle,
+  Plus,
 } from "lucide-react";
 import {
   TEAM_MEMBERS,
@@ -34,6 +44,7 @@ import {
   type TeamMember,
   type MemberStatus,
 } from "@/lib/rbac";
+import { PENDING_INVITE_EXPIRY_DAYS } from "@/lib/data";
 import { useRbac } from "@/lib/rbac-context";
 
 /* ------------------------------------------------------------------ */
@@ -143,60 +154,956 @@ export function SettingsScreen() {
 
         {/* Tab content */}
         {activeTab === "team" && <TeamTab />}
-        {activeTab !== "team" && (
-          <ComingSoonTab
-            tab={SETTINGS_TABS.find((t) => t.id === activeTab)!}
-          />
-        )}
+        {activeTab === "profile" && <ProfileTab />}
+        {activeTab === "billing" && <BillingTab />}
+        {activeTab === "integrations" && <IntegrationsTab />}
+        {activeTab === "api" && <ApiKeysTab />}
+        {activeTab === "notifications" && <NotificationsTab />}
       </div>
     </div>
   );
 }
 
 /* ================================================================== */
-/*  ComingSoonTab                                                     */
+/*  SectionCard — shared wrapper                                     */
 /* ================================================================== */
-function ComingSoonTab({
-  tab,
+function SectionCard({
+  title,
+  subtitle,
+  children,
+  actions,
 }: {
-  tab: { id: SettingsTab; label: string; icon: React.ElementType };
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
 }) {
-  const Icon = tab.icon;
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="rounded-xl flex flex-col items-center justify-center text-center py-20 px-6"
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.1 }}
+      transition={{ duration: 0.4 }}
+      className="rounded-xl overflow-hidden"
       style={{
         background: "var(--bg-surface)",
-        border: "1px dashed var(--border)",
+        border: "1px solid var(--border)",
       }}
     >
-      <span
-        className="flex items-center justify-center rounded-full mb-4"
-        style={{
-          width: 56,
-          height: 56,
-          background: "color-mix(in srgb, var(--text-3) 10%, transparent)",
-          color: "var(--text-3)",
-        }}
+      <div
+        className="flex items-center justify-between px-5 py-4 gap-3"
+        style={{ borderBottom: "1px solid var(--border)" }}
       >
-        <Icon size={26} />
-      </span>
-      <p
-        className="text-lg font-bold"
-        style={{
-          color: "var(--text-1)",
-          fontFamily: "'Space Grotesk', sans-serif",
-        }}
-      >
-        {tab.label}
-      </p>
-      <p className="text-sm mt-1" style={{ color: "var(--text-4)" }}>
-        Coming soon
-      </p>
+        <div className="min-w-0">
+          <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+            {title}
+          </p>
+          {subtitle && (
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+              {subtitle}
+            </p>
+          )}
+        </div>
+        {actions}
+      </div>
+      <div className="p-5">{children}</div>
     </motion.div>
+  );
+}
+
+/* ================================================================== */
+/*  ProfileTab                                                        */
+/* ================================================================== */
+function ProfileTab() {
+  const [twoFA, setTwoFA] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState({
+    fullName: "Yogesh Patel",
+    email: "yogesh@bandrasoap.in",
+    phone: "+91 98765 43210",
+    role: "Admin / Owner",
+    language: "English",
+    timezone: "Asia/Kolkata (IST)",
+  });
+
+  const update = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const handleSave = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionCard title="Profile" subtitle="Personal information and preferences">
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Avatar */}
+          <div className="flex flex-col items-center gap-2 md:w-40 flex-shrink-0">
+            <div
+              className="rounded-full flex items-center justify-center text-2xl font-bold"
+              style={{
+                width: 96,
+                height: 96,
+                background:
+                  "linear-gradient(135deg, color-mix(in srgb, var(--purple) 40%, transparent), color-mix(in srgb, var(--purple) 70%, transparent))",
+                color: "#fff",
+              }}
+            >
+              {form.fullName.charAt(0)}
+            </div>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
+              style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border)",
+                color: "var(--text-2)",
+              }}
+            >
+              <Camera size={12} />
+              Upload photo
+            </button>
+            <p className="text-[10px] text-center" style={{ color: "var(--text-4)" }}>
+              JPG or PNG, max 2MB
+            </p>
+          </div>
+
+          {/* Form */}
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Full name">
+              <TextInput value={form.fullName} onChange={update("fullName")} />
+            </Field>
+            <Field label="Email">
+              <TextInput value={form.email} onChange={update("email")} type="email" />
+            </Field>
+            <Field label="Phone">
+              <TextInput value={form.phone} onChange={update("phone")} />
+            </Field>
+            <Field label="Role">
+              <TextInput value={form.role} readOnly />
+            </Field>
+            <Field label="Language preference">
+              <SelectInput value={form.language} onChange={update("language")}>
+                <option>English</option>
+                <option>हिंदी</option>
+                <option>ગુજરાતી</option>
+                <option>मराठी</option>
+              </SelectInput>
+            </Field>
+            <Field label="Timezone">
+              <SelectInput value={form.timezone} onChange={update("timezone")}>
+                <option>Asia/Kolkata (IST)</option>
+                <option>UTC</option>
+                <option>America/New_York (EST)</option>
+                <option>Europe/London (GMT)</option>
+              </SelectInput>
+            </Field>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Security" subtitle="Account and authentication">
+        <div className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-3">
+            <span
+              className="flex items-center justify-center rounded-lg flex-shrink-0"
+              style={{
+                width: 32,
+                height: 32,
+                background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                color: "var(--green)",
+              }}
+            >
+              <Shield size={16} />
+            </span>
+            <div>
+              <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                Two-factor authentication
+              </p>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                SMS or authenticator app codes on sign-in
+              </p>
+            </div>
+          </div>
+          <Toggle checked={twoFA} onChange={setTwoFA} />
+        </div>
+
+        <div
+          className="flex items-center justify-between py-2 mt-2"
+          style={{ borderTop: "1px solid var(--border)" }}
+        >
+          <div className="flex items-center gap-3 pt-3">
+            <span
+              className="flex items-center justify-center rounded-lg flex-shrink-0"
+              style={{
+                width: 32,
+                height: 32,
+                background: "color-mix(in srgb, var(--blue) 15%, transparent)",
+                color: "var(--blue)",
+              }}
+            >
+              <Key size={16} />
+            </span>
+            <div>
+              <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                Password
+              </p>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                Last updated 4 months ago
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="text-xs font-semibold px-3 py-1.5 rounded-md cursor-pointer transition-colors mt-3"
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border)",
+              color: "var(--text-2)",
+            }}
+          >
+            Change password
+          </button>
+        </div>
+      </SectionCard>
+
+      {/* Save bar */}
+      <div className="flex items-center justify-end gap-2">
+        <AnimatePresence>
+          {saved && (
+            <motion.span
+              initial={{ opacity: 0, x: 6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -6 }}
+              className="inline-flex items-center gap-1 text-xs font-semibold"
+              style={{ color: "var(--green)" }}
+            >
+              <Check size={13} /> Saved
+            </motion.span>
+          )}
+        </AnimatePresence>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+          style={{
+            background: "var(--green)",
+            color: "#052E16",
+          }}
+        >
+          <Check size={13} />
+          Save changes
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  BillingTab                                                        */
+/* ================================================================== */
+function BillingTab() {
+  const invoices = [
+    { id: "inv-2603", period: "March 2026", amount: "₹1,666.67", date: "1 Mar 2026", status: "Paid" },
+    { id: "inv-2602", period: "February 2026", amount: "₹1,666.67", date: "1 Feb 2026", status: "Paid" },
+    { id: "inv-2601", period: "January 2026", amount: "₹1,666.67", date: "1 Jan 2026", status: "Paid" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Current plan */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.4 }}
+        className="rounded-xl overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(135deg, color-mix(in srgb, var(--purple) 10%, var(--bg-surface)) 0%, var(--bg-surface) 100%)",
+          border: "1px solid color-mix(in srgb, var(--purple) 30%, var(--border))",
+        }}
+      >
+        <div className="h-0.5" style={{ background: "var(--purple)" }} />
+        <div className="p-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
+              style={{
+                background: "color-mix(in srgb, var(--purple) 18%, transparent)",
+                color: "var(--purple)",
+              }}
+            >
+              Current plan
+            </span>
+            <p
+              className="text-xl font-bold mt-2"
+              style={{
+                color: "var(--text-1)",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              Teams plan · ₹20,000/year
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+              Renews 1 Feb 2026 · up to 10 seats · unlimited clients
+            </p>
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+            style={{
+              background: "var(--purple)",
+              color: "#fff",
+            }}
+          >
+            Upgrade to Enterprise
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Usage */}
+      <SectionCard title="Usage this month" subtitle="April 2026">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <UsageBar label="Seats" used={7} total={10} unit="seats" color="var(--purple)" />
+          <UsageBar label="API calls" used={2340} total={10000} unit="calls" color="var(--blue)" />
+        </div>
+      </SectionCard>
+
+      {/* Payment method */}
+      <SectionCard title="Payment method" subtitle="Card on file for renewals">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className="flex items-center justify-center rounded-lg flex-shrink-0"
+              style={{
+                width: 40,
+                height: 28,
+                background: "linear-gradient(135deg, #1e3a8a, #2563eb)",
+                color: "#fff",
+              }}
+            >
+              <CreditCard size={14} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                HDFC Credit Card ending 4532
+              </p>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                Expires 09/27 · Y. Patel
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="text-xs font-semibold px-3 py-1.5 rounded-md cursor-pointer transition-colors"
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border)",
+              color: "var(--text-2)",
+            }}
+          >
+            Update
+          </button>
+        </div>
+      </SectionCard>
+
+      {/* Invoices */}
+      <SectionCard title="Invoices" subtitle="Download recent billing statements">
+        <div className="overflow-x-auto -mx-5">
+          <table className="w-full text-xs">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                <TH>Invoice #</TH>
+                <TH>Period</TH>
+                <TH>Date</TH>
+                <TH>Amount</TH>
+                <TH>Status</TH>
+                <TH className="text-right">Actions</TH>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv, i) => (
+                <tr
+                  key={inv.id}
+                  style={{
+                    borderBottom:
+                      i < invoices.length - 1 ? "1px solid var(--border)" : "none",
+                  }}
+                >
+                  <td className="px-4 py-3 font-semibold tabular-nums" style={{ color: "var(--text-1)" }}>
+                    {inv.id.toUpperCase()}
+                  </td>
+                  <td className="px-4 py-3" style={{ color: "var(--text-2)" }}>{inv.period}</td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: "var(--text-3)" }}>{inv.date}</td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: "var(--text-1)" }}>{inv.amount}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{
+                        background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                        border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
+                        color: "var(--green)",
+                      }}
+                    >
+                      <Check size={10} />
+                      {inv.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                      style={{
+                        background: "color-mix(in srgb, var(--green) 12%, transparent)",
+                        color: "var(--green)",
+                      }}
+                    >
+                      <Download size={11} />
+                      Download
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+function UsageBar({
+  label,
+  used,
+  total,
+  unit,
+  color,
+}: {
+  label: string;
+  used: number;
+  total: number;
+  unit: string;
+  color: string;
+}) {
+  const pct = Math.min((used / total) * 100, 100);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+          {label}
+        </span>
+        <span className="text-[11px] tabular-nums" style={{ color: "var(--text-3)" }}>
+          <span style={{ color: "var(--text-1)", fontWeight: 600 }}>{used.toLocaleString("en-IN")}</span>
+          {" / "}
+          {total.toLocaleString("en-IN")} {unit}
+        </span>
+      </div>
+      <div
+        className="h-2 rounded-full overflow-hidden"
+        style={{ background: `color-mix(in srgb, ${color} 15%, transparent)` }}
+      >
+        <motion.div
+          initial={{ width: 0 }}
+          whileInView={{ width: `${pct}%` }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+          className="h-full rounded-full"
+          style={{ background: color }}
+        />
+      </div>
+      <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+        {pct.toFixed(0)}% used
+      </p>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  IntegrationsTab                                                   */
+/* ================================================================== */
+function IntegrationsTab() {
+  const integrations = [
+    { id: "tally", name: "Tally Prime", desc: "Auto-sync vouchers every 2 hours", connected: true, color: "var(--blue)", logo: "T" },
+    { id: "infini", name: "INFINI GST", desc: "GSTR-1, 3B, 2B filing APIs", connected: true, color: "var(--green)", logo: "G" },
+    { id: "msg91", name: "MSG91 WhatsApp", desc: "Transactional WhatsApp messages", connected: true, color: "#25D366", logo: "W" },
+    { id: "razorpay", name: "Razorpay", desc: "Payment gateway settlements", connected: false, color: "var(--purple)", logo: "R" },
+    { id: "zoho", name: "Zoho Books", desc: "Alternative to Tally sync", connected: false, color: "var(--red)", logo: "Z" },
+    { id: "hdfc", name: "HDFC Bank API", desc: "Auto-pull bank statements", connected: false, color: "var(--orange)", logo: "H" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionCard
+        title="Integrations"
+        subtitle={`${integrations.filter((i) => i.connected).length} of ${integrations.length} connected`}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {integrations.map((intg, i) => (
+            <motion.div
+              key={intg.id}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.35, delay: i * 0.04 }}
+              className="rounded-xl p-4 flex flex-col gap-3"
+              style={{
+                background: intg.connected
+                  ? `color-mix(in srgb, ${intg.color} 8%, var(--bg-secondary))`
+                  : "var(--bg-secondary)",
+                border: `1px solid ${
+                  intg.connected
+                    ? `color-mix(in srgb, ${intg.color} 30%, var(--border))`
+                    : "var(--border)"
+                }`,
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span
+                    className="flex items-center justify-center rounded-lg flex-shrink-0 font-bold text-sm"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      background: `color-mix(in srgb, ${intg.color} 20%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${intg.color} 35%, transparent)`,
+                      color: intg.color,
+                    }}
+                  >
+                    {intg.logo}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+                      {intg.name}
+                    </p>
+                    {intg.connected ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold mt-0.5"
+                        style={{ color: "var(--green)" }}
+                      >
+                        <Check size={10} strokeWidth={3} />
+                        Connected
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold mt-0.5"
+                        style={{ color: "var(--text-4)" }}
+                      >
+                        Not connected
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] leading-snug" style={{ color: "var(--text-3)" }}>
+                {intg.desc}
+              </p>
+              <button
+                type="button"
+                className="text-xs font-semibold px-3 py-1.5 rounded-md cursor-pointer transition-colors mt-auto"
+                style={{
+                  background: intg.connected
+                    ? "transparent"
+                    : `color-mix(in srgb, ${intg.color} 15%, transparent)`,
+                  border: `1px solid color-mix(in srgb, ${intg.color} 35%, transparent)`,
+                  color: intg.color,
+                }}
+              >
+                {intg.connected ? "Configure" : "Connect"}
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  ApiKeysTab                                                        */
+/* ================================================================== */
+function ApiKeysTab() {
+  const initialKeys = [
+    {
+      id: "k1",
+      name: "Production key",
+      secret: "riko_live_sk_8f2a91b3d7e5c4908671fa22abc9cc10",
+      created: "15 Feb 2025",
+      lastUsed: "2h ago",
+    },
+    {
+      id: "k2",
+      name: "Dev key",
+      secret: "riko_test_sk_3b2c91ad9e7f1204568c33de10abfe91",
+      created: "1 Mar 2025",
+      lastUsed: "3d ago",
+    },
+  ];
+
+  const [keys, setKeys] = useState(initialKeys);
+  const [visible, setVisible] = useState<Record<string, boolean>>({});
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const toggleVisible = (id: string) => setVisible((p) => ({ ...p, [id]: !p[id] }));
+
+  const copy = (id: string, value: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(value).catch(() => undefined);
+    }
+    setCopied(id);
+    setTimeout(() => setCopied(null), 1400);
+  };
+
+  const mask = (v: string) => v.slice(0, 12) + "•".repeat(Math.max(v.length - 16, 6)) + v.slice(-4);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionCard
+        title="API Keys"
+        subtitle="Programmatic access to your workspace"
+        actions={
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+            style={{
+              background: "var(--green)",
+              color: "#052E16",
+            }}
+          >
+            <Plus size={13} />
+            Generate new API key
+          </button>
+        }
+      >
+        <div className="overflow-x-auto -mx-5">
+          <table className="w-full text-xs">
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                <TH>Name</TH>
+                <TH>Key</TH>
+                <TH>Created</TH>
+                <TH>Last used</TH>
+                <TH className="text-right">Actions</TH>
+              </tr>
+            </thead>
+            <tbody>
+              {keys.map((k, i) => (
+                <tr
+                  key={k.id}
+                  style={{
+                    borderBottom:
+                      i < keys.length - 1 ? "1px solid var(--border)" : "none",
+                  }}
+                >
+                  <td className="px-4 py-3">
+                    <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                      {k.name}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <code
+                        className="text-[11px] px-2 py-1 rounded tabular-nums"
+                        style={{
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-2)",
+                          fontFamily: "'SF Mono', Consolas, monospace",
+                        }}
+                      >
+                        {visible[k.id] ? k.secret : mask(k.secret)}
+                      </code>
+                      <IconBtn
+                        title={visible[k.id] ? "Hide" : "Show"}
+                        onClick={() => toggleVisible(k.id)}
+                      >
+                        {visible[k.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </IconBtn>
+                      <IconBtn title="Copy" onClick={() => copy(k.id, k.secret)}>
+                        {copied === k.id ? (
+                          <Check size={13} style={{ color: "var(--green)" }} />
+                        ) : (
+                          <Copy size={13} />
+                        )}
+                      </IconBtn>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: "var(--text-3)" }}>
+                    {k.created}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums" style={{ color: "var(--text-3)" }}>
+                    {k.lastUsed}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setKeys((p) => p.filter((x) => x.id !== k.id))}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                      style={{
+                        background: "color-mix(in srgb, var(--red) 12%, transparent)",
+                        color: "var(--red)",
+                      }}
+                    >
+                      <RefreshCw size={11} />
+                      Revoke
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          className="flex items-start gap-2 mt-4 px-3 py-2.5 rounded-lg"
+          style={{
+            background: "color-mix(in srgb, var(--yellow) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
+          }}
+        >
+          <AlertCircle size={13} style={{ color: "var(--yellow)", marginTop: 2 }} />
+          <p className="text-[11px] leading-relaxed" style={{ color: "var(--text-2)" }}>
+            Treat API keys like passwords. Never commit them to Git or share them in chat.
+          </p>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  NotificationsTab                                                  */
+/* ================================================================== */
+function NotificationsTab() {
+  type Group = {
+    id: string;
+    label: string;
+    icon: React.ReactNode;
+    color: string;
+    items: { id: string; label: string; desc: string; checked: boolean }[];
+  };
+
+  const initial: Group[] = [
+    {
+      id: "whatsapp",
+      label: "WhatsApp",
+      icon: <MessageCircle size={14} />,
+      color: "#25D366",
+      items: [
+        { id: "wa-received", label: "Payment received", desc: "When a customer pays an invoice", checked: true },
+        { id: "wa-overdue", label: "Overdue reminders", desc: "Auto-send to parties >30 days overdue", checked: true },
+        { id: "wa-summary", label: "Weekly summary", desc: "Cash, AR, AP snapshot every Monday 9am", checked: true },
+        { id: "wa-gst", label: "GST filing alerts", desc: "3 days before each GSTR deadline", checked: true },
+      ],
+    },
+    {
+      id: "email",
+      label: "Email",
+      icon: <Mail size={14} />,
+      color: "var(--blue)",
+      items: [
+        { id: "em-mis", label: "MIS reports", desc: "Monthly MIS PDF, 1st of each month", checked: true },
+        { id: "em-invite", label: "Invite expiring", desc: "Pending invites about to expire", checked: false },
+        { id: "em-activity", label: "Team activity", desc: "Daily digest of team logins and actions", checked: false },
+      ],
+    },
+    {
+      id: "push",
+      label: "Push (mobile)",
+      icon: <Bell size={14} />,
+      color: "var(--orange)",
+      items: [
+        { id: "pu-urgent", label: "Urgent alerts", desc: "Cash < 10 days, GST missed, compliance", checked: true },
+      ],
+    },
+    {
+      id: "inapp",
+      label: "In-app",
+      icon: <Circle size={14} />,
+      color: "var(--purple)",
+      items: [
+        { id: "in-all", label: "Everything", desc: "All notifications show in the bell menu", checked: true },
+      ],
+    },
+  ];
+
+  const [groups, setGroups] = useState(initial);
+
+  const toggle = (groupId: string, itemId: string) =>
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              items: g.items.map((it) =>
+                it.id === itemId ? { ...it, checked: !it.checked } : it
+              ),
+            }
+          : g
+      )
+    );
+
+  return (
+    <div className="flex flex-col gap-5">
+      {groups.map((g) => (
+        <SectionCard
+          key={g.id}
+          title={g.label}
+          subtitle={`${g.items.filter((i) => i.checked).length} of ${g.items.length} enabled`}
+          actions={
+            <span
+              className="inline-flex items-center justify-center rounded-lg flex-shrink-0"
+              style={{
+                width: 32,
+                height: 32,
+                background: `color-mix(in srgb, ${g.color} 15%, transparent)`,
+                color: g.color,
+              }}
+            >
+              {g.icon}
+            </span>
+          }
+        >
+          <div className="flex flex-col divide-y" style={{ borderColor: "var(--border)" }}>
+            {g.items.map((it, i) => (
+              <div
+                key={it.id}
+                className="flex items-center justify-between py-3 gap-3"
+                style={{
+                  borderBottom:
+                    i < g.items.length - 1 ? "1px solid var(--border)" : "none",
+                }}
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                    {it.label}
+                  </p>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                    {it.desc}
+                  </p>
+                </div>
+                <Toggle checked={it.checked} onChange={() => toggle(g.id, it.id)} color={g.color} />
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      ))}
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Small reusable form primitives                                    */
+/* ================================================================== */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span
+        className="text-[10px] uppercase tracking-wider font-medium"
+        style={{ color: "var(--text-4)" }}
+      >
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function TextInput({
+  value,
+  onChange,
+  type = "text",
+  readOnly,
+}: {
+  value: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  readOnly?: boolean;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      readOnly={readOnly}
+      className="text-xs px-3 py-2 rounded-lg outline-none transition-colors"
+      style={{
+        background: readOnly ? "var(--bg-hover)" : "var(--bg-secondary)",
+        border: "1px solid var(--border)",
+        color: "var(--text-1)",
+        cursor: readOnly ? "not-allowed" : "text",
+      }}
+      onFocus={(e) => {
+        if (!readOnly) e.currentTarget.style.borderColor = "var(--green)";
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.borderColor = "var(--border)";
+      }}
+    />
+  );
+}
+
+function SelectInput({
+  value,
+  onChange,
+  children,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={onChange}
+      className="text-xs px-3 py-2 rounded-lg outline-none transition-colors cursor-pointer"
+      style={{
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border)",
+        color: "var(--text-1)",
+      }}
+    >
+      {children}
+    </select>
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+  color = "var(--green)",
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  color?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      role="switch"
+      aria-checked={checked}
+      className="relative flex-shrink-0 cursor-pointer transition-colors rounded-full"
+      style={{
+        width: 36,
+        height: 20,
+        background: checked ? color : "var(--border)",
+      }}
+    >
+      <motion.span
+        layout
+        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+        className="absolute rounded-full"
+        style={{
+          width: 14,
+          height: 14,
+          top: 3,
+          left: checked ? 19 : 3,
+          background: "#fff",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+        }}
+      />
+    </button>
   );
 }
 
@@ -208,6 +1115,7 @@ function TeamTab() {
   const [members, setMembers] = useState<TeamMember[]>(TEAM_MEMBERS);
   const [toast, setToast] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   /* Invite form */
   const [inviteEmail, setInviteEmail] = useState("");
@@ -481,6 +1389,7 @@ function TeamTab() {
           {/* Bulk invite */}
           <button
             type="button"
+            onClick={() => setBulkOpen(true)}
             className="self-start inline-flex items-center gap-1.5 text-[11px] font-semibold transition-opacity hover:opacity-80 cursor-pointer"
             style={{ color: "var(--green)" }}
           >
@@ -957,7 +1866,339 @@ function TeamTab() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ============ Bulk invite modal ============ */}
+      <BulkInviteModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onSent={(count) => {
+          setToast(`Sent ${count} invitations`);
+          setBulkOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+/* ================================================================== */
+/*  BulkInviteModal                                                   */
+/* ================================================================== */
+interface BulkInviteModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSent: (count: number) => void;
+}
+
+function BulkInviteModal({ open, onClose, onSent }: BulkInviteModalProps) {
+  const [dropped, setDropped] = useState(false);
+
+  const mockRows = [
+    { name: "Arjun Kapoor", email: "arjun@bandrasoap.in", phone: "+91 98100 10101", role: "sales", valid: true },
+    { name: "Meera Nair", email: "meera@bandrasoap.in", phone: "+91 98100 20202", role: "accounts", valid: true },
+    { name: "Rohan Iyer", email: "rohan@bandrasoap.in", phone: "+91 98100 30303", role: "manager", valid: true },
+    { name: "Divya Menon", email: "divya@bandrasoap.in", phone: "+91 98100 40404", role: "sales", valid: true },
+    { name: "Kabir Verma", email: "kabir@bandrasoap.in", phone: "+91 98100 50505", role: "viewer", valid: true },
+  ];
+
+  /* Reset on close */
+  useEffect(() => {
+    if (!open) {
+      const id = setTimeout(() => setDropped(false), 250);
+      return () => clearTimeout(id);
+    }
+  }, [open]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="bulk-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-[65] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)" }}
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 4 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="w-full max-w-2xl rounded-xl overflow-hidden flex flex-col"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.45)",
+              maxHeight: "90vh",
+            }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-5 py-3"
+              style={{ borderBottom: "1px solid var(--border)" }}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span
+                  className="flex items-center justify-center rounded-lg flex-shrink-0"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                    color: "var(--green)",
+                  }}
+                >
+                  <FileSpreadsheet size={16} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+                    Bulk invite team members
+                  </h3>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                    Upload a CSV with team details to invite everyone at once
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="flex items-center justify-center rounded-md transition-colors cursor-pointer flex-shrink-0"
+                style={{
+                  width: 30,
+                  height: 30,
+                  color: "var(--text-3)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 overflow-y-auto flex-1">
+              {!dropped ? (
+                <>
+                  {/* Drop zone */}
+                  <button
+                    type="button"
+                    onClick={() => setDropped(true)}
+                    className="w-full rounded-xl flex flex-col items-center justify-center py-10 px-4 cursor-pointer transition-colors"
+                    style={{
+                      background: "var(--bg-secondary)",
+                      border: "2px dashed color-mix(in srgb, var(--green) 35%, var(--border))",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background =
+                        "color-mix(in srgb, var(--green) 5%, var(--bg-secondary))";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLElement).style.background = "var(--bg-secondary)";
+                    }}
+                  >
+                    <span
+                      className="flex items-center justify-center rounded-full mb-3"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                        color: "var(--green)",
+                      }}
+                    >
+                      <Upload size={20} />
+                    </span>
+                    <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                      Drop CSV here
+                    </p>
+                    <p className="text-[11px] mt-1" style={{ color: "var(--text-4)" }}>
+                      (columns: name, email, phone, role)
+                    </p>
+                    <p
+                      className="text-xs mt-3 font-semibold"
+                      style={{ color: "var(--green)" }}
+                    >
+                      or browse
+                    </p>
+                  </button>
+
+                  <div className="flex items-center justify-center mt-4">
+                    <button
+                      type="button"
+                      onClick={(e) => e.preventDefault()}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold transition-opacity hover:opacity-80 cursor-pointer"
+                      style={{ color: "var(--blue)" }}
+                    >
+                      <Download size={12} />
+                      Download sample template
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div
+                    className="flex items-center justify-between rounded-lg px-3 py-2"
+                    style={{
+                      background: "color-mix(in srgb, var(--green) 10%, transparent)",
+                      border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
+                    }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="flex items-center justify-center rounded"
+                        style={{
+                          width: 24,
+                          height: 24,
+                          background: "var(--green)",
+                          color: "#052E16",
+                        }}
+                      >
+                        <Check size={14} strokeWidth={3} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                          team-invites-apr.csv
+                        </p>
+                        <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                          5 rows parsed · 5 valid · 0 errors
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDropped(false)}
+                      className="text-[11px] font-semibold cursor-pointer transition-opacity hover:opacity-80"
+                      style={{ color: "var(--text-3)" }}
+                    >
+                      Replace
+                    </button>
+                  </div>
+
+                  {/* Preview table */}
+                  <div
+                    className="rounded-lg overflow-hidden"
+                    style={{ border: "1px solid var(--border)" }}
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr
+                            style={{
+                              background: "var(--bg-secondary)",
+                              borderBottom: "1px solid var(--border)",
+                            }}
+                          >
+                            <TH>Name</TH>
+                            <TH>Email</TH>
+                            <TH>Phone</TH>
+                            <TH>Role</TH>
+                            <TH>Status</TH>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mockRows.map((row, i) => (
+                            <tr
+                              key={row.email}
+                              style={{
+                                borderBottom:
+                                  i < mockRows.length - 1
+                                    ? "1px solid var(--border)"
+                                    : "none",
+                              }}
+                            >
+                              <td className="px-3 py-2 font-semibold" style={{ color: "var(--text-1)" }}>
+                                {row.name}
+                              </td>
+                              <td className="px-3 py-2" style={{ color: "var(--text-3)" }}>
+                                {row.email}
+                              </td>
+                              <td className="px-3 py-2 tabular-nums" style={{ color: "var(--text-3)" }}>
+                                {row.phone}
+                              </td>
+                              <td className="px-3 py-2 capitalize" style={{ color: "var(--text-2)" }}>
+                                {row.role}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                  style={{
+                                    background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                                    color: "var(--green)",
+                                  }}
+                                >
+                                  <Check size={10} strokeWidth={3} />
+                                  Valid
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div
+              className="flex items-center justify-between gap-3 px-5 py-3 flex-wrap"
+              style={{ borderTop: "1px solid var(--border)" }}
+            >
+              <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                {dropped
+                  ? `${mockRows.length} valid invites found. Send all?`
+                  : "CSV columns: name, email, phone, role"}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs font-semibold px-3 py-2 rounded-md cursor-pointer transition-colors"
+                  style={{
+                    color: "var(--text-3)",
+                    background: "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--bg-hover)";
+                    e.currentTarget.style.color = "var(--text-1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--text-3)";
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!dropped}
+                  onClick={() => onSent(mockRows.length)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-md cursor-pointer transition-opacity"
+                  style={{
+                    background: "var(--green)",
+                    color: "#052E16",
+                    opacity: dropped ? 1 : 0.5,
+                    cursor: dropped ? "pointer" : "not-allowed",
+                  }}
+                >
+                  <Send size={13} />
+                  Send {dropped ? mockRows.length : ""} invites
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -1126,20 +2367,35 @@ function MemberRow({ member, onChangeRole, onRemove }: MemberRowProps) {
         <RolePillSelector role={member.role} onChange={onChangeRole} />
       </td>
       <td className="px-4 py-3">
-        <span
-          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-          style={{
-            background: `color-mix(in srgb, ${statusCfg.color} 15%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${statusCfg.color} 30%, transparent)`,
-            color: statusCfg.color,
-          }}
-        >
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: statusCfg.color }}
-          />
-          {statusCfg.label}
-        </span>
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            style={{
+              background: `color-mix(in srgb, ${statusCfg.color} 15%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${statusCfg.color} 30%, transparent)`,
+              color: statusCfg.color,
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: statusCfg.color }}
+            />
+            {statusCfg.label}
+          </span>
+          {member.status === "pending" && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{
+                background: "color-mix(in srgb, var(--yellow) 12%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
+                color: "var(--yellow)",
+              }}
+            >
+              <Clock size={9} />
+              Expires in {PENDING_INVITE_EXPIRY_DAYS} days
+            </span>
+          )}
+        </div>
       </td>
       <td
         className="px-4 py-3 text-[11px] tabular-nums"
@@ -1194,16 +2450,31 @@ function MemberCard({ member, onChangeRole, onRemove }: MemberRowProps) {
             </p>
           </div>
         </div>
-        <span
-          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-          style={{
-            background: `color-mix(in srgb, ${statusCfg.color} 15%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${statusCfg.color} 30%, transparent)`,
-            color: statusCfg.color,
-          }}
-        >
-          {statusCfg.label}
-        </span>
+        <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
+          <span
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            style={{
+              background: `color-mix(in srgb, ${statusCfg.color} 15%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${statusCfg.color} 30%, transparent)`,
+              color: statusCfg.color,
+            }}
+          >
+            {statusCfg.label}
+          </span>
+          {member.status === "pending" && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{
+                background: "color-mix(in srgb, var(--yellow) 12%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
+                color: "var(--yellow)",
+              }}
+            >
+              <Clock size={9} />
+              Expires in {PENDING_INVITE_EXPIRY_DAYS}d
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-2">

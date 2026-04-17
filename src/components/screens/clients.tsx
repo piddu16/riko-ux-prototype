@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
@@ -14,9 +14,11 @@ import {
   Send,
   FileSpreadsheet,
   ArrowRight,
+  ArrowUpDown,
 } from "lucide-react";
 import { CLIENTS, CA_FIRM } from "@/lib/data";
 import { Pill } from "@/components/ui/pill";
+import { useCompany, clientToCompany } from "@/lib/company-context";
 
 /* ------------------------------------------------------------------ */
 /*  Status → color map                                                */
@@ -119,8 +121,46 @@ function SummaryTile({ title, value, accent, icon, tinted }: SummaryTileProps) {
 /* ------------------------------------------------------------------ */
 /*  ClientsScreen                                                     */
 /* ------------------------------------------------------------------ */
+type SortKey = "status" | "health" | "revenue" | "activity";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "status", label: "Status" },
+  { key: "health", label: "Health Score" },
+  { key: "revenue", label: "Revenue" },
+  { key: "activity", label: "Last Activity" },
+];
+
+const STATUS_WEIGHT: Record<string, number> = {
+  critical: 0,
+  warning: 1,
+  healthy: 2,
+};
+
+function parseRevenue(v: string): number {
+  const m = v.trim().match(/([0-9]+(?:\.[0-9]+)?)(Cr|L)?/i);
+  if (!m) return 0;
+  const num = parseFloat(m[1]);
+  const unit = (m[2] || "").toLowerCase();
+  if (unit === "cr") return num * 1e7;
+  if (unit === "l") return num * 1e5;
+  return num;
+}
+
+function parseSyncMinutes(v: string): number {
+  const m = v.trim().match(/([0-9]+)\s*(m|min|minute|h|hour|hr|d|day)/i);
+  if (!m) return 9999;
+  const num = parseFloat(m[1]);
+  const unit = m[2].toLowerCase();
+  if (unit.startsWith("m")) return num;
+  if (unit.startsWith("h")) return num * 60;
+  if (unit.startsWith("d")) return num * 60 * 24;
+  return num;
+}
+
 export function ClientsScreen() {
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [sortBy, setSortBy] = useState<SortKey>("status");
+  const { setCurrent } = useCompany();
 
   /* ── Summary stats ── */
   const totalClients = 18;
@@ -128,15 +168,37 @@ export function ClientsScreen() {
   const misPendingCount = CLIENTS.filter((c) => c.misStatus === "Pending").length;
   const combinedRevenue = "\u20B942.6Cr";
 
-  /* ── Filter logic ── */
-  const filtered = CLIENTS.filter((c) => {
-    if (filter === "all") return true;
-    if (filter === "attention")
-      return c.status === "critical" || c.status === "warning";
-    if (filter === "mis") return c.misStatus === "Pending";
-    if (filter === "healthy") return c.status === "healthy";
-    return true;
-  });
+  /* ── Filter + sort ── */
+  const filtered = useMemo(() => {
+    const base = CLIENTS.filter((c) => {
+      if (filter === "all") return true;
+      if (filter === "attention")
+        return c.status === "critical" || c.status === "warning";
+      if (filter === "mis") return c.misStatus === "Pending";
+      if (filter === "healthy") return c.status === "healthy";
+      return true;
+    });
+
+    const sorted = [...base];
+    switch (sortBy) {
+      case "health":
+        sorted.sort((a, b) => b.healthScore - a.healthScore);
+        break;
+      case "revenue":
+        sorted.sort((a, b) => parseRevenue(b.revenue) - parseRevenue(a.revenue));
+        break;
+      case "activity":
+        sorted.sort((a, b) => parseSyncMinutes(a.lastSync) - parseSyncMinutes(b.lastSync));
+        break;
+      case "status":
+      default:
+        sorted.sort(
+          (a, b) => (STATUS_WEIGHT[a.status] ?? 3) - (STATUS_WEIGHT[b.status] ?? 3)
+        );
+        break;
+    }
+    return sorted;
+  }, [filter, sortBy]);
 
   return (
     <div
@@ -219,36 +281,61 @@ export function ClientsScreen() {
         </div>
 
         {/* ---------------------------------------------------------- */}
-        {/*  3. Filter tabs                                            */}
+        {/*  3. Filter tabs + Sort dropdown                            */}
         {/* ---------------------------------------------------------- */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.35, delay: 0.05 }}
-          className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1"
+          className="flex items-center gap-2 flex-wrap"
         >
-          {FILTERS.map((f) => {
-            const active = f.key === filter;
-            return (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-colors flex-shrink-0 whitespace-nowrap"
-                style={{
-                  background: active
-                    ? "var(--green)"
-                    : "color-mix(in srgb, var(--text-3) 10%, transparent)",
-                  color: active ? "#052E16" : "var(--text-2)",
-                  border: active
-                    ? "1px solid var(--green)"
-                    : "1px solid var(--border)",
-                }}
-              >
-                {f.label}
-              </button>
-            );
-          })}
+          <div className="flex gap-2 overflow-x-auto pb-1 flex-1 min-w-0">
+            {FILTERS.map((f) => {
+              const active = f.key === filter;
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-colors flex-shrink-0 whitespace-nowrap"
+                  style={{
+                    background: active
+                      ? "var(--green)"
+                      : "color-mix(in srgb, var(--text-3) 10%, transparent)",
+                    color: active ? "#052E16" : "var(--text-2)",
+                    border: active
+                      ? "1px solid var(--green)"
+                      : "1px solid var(--border)",
+                  }}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg flex-shrink-0"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <ArrowUpDown size={11} style={{ color: "var(--text-4)" }} />
+            <span style={{ color: "var(--text-4)" }}>Sort by</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className="bg-transparent outline-none text-[11px] font-semibold cursor-pointer"
+              style={{ color: "var(--text-1)" }}
+              aria-label="Sort clients by"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </motion.div>
 
         {/* ---------------------------------------------------------- */}
@@ -278,7 +365,7 @@ export function ClientsScreen() {
                   ease: "easeOut",
                 }}
                 whileHover={{ y: -3 }}
-                onClick={() => console.log("open client", c.id)}
+                onClick={() => setCurrent(clientToCompany(c))}
                 className="relative rounded-xl overflow-hidden cursor-pointer transition-shadow hover:shadow-xl"
                 style={{
                   background: "var(--bg-surface)",

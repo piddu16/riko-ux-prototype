@@ -553,4 +553,213 @@ export const BUILD_PHASES = [
   { phase: "Phase 5", label: "Hardening", status: "future" as const, items: ["Production credentials", "MSG91 follow-ups", "Deadline reminders"], weeks: "9-10" },
 ];
 
+/* ============================================================
+   PAYABLES — vendors we owe (item 5)
+   ============================================================ */
+
+export const PAYABLES = [
+  { name: "Amazon - Creations (Logistics)", gstin: "29AAHCA9099B1Z4", amount: 842300, days: 18, bills: 23, priority: "P3" as const, msme: false, category: "Logistics", contact: "+91 80 1234 5678" },
+  { name: "GOOGLE INDIA PVT LTD (Ads)", gstin: "29AACCG0527D1Z8", amount: 614200, days: 12, bills: 8, priority: "P3" as const, msme: false, category: "Marketing", contact: "ads-support@google.com" },
+  { name: "Shiprocket Logistics", gstin: "07AAGCS5867P1Z9", amount: 287500, days: 28, bills: 45, priority: "P2" as const, msme: false, category: "Logistics", contact: "+91 98100 22334" },
+  { name: "Mumbai Packaging Ltd", gstin: "27AAACM5555P1Z2", amount: 184200, days: 42, bills: 12, priority: "P1" as const, msme: true, category: "Raw Material", contact: "+91 98201 55667", msmeDueDate: "28 Apr 2026" },
+  { name: "Kiran Labels & Stickers", gstin: "27AAACK7777P1Z4", amount: 98500, days: 38, bills: 7, priority: "P1" as const, msme: true, category: "Raw Material", contact: "+91 98201 99887", msmeDueDate: "24 Apr 2026" },
+  { name: "Raw Material Supplier Co", gstin: "24AAACR1234P1Z2", amount: 156800, days: 22, bills: 9, priority: "P2" as const, msme: false, category: "Raw Material", contact: "+91 98765 44321" },
+  { name: "Instamojo Payments", gstin: "29AAACI8901P1Z3", amount: 45200, days: 8, bills: 3, priority: "P3" as const, msme: false, category: "Payment Gateway", contact: "support@instamojo.com" },
+  { name: "Facebook India (Ads)", gstin: "29AAACF1111F1Z2", amount: 328900, days: 15, bills: 6, priority: "P2" as const, msme: false, category: "Marketing", contact: "—" },
+  { name: "Zoho Corp (Tally licence)", gstin: "33AAACZ4123P1Z7", amount: 35000, days: 5, bills: 1, priority: "P3" as const, msme: false, category: "Software", contact: "+91 44 4996 5000" },
+  { name: "Bombay Printers", gstin: "27AAACB3366P1Z5", amount: 67400, days: 44, bills: 4, priority: "P1" as const, msme: true, category: "Raw Material", contact: "+91 98201 77665", msmeDueDate: "22 Apr 2026" },
+];
+
+/* ============================================================
+   TOP CUSTOMERS — for Sales > Customers tab (item 7)
+   ============================================================ */
+
+export const TOP_CUSTOMERS = [
+  { name: "Nykaa E-Retail Pvt Ltd", channel: "Marketplace", revenue: 3240000, orders: 142, aov: 22817, lastOrder: "28 Mar 2026", firstOrder: "04 Apr 2024", ltv: 8920000, cohort: "FY24 Q1", repeat: true },
+  { name: "Amazon Seller Central", channel: "Marketplace", revenue: 2850000, orders: 298, aov: 9564, lastOrder: "30 Mar 2026", firstOrder: "15 May 2023", ltv: 11240000, cohort: "FY23 Q1", repeat: true },
+  { name: "Flipkart Marketplace", channel: "Marketplace", revenue: 1980000, orders: 187, aov: 10588, lastOrder: "29 Mar 2026", firstOrder: "02 Jun 2024", ltv: 4210000, cohort: "FY24 Q2", repeat: true },
+  { name: "Website D2C (rikoskin.com)", channel: "D2C", revenue: 3220000, orders: 821, aov: 3922, lastOrder: "31 Mar 2026", firstOrder: "01 Apr 2023", ltv: 9830000, cohort: "FY23 Q1", repeat: true },
+  { name: "Paytm Mall (One97)", channel: "Marketplace", revenue: 890000, orders: 62, aov: 14354, lastOrder: "20 Feb 2026", firstOrder: "10 Jan 2025", ltv: 1240000, cohort: "FY24 Q4", repeat: true },
+  { name: "LLC Olimpiya", channel: "B2B Offline", revenue: 452000, orders: 8, aov: 56500, lastOrder: "14 Jan 2026", firstOrder: "18 Feb 2024", ltv: 890000, cohort: "FY23 Q4", repeat: false },
+  { name: "Meesho Seller", channel: "Marketplace", revenue: 385000, orders: 45, aov: 8555, lastOrder: "22 Mar 2026", firstOrder: "08 Aug 2025", ltv: 420000, cohort: "FY25 Q2", repeat: true },
+  { name: "JioMart (Reliance Retail)", channel: "Marketplace", revenue: 285000, orders: 31, aov: 9194, lastOrder: "12 Mar 2026", firstOrder: "19 Nov 2025", ltv: 310000, cohort: "FY25 Q3", repeat: true },
+  { name: "Ajio (Reliance)", channel: "Marketplace", revenue: 142000, orders: 18, aov: 7888, lastOrder: "05 Mar 2026", firstOrder: "12 Feb 2026", ltv: 142000, cohort: "FY25 Q4", repeat: false },
+  { name: "Scale Global Debtors", channel: "B2B Offline", revenue: 270000, orders: 4, aov: 67500, lastOrder: "28 Jan 2026", firstOrder: "14 Oct 2024", ltv: 650000, cohort: "FY24 Q3", repeat: false },
+];
+
+/* Cohort retention — customers acquired in each quarter, % still active */
+export const COHORT_RETENTION = [
+  { cohort: "FY23 Q1", acquired: 142, retention: [100, 68, 52, 41, 35, 28, 24, 21] }, // 8 quarters
+  { cohort: "FY23 Q2", acquired: 98, retention: [100, 72, 54, 43, 36, 30, 26] },
+  { cohort: "FY23 Q3", acquired: 167, retention: [100, 75, 58, 48, 39, 32] },
+  { cohort: "FY23 Q4", acquired: 215, retention: [100, 78, 61, 50, 41] },
+  { cohort: "FY24 Q1", acquired: 289, retention: [100, 80, 63, 52] },
+  { cohort: "FY24 Q2", acquired: 312, retention: [100, 82, 65] },
+  { cohort: "FY24 Q3", acquired: 401, retention: [100, 78] },
+  { cohort: "FY24 Q4", acquired: 356, retention: [100] },
+];
+
+/* AOV trend by month */
+export const AOV_TREND = [
+  { month: "Apr", aov: 8200 },
+  { month: "May", aov: 8450 },
+  { month: "Jun", aov: 7980 },
+  { month: "Jul", aov: 8120 },
+  { month: "Aug", aov: 7650 },
+  { month: "Sep", aov: 7420 },
+  { month: "Oct", aov: 7180 },
+  { month: "Nov", aov: 7640 },
+  { month: "Dec", aov: 8820 },
+  { month: "Jan", aov: 9240 },
+  { month: "Feb", aov: 8980 },
+  { month: "Mar", aov: 9420 },
+];
+
+/* ============================================================
+   RETURNS / CREDIT NOTES — item 11
+   (Bandra Soap has ₹1.62 Cr in returns = 17.5% of gross)
+   ============================================================ */
+
+export const RETURNS_SUMMARY = {
+  totalReturns: 16226404, // 1.62 Cr
+  grossSales: 108750204, // 10.87 Cr
+  returnRate: 14.9, // % of gross
+  returnCount: 847,
+  avgReturnValue: 19153,
+  trendDirection: "up" as const,
+  trendPct: 8.3,
+};
+
+export const RETURNS_BY_CHANNEL = [
+  { channel: "Amazon", returns: 7420000, sales: 22800000, rate: 32.5, count: 298, topReason: "Damaged in transit" },
+  { channel: "Flipkart", returns: 3180000, sales: 19800000, rate: 16.1, count: 187, topReason: "Wrong product" },
+  { channel: "Nykaa", returns: 2850000, sales: 32400000, rate: 8.8, count: 142, topReason: "Customer not satisfied" },
+  { channel: "Website D2C", returns: 1820000, sales: 32200000, rate: 5.7, count: 184, topReason: "Wrong address" },
+  { channel: "Meesho", returns: 620000, sales: 3850000, rate: 16.1, count: 31, topReason: "Cash on delivery refused" },
+  { channel: "Others", returns: 336404, sales: 7702204, rate: 4.4, count: 5, topReason: "Various" },
+];
+
+export const TOP_RETURNED_SKUS = [
+  { sku: "SKU-004", name: "100 GM BROWN GLASS JAR", returns: 184, rate: 38.2, loss: 920000 },
+  { sku: "SKU-005", name: "100 GM CHINA SURAH K TOAN", returns: 142, rate: 28.9, loss: 710000 },
+  { sku: "SKU-007", name: "Niacinamide Serum 30ml", returns: 89, rate: 12.4, loss: 534000 },
+  { sku: "SKU-006", name: "150 Gm Riko Jar New Tube", returns: 76, rate: 8.1, loss: 456000 },
+  { sku: "SKU-001", name: "100 Gm Riko Jar", returns: 54, rate: 4.2, loss: 324000 },
+];
+
+/* ============================================================
+   CASH FLOW FORECAST — item 9
+   ============================================================ */
+
+export const CASH_FORECAST_WEEKS = [
+  { week: "W1 (Apr 18-24)", inflow: 320000, outflow: 580000, net: -260000, endBalance: 299740 },
+  { week: "W2 (Apr 25-May 1)", inflow: 450000, outflow: 420000, net: 30000, endBalance: 329740 },
+  { week: "W3 (May 2-8)", inflow: 380000, outflow: 650000, net: -270000, endBalance: 59740 },
+  { week: "W4 (May 9-15)", inflow: 420000, outflow: 480000, net: -60000, endBalance: -260, alert: "Cash negative" },
+  { week: "W5 (May 16-22)", inflow: 380000, outflow: 520000, net: -140000, endBalance: -140260, alert: "Deepening deficit" },
+  { week: "W6 (May 23-29)", inflow: 410000, outflow: 580000, net: -170000, endBalance: -310260, alert: "Critical" },
+];
+
+export const CASH_FORECAST_SCENARIOS = [
+  { label: "Base case", endCash30d: 59740, runwayDays: 9, color: "var(--yellow)" },
+  { label: "If Nykaa pays ₹12.6L", endCash30d: 1319740, runwayDays: 68, color: "var(--green)" },
+  { label: "If GST refund ₹4.6L lands", endCash30d: 519740, runwayDays: 28, color: "var(--blue)" },
+  { label: "If marketing cut 30%", endCash30d: 759740, runwayDays: 41, color: "var(--green)" },
+  { label: "Worst case (all delays)", endCash30d: -420260, runwayDays: 0, color: "var(--red)" },
+];
+
+/* ============================================================
+   DEAD STOCK — item 8
+   ============================================================ */
+
+export const DEAD_STOCK = [
+  { sku: "SKU-010", name: "100 GM CHINA SURAH K TOAN (old)", qty: 452, value: 1130000, lastSold: "2 years ago", category: "Discontinued", recommendation: "Liquidate at 40% off" },
+  { sku: "SKU-015", name: "Peel-off Mask 50g", qty: 289, value: 434000, lastSold: "8 months ago", category: "Slow moving", recommendation: "Bundle with fast movers" },
+  { sku: "SKU-004", name: "100 GM BROWN GLASS JAR", qty: 186, value: 372000, lastSold: "6 months ago", category: "Slow moving", recommendation: "Return to supplier if possible" },
+  { sku: "SKU-022", name: "Glow Cream 30g (FY23 batch)", qty: 124, value: 248000, lastSold: "14 months ago", category: "Expiring soon", recommendation: "Discount 50% before 30 Jun" },
+  { sku: "SKU-028", name: "Herbal Toner 100ml", qty: 156, value: 195000, lastSold: "5 months ago", category: "Slow moving", recommendation: "Review pricing" },
+  { sku: "SKU-041", name: "Face Wash Duo Pack", qty: 98, value: 147000, lastSold: "7 months ago", category: "Slow moving", recommendation: "Run bundle promo" },
+];
+
+export const DEAD_STOCK_SUMMARY = {
+  totalSkus: 47,
+  totalValue: 3420000, // 34.2L
+  pctOfInventory: 44.4,
+  avgAge: 9.2, // months
+  categoryBreakdown: [
+    { category: "Discontinued", count: 12, value: 1620000 },
+    { category: "Slow moving", count: 24, value: 1280000 },
+    { category: "Expiring soon", count: 11, value: 520000 },
+  ],
+};
+
+/* ============================================================
+   TDS WORKINGS — item 16
+   ============================================================ */
+
+export const TDS_SECTIONS = [
+  { section: "194Q", desc: "Purchase of goods (>50L/vendor)", transactions: 14, liability: 182400, rate: 0.1, period: "March 2026" },
+  { section: "194J", desc: "Professional / technical fees", transactions: 28, liability: 96800, rate: 10, period: "March 2026" },
+  { section: "194C", desc: "Contractor payments", transactions: 45, liability: 54200, rate: 2, period: "March 2026" },
+  { section: "192", desc: "Salary TDS", transactions: 12, liability: 148600, rate: 0, period: "March 2026" },
+  { section: "194I", desc: "Rent payment", transactions: 3, liability: 24000, rate: 10, period: "March 2026" },
+  { section: "194H", desc: "Commission / brokerage", transactions: 8, liability: 18500, rate: 5, period: "March 2026" },
+];
+
+export const TDS_UPCOMING = {
+  depositDueDate: "7 May 2026",
+  depositAmount: 524500, // 5.24L
+  quarterlyReturnDueDate: "15 May 2026", // 24Q/26Q
+  form16DueDate: "31 May 2026", // annual for employees
+  salaryTdsDueDate: "30 Jun 2026", // Form 24Q Q4
+};
+
+export const TDS_DEDUCTEES = [
+  { name: "Priya Sharma (Manager)", pan: "ABCPS1234D", section: "192", amount: 42500, tdsRate: 15, tdsAmount: 6375 },
+  { name: "Sunil Shah (Accounts)", pan: "EFGPS5678E", section: "192", amount: 38000, tdsRate: 10, tdsAmount: 3800 },
+  { name: "Digital Lab Consultants", pan: "AAACD1111L", section: "194J", amount: 120000, tdsRate: 10, tdsAmount: 12000 },
+  { name: "Kiran Labels & Stickers", pan: "AAACK7777K", section: "194C", amount: 98500, tdsRate: 2, tdsAmount: 1970 },
+  { name: "Office Landlord (Ajay Mehta)", pan: "AJYPM4321M", section: "194I", amount: 80000, tdsRate: 10, tdsAmount: 8000 },
+];
+
+/* ============================================================
+   BANK RECONCILIATION — item 17
+   ============================================================ */
+
+export const BANK_ACCOUNTS = [
+  { id: "hdfc-oca", bank: "HDFC Bank", accountNumber: "XXXXXX7845", type: "Current", balance: 412500, lastReconciled: "31 Mar 2026", status: "reconciled" as const, statementDate: "17 Apr 2026" },
+  { id: "icici-oca", bank: "ICICI Bank", accountNumber: "XXXXXX2201", type: "Current", balance: 147240, lastReconciled: "31 Mar 2026", status: "pending" as const, statementDate: "17 Apr 2026", mismatchCount: 8 },
+  { id: "sbi-od", bank: "SBI", accountNumber: "XXXXXX9912", type: "OD/CC", balance: -816420, lastReconciled: "28 Feb 2026", status: "pending" as const, statementDate: "17 Apr 2026", mismatchCount: 14 },
+  { id: "kotak-savings", bank: "Kotak Mahindra", accountNumber: "XXXXXX4455", type: "Savings", balance: 23800, lastReconciled: "31 Mar 2026", status: "reconciled" as const, statementDate: "17 Apr 2026" },
+];
+
+export const BANK_RECON_LINES = [
+  { id: "l1", date: "12 Apr 2026", description: "RAZORPAY SETTLEMENT", bankAmount: 184500, tallyAmount: 184500, status: "matched" as const },
+  { id: "l2", date: "12 Apr 2026", description: "NEFT-NYKAA-RETAIL-INV4412", bankAmount: 125000, tallyAmount: null, status: "missing_tally" as const, suggestion: "Record as receipt from Nykaa E-Retail" },
+  { id: "l3", date: "11 Apr 2026", description: "CHQ-PAYMENT-KIRAN-LABELS", bankAmount: -48200, tallyAmount: -48200, status: "matched" as const },
+  { id: "l4", date: "10 Apr 2026", description: "UPI-CRED-TECH-3442", bankAmount: -12500, tallyAmount: null, status: "missing_tally" as const, suggestion: "Record as CRED card payment" },
+  { id: "l5", date: "09 Apr 2026", description: "NEFT-SHIPROCKET", bankAmount: -89000, tallyAmount: -82000, status: "mismatch" as const, diff: -7000, suggestion: "₹7,000 diff — check invoice SR-2301" },
+  { id: "l6", date: "08 Apr 2026", description: "BANK CHARGES - SMS", bankAmount: -236, tallyAmount: null, status: "missing_tally" as const, suggestion: "Record as bank charges" },
+  { id: "l7", date: "08 Apr 2026", description: "INTEREST CREDITED", bankAmount: 1420, tallyAmount: null, status: "missing_tally" as const, suggestion: "Record as interest income" },
+  { id: "l8", date: "07 Apr 2026", description: "IMPS-AMAZON-SELLER", bankAmount: 85200, tallyAmount: 85200, status: "matched" as const },
+];
+
+export const BANK_RECON_SUMMARY = {
+  openingBalanceBank: 486200,
+  openingBalanceTally: 486200,
+  closingBalanceBank: 147240,
+  closingBalanceTally: 162740,
+  difference: 15500,
+  matchedCount: 42,
+  mismatchCount: 3,
+  missingInTally: 8,
+  missingInBank: 0,
+};
+
+/* ============================================================
+   PENDING INVITES — item 13
+   ============================================================ */
+export const PENDING_INVITE_EXPIRY_DAYS = 7;
+
+
 

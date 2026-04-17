@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText,
   FileSpreadsheet,
   Download,
   Clock,
   MessageCircle,
+  Check,
 } from "lucide-react";
 import { R, K, fL, fCr, RECEIVABLES } from "@/lib/data";
 import { ComplianceCalendar } from "@/components/ui/compliance-calendar";
@@ -305,6 +306,299 @@ function ReceivablesPreview() {
   );
 }
 
+/* ── Investor Update Preview ── */
+function InvestorPreview() {
+  const metrics = [
+    { label: "Revenue (Mar)", value: "\u20B93.6L", color: "#22c55e", sub: "MoM −2%" },
+    { label: "Burn Rate", value: "\u20B918.6L/mo", color: "#ef4444", sub: "down from 21L" },
+    { label: "Runway", value: "9 days", color: "#ef4444", sub: "base case" },
+    { label: "Gross Margin", value: "82.5%", color: "#22c55e", sub: "+2pp MoM" },
+  ];
+
+  const highlights = [
+    "Shipped new SKU line (3 products) — niacinamide, vitamin C, retinol",
+    "Closed \u20B912.6L receivables from Nykaa (pending 2,195 days)",
+    "GM expanded 2pp MoM — COGS optimization on glass jars",
+    "Website D2C revenue up 18% WoW",
+  ];
+
+  const challenges = [
+    "Amazon returns up 8% — investigating packaging vulnerability",
+    "Cash runway at 9 days — raise or cut burn immediately",
+    "Paytm Mall pending \u20B93.55L for 2,132 days; likely requires escalation",
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Cover */}
+      <div className="text-center py-6 border-b" style={{ borderColor: "#e5e7eb" }}>
+        <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">
+          Monthly Investor Update
+        </p>
+        <p className="text-lg font-bold text-gray-900">Bandra Soap Pvt Ltd</p>
+        <p className="text-sm text-gray-500">March 2026</p>
+      </div>
+
+      {/* Metric grid */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+          Key Metrics
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {metrics.map((m) => (
+            <div
+              key={m.label}
+              className="rounded-lg px-3 py-3 bg-gray-50 border border-gray-100"
+            >
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider">
+                {m.label}
+              </p>
+              <p
+                className="text-base font-bold mt-1"
+                style={{ color: m.color, fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                {m.value}
+              </p>
+              <p className="text-[10px] text-gray-500 mt-0.5">{m.sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Highlights */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+          Highlights
+        </p>
+        <ul className="space-y-2">
+          {highlights.map((h) => (
+            <li key={h} className="flex items-start gap-2 text-sm text-gray-700">
+              <span
+                className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-2"
+                style={{ background: "#22c55e" }}
+              />
+              <span>{h}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Challenges */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+          Challenges
+        </p>
+        <ul className="space-y-2">
+          {challenges.map((c) => (
+            <li key={c} className="flex items-start gap-2 text-sm text-gray-700">
+              <span
+                className="flex-shrink-0 w-1.5 h-1.5 rounded-full mt-2"
+                style={{ background: "#ef4444" }}
+              />
+              <span>{c}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Ask */}
+      <div
+        className="rounded-lg p-4"
+        style={{
+          background: "#ecfdf5",
+          border: "1px solid #a7f3d0",
+        }}
+      >
+        <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "#065f46" }}>
+          The Ask
+        </p>
+        <p className="text-sm font-semibold" style={{ color: "#064e3b" }}>
+          Closing bridge round of {"\u20B9"}3Cr by 15 May 2026
+        </p>
+        <p className="text-xs mt-1" style={{ color: "#065f46" }}>
+          12-month runway · 20% dilution · lead investor: TBD
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ── Board Deck Preview ── */
+function BoardDeckPreview() {
+  const slides = [
+    {
+      num: 1,
+      title: "Executive Summary",
+      content: (
+        <div className="space-y-2 text-sm text-gray-700">
+          <p><span className="font-semibold text-red-600">Revenue down 55% YoY</span> — {"\u20B9"}9.25Cr (vs {"\u20B9"}20.1Cr FY24)</p>
+          <p><span className="font-semibold text-red-600">EBITDA {"\u20B9"}−1.74Cr</span> — burn {"\u20B9"}18.6L/mo, marketing-heavy</p>
+          <p><span className="font-semibold text-red-600">Cash runway critical</span> — 9 days at current burn</p>
+          <p className="text-gray-600 italic pt-1">Recommendation: immediate burn cut + bridge financing</p>
+        </div>
+      ),
+    },
+    {
+      num: 2,
+      title: "Financial Performance",
+      content: (
+        <table className="w-full text-sm">
+          <tbody>
+            {[
+              { label: "Revenue", fy24: "\u20B920.13Cr", fy25: "\u20B99.25Cr", delta: "−54%" },
+              { label: "Gross Profit", fy24: "\u20B916.50Cr", fy25: "\u20B97.64Cr", delta: "−54%" },
+              { label: "Marketing spend", fy24: "\u20B918.20Cr", fy25: "\u20B923.23Cr", delta: "+28%" },
+              { label: "EBITDA", fy24: "\u20B9−1.20Cr", fy25: "\u20B9−1.74Cr", delta: "−45%" },
+              { label: "Cash", fy24: "\u20B912.4L", fy25: "\u20B95.6L", delta: "−55%" },
+            ].map((row, i) => (
+              <tr key={row.label} style={{ borderTop: i === 0 ? undefined : "1px solid #f3f4f6" }}>
+                <td className="py-2 text-gray-700 font-medium">{row.label}</td>
+                <td className="py-2 text-right font-mono text-gray-600">{row.fy24}</td>
+                <td className="py-2 text-right font-mono text-gray-900 font-semibold">{row.fy25}</td>
+                <td
+                  className="py-2 text-right font-mono font-semibold"
+                  style={{ color: row.delta.startsWith("+") ? "#22c55e" : "#ef4444" }}
+                >
+                  {row.delta}
+                </td>
+              </tr>
+            ))}
+            <tr style={{ borderTop: "1px solid #e5e7eb" }}>
+              <td></td>
+              <td className="pt-1 text-right text-[10px] uppercase text-gray-400">FY24</td>
+              <td className="pt-1 text-right text-[10px] uppercase text-gray-400">FY25</td>
+              <td className="pt-1 text-right text-[10px] uppercase text-gray-400">YoY</td>
+            </tr>
+          </tbody>
+        </table>
+      ),
+    },
+    {
+      num: 3,
+      title: "Cash & Runway",
+      content: (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {[
+              { label: "Today", v: "\u20B95.6L", color: "#22c55e" },
+              { label: "+30d", v: "\u20B9−2.6L", color: "#ef4444" },
+              { label: "+60d", v: "\u20B9−14L", color: "#ef4444" },
+              { label: "+90d", v: "\u20B9−31L", color: "#ef4444" },
+            ].map((b) => (
+              <div key={b.label} className="flex-1 rounded-lg px-2 py-2 text-center bg-gray-50 border border-gray-100">
+                <p className="text-[10px] text-gray-400 uppercase">{b.label}</p>
+                <p className="text-sm font-bold mt-1" style={{ color: b.color }}>{b.v}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">
+            Base case burn {"\u20B9"}18.6L/mo. Needs {"\u20B9"}3Cr bridge or 40% cost cut within 30 days.
+          </p>
+        </div>
+      ),
+    },
+    {
+      num: 4,
+      title: "Operational Highlights",
+      content: (
+        <div className="space-y-3">
+          <div>
+            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Channel mix</p>
+            <div className="space-y-1.5">
+              {[
+                { ch: "Nykaa (Marketplace)", pct: 35 },
+                { ch: "Website D2C", pct: 35 },
+                { ch: "Amazon", pct: 20 },
+                { ch: "Flipkart", pct: 7 },
+                { ch: "Others", pct: 3 },
+              ].map((c) => (
+                <div key={c.ch} className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-600 w-36">{c.ch}</span>
+                  <div className="flex-1 h-3 rounded bg-gray-100 overflow-hidden">
+                    <div className="h-full rounded" style={{ width: `${c.pct}%`, background: "#22c55e" }} />
+                  </div>
+                  <span className="text-[11px] font-mono text-gray-700 w-10 text-right">{c.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-2">Top customers</p>
+            <p className="text-xs text-gray-700">Nykaa ({"\u20B9"}3.24L), Website D2C ({"\u20B9"}3.22L), Amazon Seller ({"\u20B9"}2.85L)</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      num: 5,
+      title: "Strategy & Ask",
+      content: (
+        <div className="space-y-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
+              Strategic priorities
+            </p>
+            <ul className="space-y-1 text-sm text-gray-700">
+              <li>1. Cut marketing spend 40% — shift to organic + retention</li>
+              <li>2. Close Nykaa AR collection ({"\u20B9"}12.6L stuck)</li>
+              <li>3. File RFD-01 for {"\u20B9"}4.6L excess ITC refund</li>
+              <li>4. Raise {"\u20B9"}3Cr bridge for 12-month runway</li>
+            </ul>
+          </div>
+          <div
+            className="rounded-lg p-3"
+            style={{ background: "#ecfdf5", border: "1px solid #a7f3d0" }}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#065f46" }}>
+              Board ask
+            </p>
+            <p className="text-sm font-semibold mt-1" style={{ color: "#064e3b" }}>
+              Approve {"\u20B9"}3Cr bridge facility by 15 May 2026
+            </p>
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Cover slide */}
+      <div
+        className="text-center rounded-lg py-8"
+        style={{ background: "linear-gradient(135deg, #111827, #374151)", color: "#fff" }}
+      >
+        <p className="text-[10px] uppercase tracking-widest opacity-70 mb-3">
+          Board Review
+        </p>
+        <p className="text-xl font-bold">Q4 FY25 Board Review</p>
+        <p className="text-sm mt-1 opacity-80">Bandra Soap Pvt Ltd</p>
+        <p className="text-xs mt-3 opacity-60">Presented by Yogesh Patel · 17 Apr 2026</p>
+      </div>
+
+      {/* Slides */}
+      {slides.map((s) => (
+        <div
+          key={s.num}
+          className="rounded-lg border border-gray-200 p-5"
+          style={{ background: "#fff" }}
+        >
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+            <p className="text-sm font-bold text-gray-900">
+              <span className="text-gray-400 mr-2">Slide {s.num}</span>
+              {s.title}
+            </p>
+            <span className="text-[10px] uppercase tracking-wider text-gray-400">
+              Q4 FY25
+            </span>
+          </div>
+          {s.content}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── Placeholder Preview ── */
 function PlaceholderPreview() {
   return (
@@ -321,8 +615,17 @@ function PlaceholderPreview() {
 /* ═══════════════════════════════════════════
    Reports Screen
    ═══════════════════════════════════════════ */
+type ToastState = { visible: boolean; stage: "sending" | "sent"; format: string };
+
 export function ReportsScreen() {
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState>({ visible: false, stage: "sending", format: "" });
+
+  const triggerExport = (format: string) => {
+    setToast({ visible: true, stage: "sending", format });
+    setTimeout(() => setToast({ visible: true, stage: "sent", format }), 1400);
+    setTimeout(() => setToast({ visible: false, stage: "sent", format }), 3600);
+  };
 
   const renderPreview = () => {
     switch (selectedReport) {
@@ -332,6 +635,10 @@ export function ReportsScreen() {
         return <PnLPreview />;
       case "receivables":
         return <ReceivablesPreview />;
+      case "investor":
+        return <InvestorPreview />;
+      case "board":
+        return <BoardDeckPreview />;
       default:
         return <PlaceholderPreview />;
     }
@@ -479,6 +786,7 @@ export function ReportsScreen() {
             className="flex flex-wrap items-center gap-2 mt-4"
           >
             <button
+              onClick={() => triggerExport("PDF")}
               className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
               style={{
                 background: "var(--green)",
@@ -489,6 +797,7 @@ export function ReportsScreen() {
               Download PDF
             </button>
             <button
+              onClick={() => triggerExport("Excel")}
               className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
               style={{
                 background: "transparent",
@@ -500,6 +809,7 @@ export function ReportsScreen() {
               Download Excel
             </button>
             <button
+              onClick={() => triggerExport("WhatsApp")}
               className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
               style={{
                 background: "transparent",
@@ -511,6 +821,7 @@ export function ReportsScreen() {
               Share via WhatsApp
             </button>
             <button
+              onClick={() => triggerExport("Schedule")}
               className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
               style={{
                 background: "transparent",
@@ -592,6 +903,77 @@ export function ReportsScreen() {
           </table>
         </div>
       </motion.div>
+
+      {/* Export toast */}
+      <AnimatePresence>
+        {toast.visible && (
+          <motion.div
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 rounded-xl shadow-2xl"
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border)",
+              minWidth: 280,
+              maxWidth: 360,
+            }}
+          >
+            <div className="flex items-start gap-3 p-4">
+              {/* Icon */}
+              <div
+                className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
+                style={{
+                  background:
+                    toast.format === "WhatsApp"
+                      ? toast.stage === "sent"
+                        ? "#25D366"
+                        : "color-mix(in srgb, #25D366 20%, transparent)"
+                      : toast.stage === "sent"
+                        ? "var(--green)"
+                        : "color-mix(in srgb, var(--green) 20%, transparent)",
+                  color:
+                    toast.stage === "sent" ? "#fff" : toast.format === "WhatsApp" ? "#25D366" : "var(--green)",
+                }}
+              >
+                {toast.stage === "sent" ? (
+                  <Check size={16} strokeWidth={3} />
+                ) : toast.format === "WhatsApp" ? (
+                  <MessageCircle size={16} />
+                ) : (
+                  <Download size={16} />
+                )}
+              </div>
+
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                  {toast.stage === "sending"
+                    ? toast.format === "WhatsApp"
+                      ? "Sending to Yogesh via WhatsApp…"
+                      : toast.format === "Schedule"
+                        ? "Scheduling monthly delivery…"
+                        : toast.format === "Excel"
+                          ? "Generating Excel workbook…"
+                          : "Generating PDF…"
+                    : toast.format === "WhatsApp"
+                      ? "Sent via WhatsApp ✓"
+                      : toast.format === "Schedule"
+                        ? "Schedule set — every 1st of month ✓"
+                        : `${toast.format} ready ✓`}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+                  {selectedTemplate?.name ?? "MIS Report"}
+                  {toast.stage === "sent" && toast.format === "WhatsApp" && " · +91 98765 43210"}
+                  {toast.stage === "sent" && toast.format === "PDF" && " · Downloads/riko-mis-mar-2026.pdf"}
+                  {toast.stage === "sent" && toast.format === "Excel" && " · Downloads/riko-mis-mar-2026.xlsx"}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

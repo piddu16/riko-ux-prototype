@@ -9,7 +9,6 @@ import {
   FileJson,
   Send,
   AlertTriangle,
-  CircleCheck,
   Circle,
   ArrowRight,
   MessageCircle,
@@ -21,7 +20,6 @@ import {
   Percent,
   Check,
   X as XIcon,
-  Ban,
 } from "lucide-react";
 import {
   GSTINS,
@@ -31,7 +29,6 @@ import {
   FILING_STATE,
   FILING_HISTORY,
   GST_HEALTH,
-  GST_WORKFLOWS,
   BUILD_PHASES,
 } from "@/lib/data";
 import { GstinSelector } from "@/components/ui/gst/gstin-selector";
@@ -420,16 +417,6 @@ export function GstScreen() {
   const [otpOpen, setOtpOpen] = useState(false);
   const [otpPurpose, setOtpPurpose] = useState<string>("GST consent");
 
-  /* --- Workflow click handler --- */
-  const onWorkflowClick = (id: string, phaseStatus: string) => {
-    if (phaseStatus === "blocked") {
-      // Still open the preview tab — blocked workflows have a design preview.
-    }
-    if (id === "recon") setActiveTab("recon");
-    else if (id === "gstr1") setActiveTab("gstr1");
-    else if (id === "gstr3b") setActiveTab("gstr3b");
-  };
-
   /* --- Filter recon lines --- */
   const filteredLines = RECONCILIATION.lines.filter((l) => {
     if (reconFilter === "all") return true;
@@ -726,134 +713,11 @@ export function GstScreen() {
       </motion.div>
 
       {/* ================================================== */}
-      {/*  5. Workflow Cards Grid                            */}
-      {/* ================================================== */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.15 }}
-        transition={{ duration: 0.4, delay: 0.05 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6"
-      >
-        {GST_WORKFLOWS.map((w, i) => {
-          const isBlocked = w.phaseStatus === "blocked";
-          const color = isBlocked ? "var(--red)" : "var(--green)";
-          return (
-            <motion.div
-              key={w.id}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{
-                duration: 0.4,
-                delay: 0.05 + i * 0.05,
-                ease: "easeOut",
-              }}
-              whileHover={{ y: -3 }}
-              className="rounded-xl p-4 flex flex-col gap-3 transition-shadow hover:shadow-xl cursor-default"
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                opacity: isBlocked ? 0.92 : 1,
-              }}
-            >
-              {/* Top row: icon + phase badge */}
-              <div className="flex items-start justify-between gap-2">
-                <span className="text-3xl leading-none flex-shrink-0">
-                  {w.icon}
-                </span>
-                <span
-                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 flex-shrink-0"
-                  style={{
-                    background: `color-mix(in srgb, ${color} 14%, transparent)`,
-                    color,
-                  }}
-                  title={
-                    isBlocked && "blockReason" in w
-                      ? (w as { blockReason?: string }).blockReason
-                      : undefined
-                  }
-                >
-                  {isBlocked ? (
-                    <Ban size={9} />
-                  ) : (
-                    <CircleCheck size={9} />
-                  )}
-                  {w.phase} &middot; {isBlocked ? "Blocked" : "Ready"}
-                </span>
-              </div>
-
-              {/* Title + subtitle */}
-              <div>
-                <p
-                  className="text-sm font-bold"
-                  style={{ color: "var(--text-1)" }}
-                >
-                  {w.title}
-                </p>
-                <p
-                  className="text-xs mt-0.5"
-                  style={{ color: "var(--text-3)" }}
-                >
-                  {w.subtitle}
-                </p>
-                <p
-                  className="text-[10px] mt-1.5"
-                  style={{ color: "var(--text-4)" }}
-                >
-                  {w.cadence}
-                </p>
-              </div>
-
-              {/* Blocker reason */}
-              {isBlocked && "blockReason" in w && (
-                <p
-                  className="text-[11px] leading-relaxed px-2 py-1.5 rounded"
-                  style={{
-                    background:
-                      "color-mix(in srgb, var(--red) 8%, transparent)",
-                    color: "var(--red)",
-                    border:
-                      "1px solid color-mix(in srgb, var(--red) 20%, transparent)",
-                  }}
-                >
-                  {(w as { blockReason?: string }).blockReason}
-                </p>
-              )}
-
-              {/* CTA */}
-              <button
-                type="button"
-                onClick={() => onWorkflowClick(w.id, w.phaseStatus)}
-                className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-opacity hover:opacity-90 mt-auto cursor-pointer"
-                style={{
-                  background: isBlocked
-                    ? "transparent"
-                    : "var(--green)",
-                  color: isBlocked ? "var(--text-3)" : "#052E16",
-                  border: isBlocked
-                    ? "1px solid var(--border)"
-                    : "1px solid var(--green)",
-                }}
-              >
-                {w.cta}
-                <ArrowRight size={11} />
-              </button>
-              {isBlocked && (
-                <p
-                  className="text-[10px] text-center -mt-1"
-                  style={{ color: "var(--text-4)" }}
-                >
-                  Design preview only
-                </p>
-              )}
-            </motion.div>
-          );
-        })}
-      </motion.div>
-
-      {/* ================================================== */}
-      {/*  6. Active Workflow Tabs                           */}
+      {/*  5. Active Workflow Tabs                           */}
+      {/*      (Previously duplicated by Workflow Cards;     */}
+      {/*       tabs alone are sufficient — users already    */}
+      {/*       see phase-status on the Build Phase strip    */}
+      {/*       at the top of the screen.)                   */}
       {/* ================================================== */}
       <div
         className="flex items-center gap-0 overflow-x-auto -mx-1 px-1 mb-4"

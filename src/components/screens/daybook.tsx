@@ -38,18 +38,37 @@ const VOUCHER_TYPES = ["Purchase", "Sales", "Receipt", "Payment", "Journal"] as 
 export function DaybookScreen() {
   const [activeRange, setActiveRange] = useState<string>("This Month");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeParty, setActiveParty] = useState<string>("All");
 
-  /* Filter entries by search */
+  /* Top-5 parties by transaction count */
+  const topParties = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of DAYBOOK) {
+      counts.set(e.name, (counts.get(e.name) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+  }, []);
+
+  /* Filter entries by search + active party */
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return DAYBOOK;
-    const q = searchQuery.toLowerCase();
-    return DAYBOOK.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.type.toLowerCase().includes(q) ||
-        String(e.invoice).includes(q),
-    );
-  }, [searchQuery]);
+    const q = searchQuery.trim().toLowerCase();
+    return DAYBOOK.filter((e) => {
+      if (activeParty !== "All" && !e.name.toLowerCase().includes(activeParty.toLowerCase())) {
+        return false;
+      }
+      if (q) {
+        return (
+          e.name.toLowerCase().includes(q) ||
+          e.type.toLowerCase().includes(q) ||
+          String(e.invoice).includes(q)
+        );
+      }
+      return true;
+    });
+  }, [searchQuery, activeParty]);
 
   /* Group by date */
   const grouped = useMemo(() => {
@@ -152,6 +171,46 @@ export function DaybookScreen() {
           <strong style={{ color: "var(--green)" }}>{fmtAmt(totalCredit)}</strong>
         </span>
       </div>
+
+      {/* Party chip filter */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.3 }}
+        className="flex flex-wrap items-center gap-1.5 mb-4"
+      >
+        <span
+          className="text-[10px] uppercase tracking-wider font-semibold mr-1"
+          style={{ color: "var(--text-4)" }}
+        >
+          Party:
+        </span>
+        {["All", ...topParties].map((p) => {
+          const active = activeParty === p;
+          const label = p.length > 22 ? p.slice(0, 20) + "…" : p;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setActiveParty(p)}
+              title={p}
+              className="text-[11px] font-semibold px-3 py-1 rounded-full cursor-pointer transition-colors whitespace-nowrap"
+              style={{
+                background: active
+                  ? "var(--green)"
+                  : "color-mix(in srgb, var(--text-3) 10%, transparent)",
+                color: active ? "#052E16" : "var(--text-2)",
+                border: active
+                  ? "1px solid var(--green)"
+                  : "1px solid var(--border)",
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </motion.div>
 
       {/* ── Desktop: Summary Dashboard ── */}
       <motion.div

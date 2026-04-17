@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { I18nProvider } from "@/lib/i18n-context";
 import { RbacProvider } from "@/lib/rbac-context";
+import { CompanyProvider } from "@/lib/company-context";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -23,7 +24,9 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full">
         <I18nProvider>
-          <RbacProvider>{children}</RbacProvider>
+          <RbacProvider>
+            <CompanyProvider>{children}</CompanyProvider>
+          </RbacProvider>
         </I18nProvider>
       </body>
     </html>
