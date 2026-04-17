@@ -346,8 +346,10 @@ function ExchangeMIS() {
   );
 }
 
-/* ── Context Panel (desktop right side) ── */
-function ContextPanel() {
+/* ── Context Panel (desktop right side) — topic-aware ── */
+type ContextTopic = "ratio" | "receivables" | "mis";
+
+function ContextPanel({ topic, onTopicChange }: { topic: ContextTopic; onTopicChange: (t: ContextTopic) => void }) {
   const ca = K.ca;
   const cl = K.cl;
   const ratio = K.cr;
@@ -362,13 +364,19 @@ function ContextPanel() {
   ];
 
   const sources = [
-    { field: "Cash & Bank", value: `${fL(R.cash)}L`, source: "Balance Sheet > Cash & Bank" },
-    { field: "Debtors", value: `${fL(R.debtors)}L`, source: "Balance Sheet > Sundry Debtors" },
-    { field: "Closing Stock", value: `${fL(R.stkC)}L`, source: "Balance Sheet > Inventory" },
-    { field: "Other CA", value: "14.1L", source: "Balance Sheet > Loans & Advances" },
-    { field: "Creditors", value: `${fL(R.cred)}L`, source: "Balance Sheet > Sundry Creditors" },
-    { field: "Provisions", value: `${fL(R.prov)}L`, source: "Balance Sheet > Provisions" },
+    { field: "Cash & Bank", value: `${fL(R.cash)}L`, source: "ledger (Cash)" },
+    { field: "Debtors", value: `${fL(R.debtors)}L`, source: "ledger (Debtors)" },
+    { field: "Closing Stock", value: `${fL(R.stkC)}L`, source: "stock_items" },
+    { field: "Other CA", value: "14.1L", source: "ledger (Loans)" },
+    { field: "Creditors", value: `${fL(R.cred)}L`, source: "ledger (Creditors)" },
+    { field: "Provisions", value: `${fL(R.prov)}L`, source: "ledger (Provisions)" },
   ];
+
+  const topicLabels: Record<ContextTopic, string> = {
+    ratio: "Current Ratio",
+    receivables: "Receivables",
+    mis: "MIS Report",
+  };
 
   return (
     <motion.div
@@ -378,46 +386,62 @@ function ContextPanel() {
       transition={{ duration: 0.4 }}
       className="flex flex-col h-full overflow-y-auto"
     >
-      {/* Header */}
+      {/* Header with topic tabs */}
       <div
-        className="sticky top-0 z-10 flex items-center justify-between px-5 py-3"
+        className="sticky top-0 z-10"
         style={{
           background: "var(--bg-secondary)",
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-5 pt-3">
           <span
             className="text-[10px] font-bold tracking-widest uppercase"
             style={{ color: "var(--text-4)" }}
           >
-            Context
+            Context — {topicLabels[topic]}
           </span>
-          <span className="text-[10px] font-medium" style={{ color: "var(--text-4)" }}>
-            &mdash;
-          </span>
-          <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
-            Current Ratio
-          </span>
+          <div className="flex items-center gap-1.5">
+            {["PDF", "Excel", "Email"].map((f) => (
+              <button
+                key={f}
+                className="text-[10px] font-medium px-2 py-1 rounded-md cursor-pointer transition-opacity hover:opacity-80"
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-3)",
+                }}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {["PDF", "Excel", "Email"].map((f) => (
-            <button
-              key={f}
-              className="text-[10px] font-medium px-2 py-1 rounded-md cursor-pointer transition-opacity hover:opacity-80"
-              style={{
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                color: "var(--text-3)",
-              }}
-            >
-              {f}
-            </button>
-          ))}
+        <div className="flex gap-1 px-5 pt-2 pb-0">
+          {(["ratio", "receivables", "mis"] as ContextTopic[]).map((t) => {
+            const active = topic === t;
+            return (
+              <button
+                key={t}
+                onClick={() => onTopicChange(t)}
+                className="text-xs font-semibold px-3 py-2 transition-colors cursor-pointer"
+                style={{
+                  color: active ? "var(--green)" : "var(--text-4)",
+                  borderBottom: active ? "2px solid var(--green)" : "2px solid transparent",
+                  marginBottom: "-1px",
+                }}
+              >
+                {topicLabels[t]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <div className="px-5 py-4 space-y-5">
+      <div className="px-5 py-4 space-y-5 max-w-2xl">
+        {/* === RATIO TOPIC === */}
+        {topic === "ratio" && (
+          <>
         {/* Hero KPIs */}
         <div className="grid grid-cols-3 gap-3">
           {[
@@ -586,6 +610,180 @@ function ContextPanel() {
             </button>
           ))}
         </div>
+          </>
+        )}
+
+        {/* === RECEIVABLES TOPIC === */}
+        {topic === "receivables" && (
+          <>
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Total Outstanding", value: "₹34.1L", color: "var(--red)" },
+                { label: "Overdue Parties", value: "5", color: "var(--yellow)" },
+                { label: "Avg DSO", value: `${K.dso.toFixed(0)}d`, color: "var(--blue)" },
+              ].map((k) => (
+                <div key={k.label} className="rounded-xl p-3"
+                  style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+                  <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--text-4)" }}>
+                    {k.label}
+                  </p>
+                  <p className="text-2xl font-bold" style={{ color: k.color, fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {k.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Aging buckets */}
+            <div className="rounded-xl p-4" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-bold mb-3" style={{ color: "var(--text-1)" }}>Aging Buckets</p>
+              {[
+                { label: "0-30 days", value: "₹1.7L", pct: 5, color: "var(--green)" },
+                { label: "30-90 days", value: "₹3.4L", pct: 10, color: "var(--blue)" },
+                { label: "90-365 days", value: "₹5.1L", pct: 15, color: "var(--yellow)" },
+                { label: "365+ days", value: "₹23.9L", pct: 70, color: "var(--red)" },
+              ].map((b) => (
+                <div key={b.label} className="mb-2.5 last:mb-0">
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span style={{ color: "var(--text-2)" }}>{b.label}</span>
+                    <span style={{ color: b.color, fontWeight: 600 }}>{b.value} ({b.pct}%)</span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--bg-hover)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${b.pct}%`, background: b.color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Top parties detail */}
+            <div className="rounded-xl p-4" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-bold mb-3" style={{ color: "var(--text-1)" }}>Priority Action Plan</p>
+              <div className="space-y-2">
+                {RECEIVABLES.slice(0, 5).map((r, i) => (
+                  <div key={r.name} className="flex items-center gap-2 text-xs">
+                    <span className="w-5 text-center font-bold" style={{ color: "var(--text-4)" }}>{i + 1}</span>
+                    <span className="flex-1 truncate" style={{ color: "var(--text-2)" }}>{r.name}</span>
+                    <span className="font-bold tabular-nums" style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                      ₹{(r.amount / 1e5).toFixed(1)}L
+                    </span>
+                    <span className="text-[10px] tabular-nums" style={{ color: r.days > 365 ? "var(--red)" : "var(--yellow)" }}>
+                      {r.days.toLocaleString()}d
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 p-2 rounded-lg text-[11px]"
+                style={{ background: "color-mix(in srgb, var(--green) 10%, transparent)", color: "var(--green)" }}>
+                💡 Batch-send WhatsApp reminders to all 5 — recover up to ₹34L
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* === MIS TOPIC === */}
+        {topic === "mis" && (
+          <>
+            {/* MIS Preview */}
+            <div className="rounded-xl overflow-hidden"
+              style={{ background: "#fff", border: "1px solid var(--border)" }}>
+              <div className="p-5" style={{ color: "#0F172A" }}>
+                <p className="text-[10px] uppercase tracking-widest font-bold mb-1" style={{ color: "#64748B" }}>
+                  Management Information System
+                </p>
+                <p className="text-lg font-bold">Monthly MIS Report</p>
+                <p className="text-xs mt-0.5" style={{ color: "#64748B" }}>
+                  Bandra Soap Pvt Ltd · March 2026
+                </p>
+                <hr className="my-3" style={{ borderColor: "#E2E8F0" }} />
+
+                <p className="text-xs font-bold mb-2" style={{ color: "#0F172A" }}>P&L Summary</p>
+                <table className="w-full text-[11px] mb-3">
+                  <tbody>
+                    {[
+                      { label: "Revenue", value: "₹9.25 Cr", bold: true },
+                      { label: "COGS", value: "₹1.61 Cr" },
+                      { label: "Gross Profit (82.5%)", value: "₹7.63 Cr", bold: true, color: "#16A34A" },
+                      { label: "OpEx", value: "₹9.98 Cr" },
+                      { label: "EBITDA (-18.9%)", value: "-₹1.74 Cr", bold: true, color: "#DC2626" },
+                      { label: "Net Loss", value: "-₹2.24 Cr", bold: true, color: "#DC2626" },
+                    ].map((r) => (
+                      <tr key={r.label} style={{ borderTop: "1px solid #F1F5F9" }}>
+                        <td className="py-1" style={{ color: r.color || (r.bold ? "#0F172A" : "#475569"), fontWeight: r.bold ? 600 : 400 }}>
+                          {r.label}
+                        </td>
+                        <td className="py-1 text-right tabular-nums"
+                          style={{ color: r.color || "#0F172A", fontWeight: r.bold ? 700 : 500, fontFamily: "'Space Grotesk', sans-serif" }}>
+                          {r.value}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <p className="text-xs font-bold mb-2" style={{ color: "#0F172A" }}>Key Ratios</p>
+                <div className="grid grid-cols-5 gap-1.5 mb-3">
+                  {[
+                    { label: "CR", value: "2.60", color: "#16A34A" },
+                    { label: "QR", value: "0.46", color: "#DC2626" },
+                    { label: "GM", value: "82%", color: "#16A34A" },
+                    { label: "DSO", value: "3d", color: "#16A34A" },
+                    { label: "CCC", value: "32d", color: "#F59E0B" },
+                  ].map((k) => (
+                    <div key={k.label} className="text-center p-2 rounded-md" style={{ background: "#F8FAFC" }}>
+                      <p className="text-[9px]" style={{ color: "#64748B" }}>{k.label}</p>
+                      <p className="text-sm font-bold" style={{ color: k.color, fontFamily: "'Space Grotesk', sans-serif" }}>
+                        {k.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-xs font-bold mb-2" style={{ color: "#0F172A" }}>GST Summary</p>
+                <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  <div className="p-2 rounded-md" style={{ background: "#F0FDF4" }}>
+                    <p style={{ color: "#64748B" }}>ITC Available</p>
+                    <p className="font-bold" style={{ color: "#16A34A", fontFamily: "'Space Grotesk', sans-serif" }}>₹1.08 Cr</p>
+                  </div>
+                  <div className="p-2 rounded-md" style={{ background: "#FEF2F2" }}>
+                    <p style={{ color: "#64748B" }}>GST Liability</p>
+                    <p className="font-bold" style={{ color: "#DC2626", fontFamily: "'Space Grotesk', sans-serif" }}>₹1.03 Cr</p>
+                  </div>
+                  <div className="p-2 rounded-md" style={{ background: "#FFFBEB" }}>
+                    <p style={{ color: "#64748B" }}>Excess ITC</p>
+                    <p className="font-bold" style={{ color: "#F59E0B", fontFamily: "'Space Grotesk', sans-serif" }}>₹4.61 L</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Report sections */}
+            <div className="rounded-xl p-4" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-bold mb-3" style={{ color: "var(--text-1)" }}>10 Sections Included</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  "P&L Statement", "Balance Sheet", "Key Ratios", "Cash Flow",
+                  "Receivables Ageing", "Payables Summary", "GST Summary",
+                  "Monthly Trends", "AI Recommendations", "Raw Data Appendix",
+                ].map((s) => (
+                  <div key={s} className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-2)" }}>
+                    <span style={{ color: "var(--green)" }}>✓</span>
+                    {s}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Branding action */}
+            <div className="rounded-xl p-4"
+              style={{ background: "color-mix(in srgb, var(--green) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)" }}>
+              <p className="text-xs font-bold mb-1" style={{ color: "var(--green)" }}>💡 Add CA firm branding</p>
+              <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
+                Upload your firm logo and let Riko auto-brand every report for your clients.
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </motion.div>
   );
@@ -639,6 +837,7 @@ function InputBar({ inputVal, setInputVal }: { inputVal: string; setInputVal: (v
 export function ChatScreen() {
   const [started, setStarted] = useState(false);
   const [inputVal, setInputVal] = useState("");
+  const [contextTopic, setContextTopic] = useState<ContextTopic>("ratio");
 
   /* ── Empty state ── */
   if (!started) {
@@ -723,12 +922,18 @@ export function ChatScreen() {
       className="flex flex-1 w-full"
     >
       {/* Left panel — chat conversation */}
-      <div className="flex flex-col flex-1 md:w-[40%] md:flex-none md:border-r" style={{ borderColor: "var(--border)" }}>
+      <div className="flex flex-col flex-1 md:w-[48%] md:flex-none md:border-r min-w-0" style={{ borderColor: "var(--border)" }}>
         {/* Scrollable conversation */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-          <ExchangeCurrentRatio />
-          <ExchangeReceivables />
-          <ExchangeMIS />
+          <div onClick={() => setContextTopic("ratio")}>
+            <ExchangeCurrentRatio />
+          </div>
+          <div onClick={() => setContextTopic("receivables")}>
+            <ExchangeReceivables />
+          </div>
+          <div onClick={() => setContextTopic("mis")}>
+            <ExchangeMIS />
+          </div>
         </div>
 
         {/* Input bar */}
@@ -737,10 +942,10 @@ export function ChatScreen() {
 
       {/* Right panel — reactive context (desktop only) */}
       <div
-        className="hidden md:flex md:flex-col md:w-[60%]"
+        className="hidden md:flex md:flex-col md:w-[52%] min-w-0"
         style={{ background: "var(--bg-secondary)" }}
       >
-        <ContextPanel />
+        <ContextPanel topic={contextTopic} onTopicChange={setContextTopic} />
       </div>
     </motion.div>
   );
