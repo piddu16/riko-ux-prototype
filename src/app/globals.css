@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter);
+  --color-riko-green: #22C55E;
+  --color-riko-green-dark: #15803D;
+}
+
+:root {
+  --bg-primary: #0F1117;
+  --bg-secondary: #1A1F2E;
+  --bg-surface: #242937;
+  --bg-hover: #2D3548;
+  --border: #334155;
+  --text-1: #F8FAFC;
+  --text-2: #CBD5E1;
+  --text-3: #94A3B8;
+  --text-4: #64748B;
+  --green: #22C55E;
+  --green-dark: #15803D;
+  --green-bg: #052E16;
+  --red: #EF4444;
+  --red-bg: rgba(239,68,68,.12);
+  --yellow: #F59E0B;
+  --yellow-bg: rgba(245,158,11,.12);
+  --blue: #3B82F6;
+  --blue-bg: rgba(59,130,246,.12);
+  --orange: #F97316;
+  --purple: #A855F7;
+}
+
+[data-theme="light"] {
+  --bg-primary: #F8FAFB;
+  --bg-secondary: #FFFFFF;
+  --bg-surface: #F1F5F9;
+  --bg-hover: #E2E8F0;
+  --border: #E2E8F0;
+  --text-1: #0F172A;
+  --text-2: #334155;
+  --text-3: #64748B;
+  --text-4: #94A3B8;
+  --green-bg: #F0FDF4;
+  --red-bg: #FEF2F2;
+  --yellow-bg: #FFFBEB;
+  --blue-bg: #EFF6FF;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-1);
+  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  transition: background 0.3s, color 0.3s;
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
