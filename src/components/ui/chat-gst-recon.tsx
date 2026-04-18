@@ -178,13 +178,13 @@ export function ChatGstRecon({
           </p>
           <button
             onClick={handleBatchRemind}
-            className="text-[10px] font-semibold px-2 py-1 rounded-md flex-shrink-0 cursor-pointer flex items-center gap-1"
+            className="text-[11px] font-semibold px-2.5 py-1.5 min-h-[32px] rounded-md flex-shrink-0 cursor-pointer flex items-center gap-1"
             style={{
               background: "var(--red)",
               color: "white",
             }}
           >
-            <MessageSquare size={10} />
+            <MessageSquare size={11} />
             Remind all 8
           </button>
         </div>
@@ -205,7 +205,7 @@ export function ChatGstRecon({
             <button
               key={f.key}
               onClick={() => setFilter(f.key as FilterKey)}
-              className="text-[10px] font-semibold px-2 py-1 rounded-full cursor-pointer transition-colors"
+              className="text-[11px] font-semibold px-3 py-1.5 min-h-[32px] rounded-full cursor-pointer transition-colors"
               style={{
                 background: active
                   ? "color-mix(in srgb, var(--green) 15%, transparent)"
@@ -271,7 +271,7 @@ export function ChatGstRecon({
                       {meta.short}
                     </span>
                   </div>
-                  <p className="text-[10px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
                     {line.invoiceNo} · {line.date}
                   </p>
                   {line.issue && (
@@ -284,7 +284,7 @@ export function ChatGstRecon({
                   )}
 
                   {/* Amount comparison */}
-                  <div className="flex items-center gap-3 mt-1.5 text-[10px]">
+                  <div className="flex items-center gap-3 mt-1.5 text-[11px]">
                     <span style={{ color: "var(--text-4)" }}>
                       Tally:{" "}
                       <span
@@ -316,13 +316,13 @@ export function ChatGstRecon({
                 <div className="flex-shrink-0 flex flex-col items-end gap-1">
                   {taken ? (
                     <span
-                      className="text-[10px] font-semibold px-2 py-1 rounded-md flex items-center gap-1"
+                      className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md flex items-center gap-1"
                       style={{
                         background: "color-mix(in srgb, var(--green) 15%, transparent)",
                         color: "var(--green)",
                       }}
                     >
-                      <CheckCircle2 size={10} />
+                      <CheckCircle2 size={11} />
                       {taken === "reminded"
                         ? "Reminded"
                         : taken === "accepted"
@@ -332,7 +332,7 @@ export function ChatGstRecon({
                   ) : line.status === "matched" ? (
                     <button
                       onClick={() => handleAction(line.id, "accepted")}
-                      className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer"
+                      className="text-[11px] font-semibold px-3 py-1.5 min-h-[36px] rounded-md cursor-pointer"
                       style={{
                         background: "color-mix(in srgb, var(--green) 12%, transparent)",
                         color: "var(--green)",
@@ -344,20 +344,20 @@ export function ChatGstRecon({
                   ) : line.status === "missing_portal" ? (
                     <button
                       onClick={() => handleAction(line.id, "reminded", line.supplier)}
-                      className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer flex items-center gap-1"
+                      className="text-[11px] font-semibold px-3 py-1.5 min-h-[36px] rounded-md cursor-pointer flex items-center gap-1"
                       style={{
                         background: "color-mix(in srgb, var(--orange) 12%, transparent)",
                         color: "var(--orange)",
                         border: "1px solid color-mix(in srgb, var(--orange) 30%, transparent)",
                       }}
                     >
-                      <Send size={10} />
+                      <Send size={11} />
                       Remind
                     </button>
                   ) : line.status === "mismatch" ? (
                     <button
                       onClick={() => handleAction(line.id, "flagged")}
-                      className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer"
+                      className="text-[11px] font-semibold px-3 py-1.5 min-h-[36px] rounded-md cursor-pointer"
                       style={{
                         background: "color-mix(in srgb, var(--yellow) 12%, transparent)",
                         color: "var(--yellow)",
@@ -369,7 +369,7 @@ export function ChatGstRecon({
                   ) : (
                     <button
                       onClick={() => handleAction(line.id, "flagged")}
-                      className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer"
+                      className="text-[11px] font-semibold px-3 py-1.5 min-h-[36px] rounded-md cursor-pointer"
                       style={{
                         background: "color-mix(in srgb, var(--red) 12%, transparent)",
                         color: "var(--red)",

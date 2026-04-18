@@ -12,10 +12,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
   Send,
-  Mic,
   ChevronDown,
   ChevronRight,
   Wallet,
@@ -181,7 +180,7 @@ function Chips({
         <button
           key={t}
           onClick={() => onPick(t)}
-          className="text-[11px] px-2.5 py-1 rounded-full cursor-pointer transition-colors hover:opacity-80"
+          className="text-[11px] px-3 py-2 min-h-[36px] md:min-h-0 md:py-1 rounded-full cursor-pointer transition-colors hover:opacity-80"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -1226,7 +1225,7 @@ function ExchangeUnknown({ onFollowup }: { onFollowup: (q: string) => void }) {
             <button
               key={s.q}
               onClick={() => onFollowup(s.q)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-left cursor-pointer transition-colors hover:opacity-80"
+              className="flex items-center gap-2 px-3 py-3 md:py-2 min-h-[44px] md:min-h-0 rounded-lg text-left cursor-pointer transition-colors hover:opacity-80"
               style={{
                 background: "var(--bg-hover)",
                 border: "1px solid var(--border)",
@@ -1321,7 +1320,11 @@ const PROMPT_CATEGORIES = [
 
 /* ═══════════════════════════════════════════════════════════════
    Input bar
-   ═══════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════
+   Mobile keyboard handling: on iOS the virtual keyboard shrinks
+   the visual viewport but doesn't fire window resize. We listen
+   to window.visualViewport so the sticky input stays visible above
+   the keyboard instead of vanishing behind it. */
 function InputBar({
   value,
   onChange,
@@ -1333,10 +1336,42 @@ function InputBar({
   onSend: () => void;
   placeholder?: string;
 }) {
+  // Track keyboard inset. On desktop this stays 0.
+  const [kbInset, setKbInset] = useState(0);
+
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const update = () => {
+      // How much of the bottom is covered by the virtual keyboard.
+      // vv.height shrinks when the keyboard opens; layout viewport doesn't.
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKbInset(inset);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  // When keyboard is open (inset > 0), sit directly above it.
+  // When closed, keep our default sticky position above the 60px bottom nav.
+  const bottomStyle =
+    kbInset > 0
+      ? { bottom: `${kbInset}px` }
+      : undefined;
+
   return (
     <div
       className="sticky bottom-[calc(60px+env(safe-area-inset-bottom,0px))] md:bottom-0 px-4 py-3"
-      style={{ background: "var(--bg-primary)", borderTop: "1px solid var(--border)" }}
+      style={{
+        background: "var(--bg-primary)",
+        borderTop: "1px solid var(--border)",
+        ...bottomStyle,
+      }}
     >
       <div
         className="flex items-center gap-2 rounded-xl px-3 py-2"
@@ -1356,21 +1391,19 @@ function InputBar({
             }
           }}
           placeholder={placeholder}
-          className="flex-1 bg-transparent text-sm outline-none min-w-0"
+          aria-label="Ask Riko a question"
+          className="flex-1 bg-transparent text-sm min-w-0 py-2"
           style={{ color: "var(--text-1)" }}
         />
         <button
-          className="p-1.5 rounded-lg cursor-pointer transition-opacity hover:opacity-70"
-          style={{ color: "var(--text-4)" }}
-          aria-label="Voice input"
-        >
-          <Mic size={18} />
-        </button>
-        <button
           onClick={onSend}
           disabled={!value.trim()}
-          className="p-2 rounded-lg cursor-pointer transition-opacity disabled:opacity-40"
-          style={{ background: value.trim() ? "var(--green)" : "var(--bg-hover)" }}
+          className="rounded-lg cursor-pointer transition-opacity disabled:opacity-40 flex items-center justify-center"
+          style={{
+            background: value.trim() ? "var(--green)" : "var(--bg-hover)",
+            width: 40,
+            height: 40,
+          }}
           aria-label="Send message"
         >
           <Send
@@ -1590,10 +1623,13 @@ export function ChatScreen() {
     return `${role}-${idSeq.current}`;
   };
 
-  /* auto-scroll to bottom on new message */
+  /* Auto-scroll only when user is near the bottom already.
+     If they've scrolled up to re-read something, don't hijack their position. */
   useEffect(() => {
     const el = scrollerRef.current;
-    if (el) {
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 120) {
       el.scrollTop = el.scrollHeight;
     }
   }, [messages, pendingTyping]);
@@ -1648,6 +1684,7 @@ export function ChatScreen() {
   /* ── Empty state ── */
   if (messages.length === 0) {
     return (
+      <MotionConfig reducedMotion="user">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -1709,7 +1746,7 @@ export function ChatScreen() {
                       <button
                         key={p}
                         onClick={() => handleSend(p)}
-                        className="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg text-left cursor-pointer transition-colors hover:opacity-80"
+                        className="flex items-center justify-between gap-2 w-full px-3 py-3 md:py-2 min-h-[44px] md:min-h-0 rounded-lg text-left cursor-pointer transition-colors hover:opacity-80"
                         style={{
                           background: "var(--bg-hover)",
                           color: "var(--text-2)",
@@ -1739,11 +1776,13 @@ export function ChatScreen() {
 
         <InputBar value={input} onChange={setInput} onSend={() => handleSend()} />
       </motion.div>
+      </MotionConfig>
     );
   }
 
   /* ── Conversation state ── */
   return (
+    <MotionConfig reducedMotion="user">
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -1755,7 +1794,13 @@ export function ChatScreen() {
         className="flex flex-col flex-1 md:w-[60%] md:flex-none md:border-r min-w-0"
         style={{ borderColor: "var(--border)" }}
       >
-        <div ref={scrollerRef} className="flex-1 overflow-y-auto px-4 py-4">
+        <div
+          ref={scrollerRef}
+          role="log"
+          aria-live="polite"
+          aria-label="Chat conversation with Riko"
+          className="flex-1 overflow-y-auto px-4 py-4"
+        >
           {messages.map((m) => {
             if (m.role === "user") {
               return <UserBubble key={m.id} text={m.text} />;
@@ -1781,5 +1826,6 @@ export function ChatScreen() {
         />
       </div>
     </motion.div>
+    </MotionConfig>
   );
 }

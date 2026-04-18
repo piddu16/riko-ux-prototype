@@ -55,3 +55,38 @@ body {
 }
 
 * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+/* ── Accessibility: visible focus for keyboard users ─────────────────
+   Tab / Shift+Tab / arrow-key focus gets a clear green ring.
+   Mouse clicks don't show the ring (that's what :focus-visible does).
+   Reset only where we're providing a custom focus style. */
+*:focus { outline: none; }
+*:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--green);
+  border-radius: 6px;
+}
+
+/* ── Respect prefers-reduced-motion ────────────────────────────────
+   Users with vestibular disorders, motion sensitivity, or ADHD can set
+   `Reduce motion` in OS settings. We honor that by shortening most
+   transitions to near-zero (keeping a tiny duration so layout shifts
+   aren't instant-jarring). Framer Motion's useReducedMotion() covers
+   the more complex animations inside components. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
