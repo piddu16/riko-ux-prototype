@@ -13,10 +13,28 @@ import {
   Activity,
   ReceiptText,
   ShieldCheck,
+  Lock,
+  Send,
+  Pause,
+  Eye,
+  ChevronDown,
+  CheckCircle2,
+  AlertTriangle,
+  UserRound,
 } from "lucide-react";
-import { DAYBOOK, RECEIVABLES } from "@/lib/data";
-
-const WA_GREEN = "#25D366";
+import {
+  DAYBOOK,
+  RECEIVABLES,
+  getPartyContact,
+  getReminderSettings,
+  getPartyReminderHistory,
+  recommendTone,
+  type ReminderSettings,
+  type ReminderChannel,
+  type ReminderTone,
+  type ReminderStatus,
+} from "@/lib/data";
+import { MessageTemplateModal } from "./message-template-modal";
 
 interface Party360DrawerProps {
   open: boolean;
@@ -242,39 +260,18 @@ export function Party360Drawer({ open, onClose, partyName }: Party360DrawerProps
                     />
                   </div>
 
-                  {/* Contact */}
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: "var(--bg-secondary)",
-                      border: "1px solid var(--border)",
-                    }}
-                  >
-                    <p
-                      className="text-[10px] uppercase tracking-wider font-semibold mb-2"
-                      style={{ color: "var(--text-4)" }}
-                    >
-                      Contact
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-2)" }}>
-                        <Phone size={12} style={{ color: "var(--text-4)" }} />
-                        +91 98765 43210
-                      </div>
-                      <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-2)" }}>
-                        <Mail size={12} style={{ color: "var(--text-4)" }} />
-                        accounts@{partyName.toLowerCase().replace(/[^a-z]/g, "").slice(0, 12) || "party"}.in
-                      </div>
-                      <button
-                        type="button"
-                        className="mt-2 inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-md cursor-pointer transition-opacity hover:opacity-90 self-start"
-                        style={{ background: WA_GREEN, color: "#fff" }}
-                      >
-                        <MessageCircle size={13} />
-                        Send WhatsApp
-                      </button>
-                    </div>
-                  </div>
+                  {/* Contact info row (PRD §Priority 3) */}
+                  <ContactInfoRow partyName={partyName} />
+
+                  {/* AI Payment Reminder card (PRD §Priority 3 — states A/B/C) */}
+                  <AiReminderCard
+                    partyName={partyName}
+                    outstanding={outstanding}
+                    daysOverdue={receivableRow?.days ?? 0}
+                  />
+
+                  {/* Reminder history timeline (last 4 + View all) */}
+                  <ReminderHistorySection partyName={partyName} />
 
                   {/* Credit rating */}
                   <div
@@ -553,5 +550,821 @@ function HistoryRow({
         {value}
       </span>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Contact Info Row — displays phone + email + source tag
+   (Tally / Manual / none) with an Edit affordance. Maps to PRD §Priority 3.
+   ═══════════════════════════════════════════════════════════════ */
+function ContactInfoRow({ partyName }: { partyName: string }) {
+  const [editing, setEditing] = useState(false);
+  const contact = getPartyContact(partyName);
+
+  if (contact.source === "none" && !editing) {
+    return (
+      <div
+        className="rounded-xl p-4 flex items-start justify-between gap-3"
+        style={{
+          background: "color-mix(in srgb, var(--yellow) 8%, var(--bg-secondary))",
+          border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
+        }}
+      >
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <AlertTriangle size={14} style={{ color: "var(--yellow)", flexShrink: 0, marginTop: 2 }} />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+              No contact info on file
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+              Add a mobile number or email to enable reminders for this party — manually below
+              or via bulk import on the Outstanding page.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setEditing(true)}
+          className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-md cursor-pointer flex-shrink-0"
+          style={{
+            background: "var(--yellow)",
+            color: "#1F1F1F",
+          }}
+        >
+          + Add
+        </button>
+      </div>
+    );
+  }
+
+  const sourceMeta = {
+    tally:  { label: "Tally",  color: "var(--green)" },
+    manual: { label: "Manual", color: "var(--blue)"  },
+    none:   { label: "—",      color: "var(--text-4)" },
+  }[contact.source];
+
+  return (
+    <div
+      className="rounded-xl p-4"
+      style={{
+        background: "var(--bg-secondary)",
+        border: "1px solid var(--border)",
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <p
+          className="text-[10px] uppercase tracking-wider font-semibold"
+          style={{ color: "var(--text-4)" }}
+        >
+          Contact
+        </p>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+            style={{
+              background: `color-mix(in srgb, ${sourceMeta.color} 15%, transparent)`,
+              color: sourceMeta.color,
+            }}
+            title={
+              contact.source === "tally"
+                ? "Synced from Tally party master"
+                : "Entered manually (via bulk import or this drawer)"
+            }
+          >
+            {sourceMeta.label}
+          </span>
+          <button
+            onClick={() => setEditing((v) => !v)}
+            className="text-[10px] font-semibold px-2 py-0.5 rounded-md cursor-pointer"
+            style={{
+              background: editing ? "var(--green)" : "var(--bg-hover)",
+              color: editing ? "#fff" : "var(--text-3)",
+            }}
+          >
+            {editing ? "Save" : "Edit"}
+          </button>
+        </div>
+      </div>
+      {contact.optedOut && (
+        <div
+          className="flex items-center gap-1.5 text-[10px] font-semibold mb-2 px-2 py-1 rounded-md"
+          style={{
+            background: "color-mix(in srgb, var(--red) 12%, transparent)",
+            color: "var(--red)",
+          }}
+        >
+          <AlertTriangle size={10} />
+          Opted out via STOP reply — reminders auto-disabled
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        <FieldRow
+          icon={<Phone size={12} />}
+          value={contact.phone ?? "—"}
+          placeholder="+91 …"
+          editing={editing}
+        />
+        <FieldRow
+          icon={<Mail size={12} />}
+          value={contact.email ?? "—"}
+          placeholder="name@company.in"
+          editing={editing}
+        />
+        {contact.contactPerson && !editing && (
+          <FieldRow
+            icon={<UserRound size={12} />}
+            value={contact.contactPerson}
+            placeholder=""
+            editing={false}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FieldRow({
+  icon,
+  value,
+  placeholder,
+  editing,
+}: {
+  icon: React.ReactNode;
+  value: string;
+  placeholder: string;
+  editing: boolean;
+}) {
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 text-xs">
+        <span style={{ color: "var(--text-4)" }}>{icon}</span>
+        <input
+          defaultValue={value === "—" ? "" : value}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent border-0 px-2 py-1.5 text-xs rounded-md outline-none"
+          style={{
+            color: "var(--text-1)",
+            background: "var(--bg-primary)",
+            border: "1px solid var(--border)",
+          }}
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-2)" }}>
+      <span style={{ color: "var(--text-4)" }}>{icon}</span>
+      {value}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AI Reminder Card — 3 states (PRD §Priority 3)
+     A. Locked   — no phone on file, greyed toggle, CTA to add contact
+     B. Ready    — toggle OFF, one-liner preview, [Configure]
+     C. Active   — full control: frequency / channels / tone / pause /
+                   Send Now / Preview
+   ═══════════════════════════════════════════════════════════════ */
+
+function AiReminderCard({
+  partyName,
+  outstanding,
+  daysOverdue,
+}: {
+  partyName: string;
+  outstanding: number;
+  daysOverdue: number;
+}) {
+  // Demo-only local state — in production wired to reminder_settings table.
+  const seed = getReminderSettings(partyName);
+  const contact = getPartyContact(partyName);
+  const hasPhone = !!contact.phone;
+  const canEnable = hasPhone && !contact.optedOut;
+
+  const [enabled, setEnabled] = useState<boolean>(seed?.enabled ?? false);
+  const [expanded, setExpanded] = useState<boolean>(!!(seed?.enabled));
+  const [frequency, setFrequency] = useState<ReminderSettings["frequencyDays"]>(seed?.frequencyDays ?? 7);
+  const [channels, setChannels] = useState<ReminderChannel[]>(seed?.channels ?? ["whatsapp"]);
+  const [tone, setTone] = useState<ReminderSettings["tone"]>(seed?.tone ?? "auto");
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2200);
+  };
+
+  const effectiveTone: ReminderTone = tone === "auto" ? recommendTone(daysOverdue) : tone;
+
+  const toggleChannel = (id: ReminderChannel) => {
+    setChannels((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
+    );
+  };
+
+  /* STATE A — Locked: no phone, or opted out */
+  if (!canEnable) {
+    const reason = contact.optedOut
+      ? "Party opted out via STOP reply — reminders permanently disabled"
+      : "Add a mobile number above to enable reminders";
+    return (
+      <div
+        className="rounded-xl p-4 flex items-center gap-3"
+        style={{
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border)",
+          opacity: 0.82,
+        }}
+      >
+        <div
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "var(--bg-hover)" }}
+        >
+          <Lock size={14} style={{ color: "var(--text-4)" }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold" style={{ color: "var(--text-2)" }}>
+            AI payment reminder
+          </p>
+          <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+            {reason}
+          </p>
+        </div>
+        <ToggleSwitch value={false} onChange={() => { /* locked */ }} disabled />
+      </div>
+    );
+  }
+
+  /* STATE B — Ready: can enable but currently off */
+  if (!enabled) {
+    return (
+      <>
+        <div
+          className="rounded-xl p-4"
+          style={{
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: "color-mix(in srgb, var(--green) 15%, transparent)" }}
+            >
+              <MessageCircle size={14} style={{ color: "var(--green)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+                AI payment reminder
+              </p>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                Send reminders via <strong>{channels.map((c) => c).join(" + ")}</strong> every{" "}
+                <strong>{frequency} days</strong>
+              </p>
+            </div>
+            <ToggleSwitch
+              value={false}
+              onChange={() => {
+                setEnabled(true);
+                setExpanded(true);
+                showToast("Reminders enabled — next send scheduled");
+              }}
+            />
+          </div>
+          <button
+            onClick={() => {
+              setEnabled(true);
+              setExpanded(true);
+            }}
+            className="text-[11px] font-semibold mt-3 cursor-pointer"
+            style={{ color: "var(--green)" }}
+          >
+            Configure →
+          </button>
+        </div>
+        {toast && <Toast text={toast} />}
+      </>
+    );
+  }
+
+  /* STATE C — Active: full control */
+  return (
+    <>
+      <div
+        className="rounded-xl p-4"
+        style={{
+          background: "color-mix(in srgb, var(--green) 5%, var(--bg-secondary))",
+          border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
+        }}
+      >
+        {/* Header row */}
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: "var(--green)" }}
+          >
+            <MessageCircle size={14} style={{ color: "#fff" }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+              AI payment reminder · Active
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              Next send {seed?.nextReminderAt ?? "in 7 days"} · {seed?.sendsSoFar ?? 0}/
+              {seed?.maxReminders ?? 5} sends used
+            </p>
+          </div>
+          <ToggleSwitch
+            value
+            onChange={() => {
+              setEnabled(false);
+              setExpanded(false);
+              showToast("Reminders paused for this party");
+            }}
+          />
+        </div>
+
+        {/* Configuration rows */}
+        {expanded && (
+          <div className="flex flex-col gap-3 pt-3" style={{ borderTop: "1px solid color-mix(in srgb, var(--green) 20%, transparent)" }}>
+            {/* Frequency */}
+            <ConfigRow label="Frequency">
+              <select
+                value={frequency}
+                onChange={(e) =>
+                  setFrequency(parseInt(e.target.value, 10) as ReminderSettings["frequencyDays"])
+                }
+                className="text-[11px] font-semibold px-2 py-1 rounded-md cursor-pointer"
+                style={{
+                  background: "var(--bg-surface)",
+                  color: "var(--text-1)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                {[3, 5, 7, 14, 30].map((d) => (
+                  <option key={d} value={d}>
+                    Every {d} days
+                  </option>
+                ))}
+              </select>
+            </ConfigRow>
+
+            {/* Channels */}
+            <ConfigRow label="Channels">
+              <div className="flex gap-1">
+                {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => {
+                  const on = channels.includes(ch);
+                  const Icon = ch === "whatsapp" ? MessageCircle : ch === "email" ? Mail : MessageCircle;
+                  const color = ch === "whatsapp" ? "var(--green)" : ch === "email" ? "var(--blue)" : "var(--text-2)";
+                  const isEmailEnabled = ch !== "email" || !!contact.email;
+                  return (
+                    <button
+                      key={ch}
+                      onClick={() => isEmailEnabled && toggleChannel(ch)}
+                      disabled={!isEmailEnabled}
+                      className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer disabled:opacity-40"
+                      style={{
+                        background: on
+                          ? `color-mix(in srgb, ${color} 18%, transparent)`
+                          : "var(--bg-hover)",
+                        color: on ? color : "var(--text-4)",
+                        border: `1px solid ${on ? `color-mix(in srgb, ${color} 35%, transparent)` : "var(--border)"}`,
+                      }}
+                      title={!isEmailEnabled ? "No email on file" : undefined}
+                    >
+                      <Icon size={10} /> {ch}
+                    </button>
+                  );
+                })}
+              </div>
+            </ConfigRow>
+
+            {/* Tone */}
+            <ConfigRow label="Tone">
+              <div className="flex gap-1">
+                {(["auto", "gentle", "standard", "firm", "final"] as const).map((t) => {
+                  const on = tone === t;
+                  const colorMap: Record<typeof t, string> = {
+                    auto: "var(--purple)",
+                    gentle: "var(--green)",
+                    standard: "var(--blue)",
+                    firm: "var(--orange)",
+                    final: "var(--red)",
+                  };
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => setTone(t)}
+                      className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer capitalize"
+                      style={{
+                        background: on
+                          ? `color-mix(in srgb, ${colorMap[t]} 18%, transparent)`
+                          : "var(--bg-hover)",
+                        color: on ? colorMap[t] : "var(--text-4)",
+                        border: `1px solid ${on ? `color-mix(in srgb, ${colorMap[t]} 35%, transparent)` : "var(--border)"}`,
+                      }}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </ConfigRow>
+            {tone === "auto" && (
+              <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                Auto picks <strong style={{ color: "var(--text-2)" }}>{effectiveTone}</strong> based on{" "}
+                {daysOverdue}d overdue
+              </p>
+            )}
+
+            {/* Pause state */}
+            {seed?.pauseUntil && (
+              <div
+                className="flex items-center gap-2 text-[11px] px-2.5 py-1.5 rounded-md"
+                style={{
+                  background: "color-mix(in srgb, var(--yellow) 12%, transparent)",
+                  color: "var(--yellow)",
+                }}
+              >
+                <Pause size={11} />
+                Paused until {seed.pauseUntil}
+              </div>
+            )}
+
+            {/* Action row */}
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => showToast("Reminder queued to send now")}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer"
+                style={{ background: "var(--green)", color: "#fff" }}
+              >
+                <Send size={11} /> Send now
+              </button>
+              <button
+                onClick={() => setPauseOpen((v) => !v)}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer"
+                style={{ background: "var(--bg-hover)", color: "var(--text-2)" }}
+              >
+                <Pause size={11} /> Pause until…
+              </button>
+              <button
+                onClick={() => setPreviewOpen(true)}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer ml-auto"
+                style={{ background: "var(--bg-hover)", color: "var(--text-2)" }}
+              >
+                <Eye size={11} /> Preview
+              </button>
+            </div>
+
+            {pauseOpen && (
+              <div
+                className="rounded-lg p-3 flex items-center gap-2"
+                style={{
+                  background: "var(--bg-primary)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                <CalendarDays size={12} style={{ color: "var(--text-4)" }} />
+                <input
+                  type="date"
+                  className="flex-1 bg-transparent border-0 text-[11px] outline-none"
+                  style={{ color: "var(--text-1)" }}
+                />
+                <button
+                  onClick={() => {
+                    setPauseOpen(false);
+                    showToast("Pause applied");
+                  }}
+                  className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer"
+                  style={{ background: "var(--green)", color: "#fff" }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!expanded && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+            style={{ color: "var(--green)" }}
+          >
+            Configure <ChevronDown size={11} />
+          </button>
+        )}
+      </div>
+
+      <MessageTemplateModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        partyName={partyName}
+        daysOverdue={daysOverdue}
+        netAmount={outstanding}
+        defaultChannel={channels[0] ?? "whatsapp"}
+      />
+      {toast && <Toast text={toast} />}
+    </>
+  );
+}
+
+function ConfigRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 flex-wrap">
+      <span
+        className="text-[10px] uppercase tracking-wider font-semibold"
+        style={{ color: "var(--text-4)" }}
+      >
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function ToggleSwitch({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={disabled ? undefined : onChange}
+      disabled={disabled}
+      className="relative rounded-full cursor-pointer transition-colors disabled:cursor-not-allowed"
+      style={{
+        width: 32,
+        height: 18,
+        background: value ? "var(--green)" : "var(--bg-hover)",
+        border: "1px solid var(--border)",
+        opacity: disabled ? 0.5 : 1,
+      }}
+      aria-pressed={value}
+      aria-label={value ? "Reminders enabled" : "Reminders disabled"}
+    >
+      <motion.div
+        animate={{ x: value ? 14 : 0 }}
+        transition={{ type: "spring", stiffness: 400, damping: 28 }}
+        className="absolute top-0 left-0 rounded-full"
+        style={{
+          width: 16,
+          height: 16,
+          background: "#fff",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+          margin: 0,
+        }}
+      />
+    </button>
+  );
+}
+
+function Toast({ text }: { text: string }) {
+  return (
+    <motion.div
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 20, opacity: 0 }}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[95] px-4 py-2 rounded-xl text-[12px] font-semibold"
+      style={{
+        background: "var(--text-1)",
+        color: "var(--bg-primary)",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+      }}
+    >
+      {text}
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Reminder History Timeline — last 4 + "View all" modal
+   ═══════════════════════════════════════════════════════════════ */
+
+const STATUS_META: Record<ReminderStatus, { label: string; color: string; icon: React.ReactNode }> = {
+  sent:       { label: "Sent",       color: "var(--text-3)", icon: <Send size={10} /> },
+  delivered:  { label: "Delivered",  color: "var(--blue)",   icon: <CheckCircle2 size={10} /> },
+  read:       { label: "Read",       color: "var(--green)",  icon: <Eye size={10} /> },
+  replied:    { label: "Replied",    color: "var(--green)",  icon: <MessageCircle size={10} /> },
+  failed:     { label: "Failed",     color: "var(--red)",    icon: <AlertTriangle size={10} /> },
+  "opted-out":{ label: "Opted out",  color: "var(--red)",    icon: <X size={10} /> },
+};
+
+function ReminderHistorySection({ partyName }: { partyName: string }) {
+  const [viewAll, setViewAll] = useState(false);
+  const history = getPartyReminderHistory(partyName);
+  const preview = history.slice(0, 4);
+
+  if (history.length === 0) {
+    return (
+      <div
+        className="rounded-xl p-4 text-center"
+        style={{
+          background: "var(--bg-secondary)",
+          border: "1px dashed var(--border)",
+        }}
+      >
+        <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+          No reminders sent yet
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className="rounded-xl p-4"
+        style={{
+          background: "var(--bg-secondary)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <p
+            className="text-[10px] uppercase tracking-wider font-semibold"
+            style={{ color: "var(--text-4)" }}
+          >
+            Reminder history
+          </p>
+          {history.length > 4 && (
+            <button
+              onClick={() => setViewAll(true)}
+              className="text-[10px] font-semibold cursor-pointer"
+              style={{ color: "var(--green)" }}
+            >
+              View all {history.length} →
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {preview.map((h) => {
+            const meta = STATUS_META[h.status];
+            const channelIcon =
+              h.channel === "whatsapp" ? <MessageCircle size={11} /> : h.channel === "email" ? <Mail size={11} /> : <MessageCircle size={11} />;
+            return (
+              <div
+                key={h.id}
+                className="flex items-start gap-2.5 p-2.5 rounded-lg"
+                style={{ background: "var(--bg-primary)" }}
+              >
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{
+                    background: "var(--bg-hover)",
+                    color: "var(--text-3)",
+                  }}
+                >
+                  {channelIcon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold capitalize" style={{ color: "var(--text-1)" }}>
+                      {h.channel} · {h.tone}
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                      style={{
+                        background: `color-mix(in srgb, ${meta.color} 15%, transparent)`,
+                        color: meta.color,
+                      }}
+                    >
+                      {meta.icon}
+                      {meta.label}
+                    </span>
+                  </div>
+                  <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--text-3)" }}>
+                    {h.messagePreview}
+                  </p>
+                  <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                    {new Date(h.sentAt).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })} · {h.billsCovered} bills
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* "View all" modal */}
+      <AnimatePresence>
+        {viewAll && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[80]"
+              style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)" }}
+              onClick={() => setViewAll(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16 }}
+              className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none"
+            >
+              <div
+                className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col pointer-events-auto"
+                style={{
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border)",
+                  boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+                  maxHeight: "80vh",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div
+                  className="flex items-center justify-between px-5 py-3"
+                  style={{ borderBottom: "1px solid var(--border)" }}
+                >
+                  <div>
+                    <h3 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+                      Full reminder history
+                    </h3>
+                    <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                      {partyName} · {history.length} events
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setViewAll(false)}
+                    className="p-1.5 rounded-md cursor-pointer"
+                    style={{ color: "var(--text-3)" }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="p-4 overflow-y-auto flex flex-col gap-2">
+                  {history.map((h) => {
+                    const meta = STATUS_META[h.status];
+                    return (
+                      <div
+                        key={h.id}
+                        className="flex items-start gap-2.5 p-2.5 rounded-lg"
+                        style={{ background: "var(--bg-primary)" }}
+                      >
+                        <div
+                          className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                          style={{ background: "var(--bg-hover)", color: "var(--text-3)" }}
+                        >
+                          {h.channel === "whatsapp" ? (
+                            <MessageCircle size={11} />
+                          ) : h.channel === "email" ? (
+                            <Mail size={11} />
+                          ) : (
+                            <MessageCircle size={11} />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] font-semibold capitalize" style={{ color: "var(--text-1)" }}>
+                              {h.channel} · {h.tone}
+                            </span>
+                            <span
+                              className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                              style={{
+                                background: `color-mix(in srgb, ${meta.color} 15%, transparent)`,
+                                color: meta.color,
+                              }}
+                            >
+                              {meta.icon} {meta.label}
+                            </span>
+                            <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                              {h.daysOverdueAtSend}d overdue at send
+                            </span>
+                          </div>
+                          <p className="text-[11px] mt-1" style={{ color: "var(--text-2)" }}>
+                            {h.messagePreview}
+                          </p>
+                          <p className="text-[10px] mt-0.5" style={{ color: "var(--text-4)" }}>
+                            {new Date(h.sentAt).toLocaleString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

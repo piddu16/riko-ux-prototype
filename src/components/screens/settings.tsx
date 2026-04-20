@@ -44,7 +44,11 @@ import {
   type TeamMember,
   type MemberStatus,
 } from "@/lib/rbac";
-import { PENDING_INVITE_EXPIRY_DAYS } from "@/lib/data";
+import {
+  PENDING_INVITE_EXPIRY_DAYS,
+  REMINDER_AUTOMATION_DEFAULTS,
+  type ReminderAutomationRules,
+} from "@/lib/data";
 import { useRbac } from "@/lib/rbac-context";
 
 /* ------------------------------------------------------------------ */
@@ -57,11 +61,13 @@ type SettingsTab =
   | "integrations"
   | "api"
   | "notifications"
-  | "approvals";
+  | "approvals"
+  | "reminders";
 
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
   { id: "team", label: "Team", icon: Users },
   { id: "approvals", label: "Approvals", icon: ShieldCheck },
+  { id: "reminders", label: "Reminders", icon: MessageCircle },
   { id: "profile", label: "Profile", icon: UserCircle },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Puzzle },
@@ -157,6 +163,7 @@ export function SettingsScreen() {
         {/* Tab content */}
         {activeTab === "team" && <TeamTab />}
         {activeTab === "approvals" && <ApprovalsTab />}
+        {activeTab === "reminders" && <RemindersTab />}
         {activeTab === "profile" && <ProfileTab />}
         {activeTab === "billing" && <BillingTab />}
         {activeTab === "integrations" && <IntegrationsTab />}
@@ -2917,6 +2924,237 @@ function ToggleRow({
           style={{ background: checked ? "#fff" : "var(--text-4)" }}
         />
       </button>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  RemindersTab — payment reminder automation rules                  */
+/*  (per PRD v2.0 §4 Automation + Open Questions)                     */
+/* ================================================================== */
+function RemindersTab() {
+  const [rules, setRules] = useState<ReminderAutomationRules>(REMINDER_AUTOMATION_DEFAULTS);
+  const [saved, setSaved] = useState(false);
+
+  const update = <K extends keyof ReminderAutomationRules>(
+    key: K,
+    value: ReminderAutomationRules[K],
+  ) => {
+    setRules((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = () => {
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2200);
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* WABA status card */}
+      <SectionCard
+        title="WhatsApp Business API"
+        subtitle="Message templates must be approved by Meta before reminders can batch-send."
+      >
+        <div
+          className="rounded-xl p-4 flex items-center gap-3"
+          style={{
+            background: rules.wabaApproved
+              ? "color-mix(in srgb, var(--green) 10%, transparent)"
+              : "color-mix(in srgb, var(--yellow) 12%, transparent)",
+            border: `1px solid ${rules.wabaApproved ? "color-mix(in srgb, var(--green) 30%, transparent)" : "color-mix(in srgb, var(--yellow) 30%, transparent)"}`,
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{
+              background: rules.wabaApproved
+                ? "color-mix(in srgb, var(--green) 20%, transparent)"
+                : "color-mix(in srgb, var(--yellow) 20%, transparent)",
+            }}
+          >
+            {rules.wabaApproved ? (
+              <CheckCircle2 size={18} style={{ color: "var(--green)" }} />
+            ) : (
+              <AlertCircle size={18} style={{ color: "var(--yellow)" }} />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p
+              className="text-[13px] font-semibold"
+              style={{ color: rules.wabaApproved ? "var(--green)" : "var(--yellow)" }}
+            >
+              {rules.wabaApproved ? "WABA templates approved" : "Templates pending Meta approval"}
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+              {rules.wabaApproved
+                ? "All 4 tone templates (Gentle · Standard · Firm · Final) are live. Automated WhatsApp reminders will send on schedule."
+                : "Meta typically takes 2–7 days to approve WABA templates. While pending, only manual wa.me sends work."}
+            </p>
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Schedule & thresholds */}
+      <SectionCard
+        title="Schedule & thresholds"
+        subtitle="How often reminders fire and when a party is flagged for manual outreach."
+      >
+        <div className="flex flex-col gap-4">
+          <NumericRow
+            label="Daily batch limit"
+            desc="Max reminders sent across all parties per day. Cron splits evenly across the 10:00 AM IST window."
+            value={rules.dailyBatchLimit}
+            onChange={(v) => update("dailyBatchLimit", v)}
+            suffix="reminders/day"
+            min={1}
+            max={500}
+          />
+          <NumericRow
+            label="Max reminders per party"
+            desc="Hard cap before we stop auto-sending to a party and flag for manual contact. Counts reset on payment."
+            value={rules.maxRemindersPerParty}
+            onChange={(v) => update("maxRemindersPerParty", v)}
+            suffix="sends"
+            min={1}
+            max={20}
+          />
+          <NumericRow
+            label="Max overdue threshold"
+            desc="Parties overdue more than this are excluded from automated batch sends — they need relationship-manager contact, not another reminder."
+            value={rules.maxOverdueThresholdDays}
+            onChange={(v) => update("maxOverdueThresholdDays", v)}
+            suffix="days"
+            min={30}
+            max={730}
+          />
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-lg"
+            style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+          >
+            <Clock size={14} style={{ color: "var(--text-3)" }} />
+            <div className="flex-1">
+              <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+                Daily send time
+              </p>
+              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                Cron fires at this IST time every day. Business hours (10 AM) works best for reply rates.
+              </p>
+            </div>
+            <input
+              type="time"
+              value={rules.cronTimeIst}
+              onChange={(e) => update("cronTimeIst", e.target.value)}
+              className="text-[12px] font-semibold px-2 py-1 rounded-md"
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--text-1)",
+                border: "1px solid var(--border)",
+              }}
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Stop-rules */}
+      <SectionCard
+        title="Auto-stop rules"
+        subtitle="When reminders should stop automatically — prevents awkward follow-ups after payment or opt-out."
+      >
+        <div className="flex flex-col gap-3">
+          <ToggleRow
+            title="Stop on payment received"
+            desc="When Tally sync brings in a receipt voucher for a party, disable their reminders automatically and log the reason."
+            checked={rules.stopOnPaymentReceived}
+            onChange={(v) => update("stopOnPaymentReceived", v)}
+          />
+          <ToggleRow
+            title="Stop on STOP reply"
+            desc="If a party replies STOP to a WhatsApp reminder, mark them opted-out in party_contacts and skip future automated sends across all channels."
+            checked={rules.stopOnOptOut}
+            onChange={(v) => update("stopOnOptOut", v)}
+          />
+        </div>
+      </SectionCard>
+
+      {/* Save */}
+      <div className="flex items-center justify-end gap-3 pt-2">
+        <AnimatePresence>
+          {saved && (
+            <motion.span
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+              className="text-[12px] font-semibold"
+              style={{ color: "var(--green)" }}
+            >
+              ✓ Saved
+            </motion.span>
+          )}
+        </AnimatePresence>
+        <button
+          onClick={handleSave}
+          className="text-[12px] font-semibold px-4 py-2 rounded-lg cursor-pointer"
+          style={{ background: "var(--green)", color: "#fff" }}
+        >
+          Save reminder rules
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NumericRow({
+  label,
+  desc,
+  value,
+  onChange,
+  suffix,
+  min,
+  max,
+}: {
+  label: string;
+  desc: string;
+  value: number;
+  onChange: (v: number) => void;
+  suffix: string;
+  min: number;
+  max: number;
+}) {
+  return (
+    <div
+      className="flex items-start gap-3 px-4 py-3 rounded-lg"
+      style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+          {label}
+        </p>
+        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+          {desc}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            if (!Number.isNaN(n)) onChange(Math.min(Math.max(n, min), max));
+          }}
+          className="w-20 text-[12px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+          style={{
+            background: "var(--bg-surface)",
+            color: "var(--text-1)",
+            border: "1px solid var(--border)",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
+        />
+        <span className="text-[11px]" style={{ color: "var(--text-4)" }}>
+          {suffix}
+        </span>
+      </div>
     </div>
   );
 }
