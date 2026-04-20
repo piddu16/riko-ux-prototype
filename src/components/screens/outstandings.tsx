@@ -1,11 +1,38 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  MessageCircle,
+  Mail,
+  MessageSquare as MessageSquareIcon,
+  Upload,
+  AlertTriangle,
+  X,
+  Phone,
+} from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import { WhatsAppModal } from "@/components/ui/whatsapp-modal";
 import { Party360Drawer } from "@/components/ui/party-360-drawer";
-import { RECEIVABLES, PAYABLES, K, fL } from "@/lib/data";
+import { BulkImportModal } from "@/components/ui/bulk-import-modal";
+import {
+  RECEIVABLES,
+  PAYABLES,
+  K,
+  fL,
+  getPartyContact,
+  lastRemindedLabel,
+  agingColor5,
+  REMINDER_LIST_FILTERS,
+  type ReminderListFilter,
+  getPartyReminderHistory,
+} from "@/lib/data";
+
+/* Stable "today" for the demo — keeps filters purity-safe (React 19's
+   purity rule forbids Date.now() in useMemo/render). Aligned with the
+   demo dataset which centers on 20 Apr 2026. */
+const DEMO_TODAY_MS = new Date("2026-04-20T23:59:59+05:30").getTime();
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /* ------------------------------------------------------------------ */
 /*  Desktop enrichment data (receivables)                             */
@@ -43,12 +70,6 @@ const priorityColor: Record<string, string> = {
   P2: "var(--yellow)",
   P3: "var(--text-4)",
 };
-
-function daysColor(d: number): string {
-  if (d > 365) return "var(--red)";
-  if (d > 90) return "var(--yellow)";
-  return "var(--text-2)";
-}
 
 /* Aging distribution (approximate from the data set) */
 const aging = [
@@ -115,6 +136,71 @@ export default function OutstandingsScreen() {
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const [whatsappTarget, setWhatsappTarget] = useState<{ name: string; amount: string; days: number } | null>(null);
   const [partyDrawer, setPartyDrawer] = useState<string | null>(null);
+
+  // Reminder-list state (PRD Priority 2 enhancements)
+  const [reminderFilter, setReminderFilter] = useState<ReminderListFilter>("all");
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  // Toast shown after clicking WA/Email/SMS in the bulk bar — pure demo.
+  const [bulkToast, setBulkToast] = useState<string | null>(null);
+
+  // Filtered receivables based on the active reminder chip
+  const filteredReceivables = useMemo(() => {
+    return RECEIVABLES.filter((r) => {
+      if (reminderFilter === "all") return true;
+      const contact = getPartyContact(r.name);
+      const history = getPartyReminderHistory(r.name, 1);
+      const last = history[0];
+      if (reminderFilter === "never-reminded") return !last;
+      if (reminderFilter === "overdue-30") return r.days > 30;
+      if (reminderFilter === "no-contact") return contact.source === "none";
+      if (reminderFilter === "reminded-this-week") {
+        if (!last) return false;
+        const ageMs = DEMO_TODAY_MS - new Date(last.sentAt).getTime();
+        return ageMs < ONE_WEEK_MS;
+      }
+      return true;
+    });
+  }, [reminderFilter]);
+
+  /** Count helpers for the filter chip counter pills. */
+  const chipCount = (f: ReminderListFilter): number => {
+    return RECEIVABLES.filter((r) => {
+      if (f === "all") return true;
+      const contact = getPartyContact(r.name);
+      const history = getPartyReminderHistory(r.name, 1);
+      const last = history[0];
+      if (f === "never-reminded") return !last;
+      if (f === "overdue-30") return r.days > 30;
+      if (f === "no-contact") return contact.source === "none";
+      if (f === "reminded-this-week") {
+        if (!last) return false;
+        const ageMs = DEMO_TODAY_MS - new Date(last.sentAt).getTime();
+        return ageMs < ONE_WEEK_MS;
+      }
+      return true;
+    }).length;
+  };
+
+  // For the bulk bar: counts of contact coverage in the current selection.
+  const selectedContactStats = useMemo(() => {
+    let withPhone = 0;
+    let withEmail = 0;
+    let noContact = 0;
+    selected.forEach((i) => {
+      const r = RECEIVABLES[i];
+      const c = getPartyContact(r.name);
+      if (c.phone) withPhone++;
+      if (c.email) withEmail++;
+      if (c.source === "none") noContact++;
+    });
+    return { withPhone, withEmail, noContact };
+  }, [selected]);
+
+  // Toast auto-hide
+  const showBulkToast = (msg: string) => {
+    setBulkToast(msg);
+    window.setTimeout(() => setBulkToast(null), 2400);
+  };
 
   // Payables-side selection state (separate from receivables)
   const [payableSelected, setPayableSelected] = useState<Set<number>>(new Set());
@@ -307,6 +393,55 @@ export default function OutstandingsScreen() {
               </div>
             </motion.div>
 
+            {/* Reminder filter chips + Import Contacts button (PRD §Priority 2) */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {REMINDER_LIST_FILTERS.map((f) => {
+                  const active = reminderFilter === f.id;
+                  const count = chipCount(f.id);
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => setReminderFilter(f.id)}
+                      className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full cursor-pointer transition-colors"
+                      style={{
+                        background: active
+                          ? "color-mix(in srgb, var(--green) 15%, transparent)"
+                          : "var(--bg-surface)",
+                        color: active ? "var(--green)" : "var(--text-3)",
+                        border: `1px solid ${active ? "color-mix(in srgb, var(--green) 35%, transparent)" : "var(--border)"}`,
+                      }}
+                    >
+                      {f.label}
+                      <span
+                        className="text-[10px] px-1 rounded-md tabular-nums"
+                        style={{
+                          background: active ? "var(--green)" : "var(--bg-hover)",
+                          color: active ? "#fff" : "var(--text-4)",
+                          minWidth: 18,
+                          textAlign: "center",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setBulkImportOpen(true)}
+                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                style={{
+                  background: "color-mix(in srgb, var(--blue) 10%, transparent)",
+                  color: "var(--blue)",
+                  border: "1px solid color-mix(in srgb, var(--blue) 30%, transparent)",
+                }}
+                title="Bulk-import contact info via CSV"
+              >
+                <Upload size={12} /> Import contacts
+              </button>
+            </div>
+
             {/* Density toggle */}
             <div className="hidden sm:flex items-center justify-end gap-1 mb-2">
               <span className="text-[10px] mr-1.5" style={{ color: "var(--text-4)" }}>Density:</span>
@@ -361,12 +496,18 @@ export default function OutstandingsScreen() {
                       <th className="py-2.5 px-3 text-right font-medium">Outstanding</th>
                       <th className="py-2.5 px-3 text-right font-medium">Days</th>
                       <th className="py-2.5 px-3 text-right font-medium">Bills</th>
+                      <th className="py-2.5 px-3 text-right font-medium">Last reminded</th>
                       <th className="py-2.5 px-3 text-center font-medium">Priority</th>
                       <th className="py-2.5 px-3 text-center font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {RECEIVABLES.map((r, i) => {
+                    {filteredReceivables.map((r, rowIdx) => {
+                      // We still need the original index into RECEIVABLES so
+                      // selection (which uses original indices) works after
+                      // the filter chip narrows the view.
+                      const i = RECEIVABLES.indexOf(r);
+                      void rowIdx;
                       const isSelected = selected.has(i);
                       const isHovered = hoveredRow === i;
                       return (
@@ -440,11 +581,19 @@ export default function OutstandingsScreen() {
                           {fmt(r.amount)}
                         </td>
 
-                        <td
-                          className={`${DENSITY_PY[density]} px-3 text-right font-semibold tabular-nums`}
-                          style={{ color: daysColor(r.days) }}
-                        >
-                          {r.days.toLocaleString()}
+                        <td className={`${DENSITY_PY[density]} px-3 text-right`}>
+                          {(() => {
+                            const ag = agingColor5(r.days);
+                            return (
+                              <span
+                                className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md tabular-nums"
+                                style={{ background: ag.bg, color: ag.fg }}
+                                title={ag.label}
+                              >
+                                {r.days.toLocaleString()}
+                              </span>
+                            );
+                          })()}
                         </td>
 
                         <td
@@ -452,6 +601,18 @@ export default function OutstandingsScreen() {
                           style={{ color: "var(--text-3)" }}
                         >
                           {r.bills}
+                        </td>
+
+                        <td
+                          className={`${DENSITY_PY[density]} px-3 text-right text-[11px] tabular-nums`}
+                          style={{
+                            color:
+                              lastRemindedLabel(r.name) === "Never"
+                                ? "var(--text-4)"
+                                : "var(--text-2)",
+                          }}
+                        >
+                          {lastRemindedLabel(r.name)}
                         </td>
 
                         <td className={`${DENSITY_PY[density]} px-3 text-center`}>
@@ -483,118 +644,238 @@ export default function OutstandingsScreen() {
                 </table>
               </div>
 
-              {/* Floating bulk action bar */}
-              {selected.size > 0 && (
-                <motion.div
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 20, opacity: 0 }}
-                  className="hidden sm:flex sticky bottom-0 items-center justify-between px-4 py-2.5 rounded-b-xl z-20"
-                  style={{
-                    background: "var(--bg-secondary)",
-                    borderTop: "1px solid var(--green)",
-                    boxShadow: "0 -4px 12px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  <span className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
-                    {selected.size} {selected.size === 1 ? "party" : "parties"} selected
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      className="text-[11px] font-semibold px-3 py-1.5 rounded-md"
-                      style={{ color: "var(--green)", background: "color-mix(in srgb, var(--green) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)" }}
-                    >
-                      📲 Send Reminder to {selected.size}
-                    </button>
-                    <button
-                      className="text-[11px] font-semibold px-3 py-1.5 rounded-md"
-                      style={{ color: "var(--blue)", background: "color-mix(in srgb, var(--blue) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--blue) 30%, transparent)" }}
-                    >
-                      📤 Export Selected
-                    </button>
-                    <button
-                      onClick={() => setSelected(new Set())}
-                      className="text-[11px] px-2 py-1.5 rounded-md"
-                      style={{ color: "var(--text-4)" }}
-                    >
-                      ✕ Clear
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Mobile card layout */}
-              <div className="sm:hidden flex flex-col">
-                {RECEIVABLES.map((r, i) => (
+              {/* Floating bulk action bar — matches production UX
+                  (WhatsApp/Email/SMS + contact summary + no-contact warning) */}
+              <AnimatePresence>
+                {selected.size > 0 && (
                   <motion.div
-                    key={r.name}
-                    custom={i}
-                    variants={rowVariants}
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true, amount: 0.1 }}
-                    className="p-3"
+                    initial={{ y: 30, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 30, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="hidden sm:flex sticky bottom-0 items-center justify-between px-4 py-3 rounded-b-xl z-20 gap-4"
                     style={{
-                      background:
-                        i % 2 === 0
-                          ? "var(--bg-surface)"
-                          : "var(--bg-secondary)",
-                      borderBottom: "1px solid var(--border)",
+                      background: "var(--bg-primary)",
+                      borderTop: "1px solid var(--green)",
+                      boxShadow: "0 -6px 18px rgba(0,0,0,0.28)",
                     }}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <button
-                        type="button"
-                        onClick={() => setPartyDrawer(r.name)}
-                        className="text-xs font-medium truncate flex-1 mr-2 text-left cursor-pointer transition-colors"
-                        style={{ color: "var(--text-2)" }}
-                      >
-                        {r.name}
-                      </button>
-                      <Pill color={priorityColor[r.priority]}>{r.priority}</Pill>
-                    </div>
-
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold" style={{ color: "var(--text-1)" }}>
+                        {selected.size} sel.
+                      </span>
+                      {selectedContactStats.noContact > 0 && (
+                        <span
+                          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md"
+                          style={{
+                            background: "color-mix(in srgb, var(--yellow) 15%, transparent)",
+                            color: "var(--yellow)",
+                            border: "1px solid color-mix(in srgb, var(--yellow) 30%, transparent)",
+                          }}
+                          title={`${selectedContactStats.noContact} parties have no contact info — will be skipped`}
+                        >
+                          <AlertTriangle size={10} />
+                          {selectedContactStats.noContact} no contact
+                        </span>
+                      )}
                       <span
-                        className="text-sm font-bold"
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md"
                         style={{
-                          color: "var(--text-1)",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                        }}
-                      >
-                        {fmt(r.amount)}
-                      </span>
-                      <span
-                        className="text-xs font-semibold"
-                        style={{ color: daysColor(r.days) }}
-                      >
-                        {r.days} days
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span
-                        className="text-[10px]"
-                        style={{ color: "var(--text-4)" }}
-                      >
-                        {r.bills} bills
-                      </span>
-                      <button
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer"
-                        style={{
+                          background: "color-mix(in srgb, var(--green) 12%, transparent)",
                           color: "var(--green)",
-                          background:
-                            "color-mix(in srgb, var(--green) 12%, transparent)",
                         }}
-                        onClick={() =>
-                          setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days })
-                        }
                       >
-                        {"\uD83D\uDCF2"} Remind
+                        <Phone size={10} />
+                        {selectedContactStats.withPhone} with phone
+                      </span>
+                      <span
+                        className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md"
+                        style={{
+                          background: "color-mix(in srgb, var(--blue) 12%, transparent)",
+                          color: "var(--blue)",
+                        }}
+                      >
+                        <Mail size={10} />
+                        {selectedContactStats.withEmail} with email
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() =>
+                          showBulkToast(
+                            `Opening WhatsApp for ${selectedContactStats.withPhone} parties…`
+                          )
+                        }
+                        disabled={selectedContactStats.withPhone === 0}
+                        className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg cursor-pointer disabled:opacity-40"
+                        style={{
+                          background: "var(--green)",
+                          color: "#fff",
+                        }}
+                      >
+                        <MessageCircle size={13} /> WhatsApp
+                      </button>
+                      <button
+                        onClick={() =>
+                          showBulkToast(
+                            `Drafting emails for ${selectedContactStats.withEmail} parties…`
+                          )
+                        }
+                        disabled={selectedContactStats.withEmail === 0}
+                        className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg cursor-pointer disabled:opacity-40"
+                        style={{
+                          background: "var(--blue)",
+                          color: "#fff",
+                        }}
+                      >
+                        <Mail size={13} /> Email
+                      </button>
+                      <button
+                        onClick={() =>
+                          showBulkToast(
+                            `Queuing SMS for ${selectedContactStats.withPhone} parties…`
+                          )
+                        }
+                        disabled={selectedContactStats.withPhone === 0}
+                        className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg cursor-pointer disabled:opacity-40"
+                        style={{
+                          background: "var(--text-2)",
+                          color: "var(--bg-primary)",
+                        }}
+                      >
+                        <MessageSquareIcon size={13} /> SMS
+                      </button>
+                      <button
+                        onClick={() => setSelected(new Set())}
+                        className="text-[11px] px-2 py-1.5 rounded-md cursor-pointer"
+                        style={{ color: "var(--text-4)" }}
+                        aria-label="Clear selection"
+                      >
+                        <X size={14} />
                       </button>
                     </div>
                   </motion.div>
-                ))}
+                )}
+              </AnimatePresence>
+
+              {/* Toast feedback */}
+              <AnimatePresence>
+                {bulkToast && (
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 20, opacity: 0 }}
+                    className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-[12px] font-semibold"
+                    style={{
+                      background: "var(--text-1)",
+                      color: "var(--bg-primary)",
+                      boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                    }}
+                  >
+                    {bulkToast}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Mobile card layout */}
+              <div className="sm:hidden flex flex-col">
+                {filteredReceivables.map((r, rowIdx) => {
+                  const ag = agingColor5(r.days);
+                  const last = lastRemindedLabel(r.name);
+                  const contact = getPartyContact(r.name);
+                  return (
+                    <motion.div
+                      key={r.name}
+                      custom={rowIdx}
+                      variants={rowVariants}
+                      initial="hidden"
+                      whileInView="visible"
+                      viewport={{ once: true, amount: 0.1 }}
+                      className="p-3"
+                      style={{
+                        background:
+                          rowIdx % 2 === 0
+                            ? "var(--bg-surface)"
+                            : "var(--bg-secondary)",
+                        borderBottom: "1px solid var(--border)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setPartyDrawer(r.name)}
+                          className="text-xs font-medium truncate flex-1 mr-2 text-left cursor-pointer transition-colors"
+                          style={{ color: "var(--text-2)" }}
+                        >
+                          {r.name}
+                        </button>
+                        <Pill color={priorityColor[r.priority]}>{r.priority}</Pill>
+                      </div>
+
+                      <div className="flex items-center justify-between mb-2">
+                        <span
+                          className="text-sm font-bold"
+                          style={{
+                            color: "var(--text-1)",
+                            fontFamily: "'Space Grotesk', sans-serif",
+                          }}
+                        >
+                          {fmt(r.amount)}
+                        </span>
+                        <span
+                          className="text-[11px] font-semibold px-2 py-0.5 rounded-md tabular-nums"
+                          style={{ background: ag.bg, color: ag.fg }}
+                        >
+                          {r.days}d · {ag.label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                            {r.bills} bills
+                          </span>
+                          <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                            ·
+                          </span>
+                          <span
+                            className="text-[10px]"
+                            style={{ color: last === "Never" ? "var(--text-4)" : "var(--text-3)" }}
+                          >
+                            Reminded: {last}
+                          </span>
+                          {contact.source === "none" && (
+                            <span
+                              className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                              style={{
+                                background: "color-mix(in srgb, var(--yellow) 18%, transparent)",
+                                color: "var(--yellow)",
+                              }}
+                              title="No contact on file — add via bulk import or party panel"
+                            >
+                              no contact
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer disabled:opacity-40"
+                          disabled={!contact.phone}
+                          style={{
+                            color: "var(--green)",
+                            background:
+                              "color-mix(in srgb, var(--green) 12%, transparent)",
+                          }}
+                          onClick={() =>
+                            setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days })
+                          }
+                        >
+                          {"\uD83D\uDCF2"} Remind
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
 
@@ -611,6 +892,12 @@ export default function OutstandingsScreen() {
               open={partyDrawer !== null}
               onClose={() => setPartyDrawer(null)}
               partyName={partyDrawer ?? ""}
+            />
+
+            {/* Bulk Contact Import modal */}
+            <BulkImportModal
+              open={bulkImportOpen}
+              onClose={() => setBulkImportOpen(false)}
             />
 
             {/* Desktop: Collection Insights */}
