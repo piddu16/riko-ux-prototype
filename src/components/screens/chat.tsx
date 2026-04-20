@@ -330,7 +330,7 @@ function ExchangeCurrentRatio({ onFollowup }: { onFollowup: (q: string) => void 
         </p>
       </Layer>
 
-      <div className="mt-2">
+      <div className="md:hidden mt-2">
         <ExportBar />
       </div>
       <Chips
@@ -432,7 +432,9 @@ function ExchangeReceivables({ onFollowup }: { onFollowup: (q: string) => void }
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Who do I owe?", "Send WhatsApp reminders", "Aging older than 365 days"]}
         onPick={onFollowup}
@@ -520,7 +522,9 @@ function ExchangePayables({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Who owes me?", "Cash flow next 6 weeks", "Generate MIS"]}
         onPick={onFollowup}
@@ -565,7 +569,9 @@ function ExchangeMIS({ onFollowup }: { onFollowup: (q: string) => void }) {
           ))}
         </div>
       </div>
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Add branding", "Schedule monthly", "Send to CA"]}
         onPick={onFollowup}
@@ -624,7 +630,9 @@ function ExchangeRevenueTrend({ onFollowup }: { onFollowup: (q: string) => void 
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={[
           "Top customers this year",
@@ -708,7 +716,9 @@ function ExchangeCashFlow({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Who owes me?", "Cut marketing 30%", "Show runway gauge"]}
         onPick={onFollowup}
@@ -721,10 +731,12 @@ function ExchangeCashFlow({ onFollowup }: { onFollowup: (q: string) => void }) {
 function ExchangeRunway({ onFollowup }: { onFollowup: (q: string) => void }) {
   const months = R.cash / K.burn;
   const days = Math.round(months * 30);
+  const dangerColor = days < 30 ? "var(--red)" : "var(--yellow)";
   return (
     <RikoMsg>
+      {/* Mobile: full hero with gauge + KPI grid */}
       <div
-        className="rounded-xl p-4 mb-2"
+        className="md:hidden rounded-xl p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-4">
@@ -739,10 +751,7 @@ function ExchangeRunway({ onFollowup }: { onFollowup: (q: string) => void }) {
           <div className="flex-1">
             <p
               className="text-3xl font-bold"
-              style={{
-                color: days < 30 ? "var(--red)" : "var(--yellow)",
-                fontFamily: "'Space Grotesk', sans-serif",
-              }}
+              style={{ color: dangerColor, fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {days} days
             </p>
@@ -757,6 +766,25 @@ function ExchangeRunway({ onFollowup }: { onFollowup: (q: string) => void }) {
         </div>
       </div>
 
+      {/* Desktop: compact summary (gauge + KPIs live in Result panel) */}
+      <div
+        className="hidden md:block rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+          Cash runway
+        </p>
+        <p
+          className="text-3xl font-bold leading-none mt-1"
+          style={{ color: dangerColor, fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          {days} days
+        </p>
+        <p className="text-xs mt-1.5" style={{ color: "var(--text-3)" }}>
+          At current burn of ₹{fL(K.burn)}L/month · see full breakdown →
+        </p>
+      </div>
+
       <Layer color="var(--red)" icon="🚨" title="This is urgent">
         <p>
           You have {days} days of cash. The actions that extend runway fastest: (1) collect
@@ -765,7 +793,9 @@ function ExchangeRunway({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Show cash forecast", "Who owes me?", "Cut costs ideas"]}
         onPick={onFollowup}
@@ -828,7 +858,9 @@ function ExchangeExpenses({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Show P&L waterfall", "Cash flow forecast", "Dead stock"]}
         onPick={onFollowup}
@@ -863,7 +895,9 @@ function ExchangeWaterfall({ onFollowup }: { onFollowup: (q: string) => void }) 
           {fL(K.burn)}L/mo.
         </p>
       </Layer>
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Where can I cut costs?", "Expense breakdown", "Cash forecast"]}
         onPick={onFollowup}
@@ -907,10 +941,17 @@ function ExchangeGstRecon({ onFollowup }: { onFollowup: (q: string) => void }) {
 
 /* ── GST health ── */
 function ExchangeGstHealth({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const scoreColor =
+    GST_HEALTH.score < 50
+      ? "var(--red)"
+      : GST_HEALTH.score < 75
+      ? "var(--yellow)"
+      : "var(--green)";
   return (
     <RikoMsg>
+      {/* Mobile: full gauge + 4-row metric list */}
       <div
-        className="rounded-xl p-4 mb-2"
+        className="md:hidden rounded-xl p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-4">
@@ -966,6 +1007,26 @@ function ExchangeGstHealth({ onFollowup }: { onFollowup: (q: string) => void }) 
         </div>
       </div>
 
+      {/* Desktop: compact summary (gauge + full metrics live in Result panel) */}
+      <div
+        className="hidden md:block rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+          GST Health score
+        </p>
+        <p
+          className="text-3xl font-bold leading-none mt-1"
+          style={{ color: scoreColor, fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          {GST_HEALTH.score}<span className="text-lg" style={{ color: "var(--text-4)" }}>/100</span>
+        </p>
+        <p className="text-xs mt-1.5" style={{ color: "var(--text-3)" }}>
+          {GST_HEALTH.filingStreak}-month filing streak · ₹
+          {(GST_HEALTH.excessItcUnclaimed / 1e5).toFixed(1)}L ITC to refund
+        </p>
+      </div>
+
       <Layer color="var(--yellow)" icon="💡" title="One thing to fix">
         <p>
           You have <strong>₹{(GST_HEALTH.excessItcUnclaimed / 1e5).toFixed(1)}L</strong> of
@@ -974,7 +1035,9 @@ function ExchangeGstHealth({ onFollowup }: { onFollowup: (q: string) => void }) 
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Reconcile March 2B", "Generate GSTR-3B", "ITC refund process"]}
         onPick={onFollowup}
@@ -1025,7 +1088,9 @@ function ExchangeTopCustomers({ onFollowup }: { onFollowup: (q: string) => void 
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Returns by channel", "Revenue trend", "Biggest receivables"]}
         onPick={onFollowup}
@@ -1038,10 +1103,14 @@ function ExchangeTopCustomers({ onFollowup }: { onFollowup: (q: string) => void 
 function ExchangeHealthScore({ onFollowup }: { onFollowup: (q: string) => void }) {
   const avg =
     HEALTH_SCORES.reduce((s, h) => s + h.score, 0) / HEALTH_SCORES.length;
+  const scoreColor =
+    avg < 40 ? "var(--red)" : avg < 70 ? "var(--yellow)" : "var(--green)";
+  const weakest = HEALTH_SCORES.reduce((w, h) => (h.score < w.score ? h : w));
   return (
     <RikoMsg>
+      {/* Mobile: full gauge + 4 dimension bars */}
       <div
-        className="rounded-xl p-4 mb-2"
+        className="md:hidden rounded-xl p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-4 mb-3">
@@ -1083,6 +1152,28 @@ function ExchangeHealthScore({ onFollowup }: { onFollowup: (q: string) => void }
         </div>
       </div>
 
+      {/* Desktop: compact summary (full gauge + bars in Result panel) */}
+      <div
+        className="hidden md:block rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+          Business health
+        </p>
+        <p
+          className="text-3xl font-bold leading-none mt-1"
+          style={{ color: scoreColor, fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          {avg.toFixed(0)}<span className="text-lg" style={{ color: "var(--text-4)" }}>/100</span>
+        </p>
+        <p className="text-xs mt-1.5" style={{ color: "var(--text-3)" }}>
+          Weakest dimension:{" "}
+          <span style={{ color: weakest.color, fontWeight: 600 }}>
+            {weakest.label} ({weakest.score})
+          </span>
+        </p>
+      </div>
+
       <Layer color="var(--red)" icon="💡" title="Growth is your biggest weakness">
         <p>
           Growth (15/100) is dragging the score. Revenue is down{" "}
@@ -1091,7 +1182,9 @@ function ExchangeHealthScore({ onFollowup }: { onFollowup: (q: string) => void }
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Revenue trend", "Cash runway", "Top customers"]}
         onPick={onFollowup}
@@ -1154,7 +1247,9 @@ function ExchangeDeadStock({ onFollowup }: { onFollowup: (q: string) => void }) 
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={[
           "Show inventory health",
@@ -1213,7 +1308,9 @@ function ExchangeReturns({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </Layer>
 
-      <ExportBar />
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
       <Chips
         items={["Top returned SKUs", "Dead stock", "Top customers"]}
         onPick={onFollowup}
@@ -1837,73 +1934,15 @@ function InputBar({
 function ResultPanel({
   currentIntent,
   hasMessages,
-  onPick,
   onNewChat,
 }: {
   currentIntent: Intent | null;
   hasMessages: boolean;
-  onPick: (q: string) => void;
   onNewChat: () => void;
 }) {
   const intent = currentIntent;
   const Renderer = intent ? RESULT_RENDERERS[intent] : null;
   const label = intent ? INTENT_LABELS[intent] : "Result";
-
-  // Related follow-up questions by intent (same mapping as before)
-  const related = useMemo(() => {
-    const map: Partial<Record<Intent, string[]>> = {
-      "gst-recon": [
-        "How's my GST health?",
-        "₹5.7L ITC at risk — how to recover?",
-        "Generate GSTR-3B",
-      ],
-      "gst-health": [
-        "Reconcile March 2B",
-        "File ITC refund (RFD-01)",
-        "GSTR-1 vs 3B mismatch",
-      ],
-      "current-ratio": ["Quick ratio?", "Cash ratio?", "Dead stock analysis"],
-      receivables: [
-        "Top 5 debtors",
-        "Aging over 365 days",
-        "Batch WhatsApp reminders",
-      ],
-      payables: ["MSME 45-day list", "Cash forecast", "Prioritize payments"],
-      "revenue-trend": [
-        "Best performing channel",
-        "Top customers",
-        "Why are returns up?",
-      ],
-      "cash-flow": ["Show runway gauge", "Cut marketing scenario", "Who owes me?"],
-      runway: ["Show cash forecast", "Where is cash stuck?", "Cut costs ideas"],
-      "expense-breakdown": [
-        "P&L waterfall",
-        "Dead stock unlock",
-        "Marketing ROI",
-      ],
-      waterfall: ["Marketing vs gross profit", "Cost cut ideas", "Runway impact"],
-      "top-customers": [
-        "Cohort retention",
-        "Returns by channel",
-        "Biggest receivables",
-      ],
-      "health-score": [
-        "Revenue trend",
-        "GST health",
-        "What's my single biggest risk?",
-      ],
-      "inventory-dead": [
-        "Liquidation plan",
-        "Returns top SKUs",
-        "Working capital tied up",
-      ],
-      returns: ["Top returned SKUs", "Amazon return root cause", "Packaging fix ROI"],
-      mis: ["Send to CA", "Schedule monthly", "Board deck version"],
-      unknown: [],
-    };
-    if (!intent) return [];
-    return map[intent] ?? [];
-  }, [intent]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -1974,42 +2013,13 @@ function ResultPanel({
         </div>
       </div>
 
-      {/* Main content — scrollable */}
+      {/* Main content — scrollable. No suggested-follow-up chips here;
+         follow-ups live in the chat on the left as <Chips>, avoiding
+         duplication across panels. */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {Renderer ? (
-          <div className="space-y-4">
+          <div>
             <Renderer />
-            {/* Related follow-ups below the main result */}
-            {related.length > 0 && (
-              <div>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-wider mb-2 mt-2"
-                  style={{ color: "var(--text-4)" }}
-                >
-                  Suggested follow-ups
-                </p>
-                <div className="space-y-1.5">
-                  {related.map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => onPick(r)}
-                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-left cursor-pointer transition-colors hover:opacity-80"
-                      style={{
-                        background: "var(--bg-surface)",
-                        border: "1px solid var(--border)",
-                        color: "var(--text-2)",
-                      }}
-                    >
-                      <Sparkles
-                        size={11}
-                        style={{ color: "var(--green)", flexShrink: 0 }}
-                      />
-                      <span className="text-xs">{r}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         ) : (
           // Empty state — no active result
@@ -2281,7 +2291,6 @@ export function ChatScreen({
         <ResultPanel
           currentIntent={currentIntent}
           hasMessages={messages.length > 0}
-          onPick={handleSend}
           onNewChat={handleNewChat}
         />
       </div>
