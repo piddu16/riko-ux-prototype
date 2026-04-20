@@ -16,8 +16,10 @@
   --text-2: #CBD5E1;
   --text-3: #94A3B8;
   --text-4: #64748B;
+  /* Brand palette — aligned with riko-website (piddu16/riko-website)
+     Primary #22C55E (green-500), secondary #16A34A (green-600). */
   --green: #22C55E;
-  --green-dark: #15803D;
+  --green-dark: #16A34A;
   --green-bg: #052E16;
   --red: #EF4444;
   --red-bg: rgba(239,68,68,.12);
