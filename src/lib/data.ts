@@ -2229,31 +2229,229 @@ export const BULK_IMPORT_SAMPLE: BulkImportRow[] = [
 
 /* ── Global reminder automation rules (Settings → Reminders) ── */
 export interface ReminderAutomationRules {
+  // ── Schedule & frequency ──────────────────────────────────────
+  /** Cron schedule (IST) — 10:00 AM daily per PRD. */
+  cronTimeIst: string;
+  /** Batch cron: daily max sends across the whole portfolio. */
+  dailyBatchLimit: number;
+  /** Hard cap on total sends before we stop automated reminders
+   *  for a party. */
+  maxRemindersPerParty: number;
+  /** Parties overdue > this number of days are flagged for manual
+   *  outreach (no automated sends). */
+  maxOverdueThresholdDays: number;
+  /** Quiet-hours window — cron won't fire outside this range. */
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  /** Skip weekends (Sat + Sun) entirely. */
+  skipWeekends: boolean;
+  /** Skip known Indian public holidays (hardcoded list for demo). */
+  skipHolidays: boolean;
+  /** Don't auto-remind for outstanding < this value. Prevents
+   *  nagging customers for a ₹50 postage bill. */
+  minOutstandingAmount: number;
+  /** Subtract on_account credits from outstanding before urgency
+   *  scoring (PRD §4.3). A party owing 5.7L with 5.1L on account
+   *  ranks lower than one owing 1L fresh. */
+  onAccountDeduction: boolean;
+
+  // ── Exclusions ────────────────────────────────────────────────
+  /** Party names that should NEVER receive automated reminders.
+   *  Owner still has the option to send manually via the drawer. */
+  blacklistedParties: string[];
+  /** Parties marked as "key accounts" — automated channel is forced
+   *  to "phone call" only (reminder becomes a to-do, not a WA send). */
+  keyAccountParties: string[];
+
+  // ── Escalation ────────────────────────────────────────────────
+  /** After this many days with no reply, escalate to a human. */
+  escalateAfterDays: number;
+  /** Role that gets assigned the escalated party as a to-do. */
+  escalateTo: "accounts" | "sales" | "accounts-head" | "admin";
+  /** When a party crosses into Final tier, notify the owner on
+   *  WhatsApp so they can intervene directly. */
+  finalTierAlert: boolean;
+  /** Days after final-tier send to keep trying before flagging for
+   *  legal / formal recovery. */
+  slaAfterFinalDays: number;
+
+  // ── Auto-stop rules ───────────────────────────────────────────
   /** Stop reminders when a receipt voucher lands for the party. */
   stopOnPaymentReceived: boolean;
   /** Honor WhatsApp STOP replies by auto-disabling. */
   stopOnOptOut: boolean;
-  /** Batch cron: daily max sends across the whole portfolio. */
-  dailyBatchLimit: number;
-  /** Parties overdue > this number of days are flagged for manual
-   *  outreach (no automated sends). */
-  maxOverdueThresholdDays: number;
-  /** Hard cap on total sends before we stop automated reminders
-   *  for a party. */
-  maxRemindersPerParty: number;
-  /** Cron schedule (IST) — 10:00 AM daily per PRD. */
-  cronTimeIst: string;
-  /** WABA template approval status (held in MSG91 dashboard). */
+  /** Detect "paying soon", "will clear", "promise" in replies and
+   *  pause reminders for 7 days to avoid nagging. */
+  stopOnPromiseToPay: boolean;
+  /** Stop once the party has paid more than this fraction of the
+   *  outstanding. 0.8 = stop after 80% paid. */
+  stopOnPartialPayment: boolean;
+  partialPaymentThreshold: number;
+
+  // ── WABA approval status per tone ─────────────────────────────
+  /** Per-tone approval state at MSG91 / Meta. Automated WA sends
+   *  require "approved" templates; others fall back to email. */
   wabaApproved: boolean;
+  wabaApprovalByTone: Record<ReminderTone, "approved" | "pending" | "rejected">;
+
+  // ── Channel-specific health ───────────────────────────────────
+  /** MSG91 credit balance in rupees. Drops as reminders send. */
+  msg91Credits: number;
+  /** Cost per WA message in rupees (MSG91 utility template rate). */
+  msg91CostPerMessage: number;
+  /** SMS cost per message (DLT + carrier). */
+  smsCostPerMessage: number;
+  /** Display name attached to outbound emails. */
+  emailFromAddress: string;
+  emailReplyTo: string;
+  emailSignature: string;
+  /** DLT-registered header for SMS compliance. */
+  smsDltHeader: string;
+  smsSenderId: string;
 }
 
 export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
+  // Schedule
+  cronTimeIst: "10:00",
+  dailyBatchLimit: 5,
+  maxRemindersPerParty: 5,
+  maxOverdueThresholdDays: 180,
+  quietHoursStart: "09:00",
+  quietHoursEnd: "18:00",
+  skipWeekends: true,
+  skipHolidays: true,
+  minOutstandingAmount: 500,
+  onAccountDeduction: true,
+  // Exclusions
+  blacklistedParties: ["Scale Global Debtors"],
+  keyAccountParties: ["Website Debtors"],
+  // Escalation
+  escalateAfterDays: 14,
+  escalateTo: "accounts",
+  finalTierAlert: true,
+  slaAfterFinalDays: 30,
+  // Auto-stop
   stopOnPaymentReceived: true,
   stopOnOptOut: true,
-  dailyBatchLimit: 5,
-  maxOverdueThresholdDays: 180,
-  maxRemindersPerParty: 5,
-  cronTimeIst: "10:00",
+  stopOnPromiseToPay: true,
+  stopOnPartialPayment: true,
+  partialPaymentThreshold: 0.8,
+  // WABA
   wabaApproved: true,
+  wabaApprovalByTone: {
+    gentle: "approved",
+    standard: "approved",
+    firm: "approved",
+    final: "pending",
+  },
+  // Channel health
+  msg91Credits: 14_20, // credits, not rupees — 1 credit ≈ ₹0.20
+  msg91CostPerMessage: 0.2,
+  smsCostPerMessage: 0.18,
+  emailFromAddress: "yogesh@bandrasoap.in",
+  emailReplyTo: "accounts@bandrasoap.in",
+  emailSignature: "Yogesh Patel\nBandra Soap Pvt Ltd\n+91 98765 43210",
+  smsDltHeader: "BNDSOP",
+  smsSenderId: "BNDSOP",
 };
+
+/* ── Reminder analytics — demo data for the 30-day strip ── */
+
+export interface ReminderDaySend {
+  date: string; // ISO
+  dayLabel: string; // "Mon 15"
+  gentle: number;
+  standard: number;
+  firm: number;
+  final: number;
+}
+
+/** Last 30 days of batch sends by tier — used by the analytics
+ *  strip on Settings → Reminders. Pattern: Mon-Fri heavy, weekend
+ *  light (honoring skipWeekends rule), gradual ramp as rules tuned. */
+export const REMINDER_ANALYTICS_30D: {
+  dailySends: ReminderDaySend[];
+  replyRateByChannel: Record<ReminderChannel, number>;
+  paymentCorrelation: Record<ReminderTone, { reminded: number; paidWithin7d: number; pct: number }>;
+  totalSent: number;
+  totalReplies: number;
+  totalCollected: number;
+  totalCost: number;
+  creditsBurnRate: number; // credits per day
+} = (() => {
+  const days: ReminderDaySend[] = [];
+  const end = new Date("2026-04-20");
+  let totalSent = 0;
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(end);
+    d.setDate(d.getDate() - i);
+    const dow = d.getDay(); // 0=Sun, 6=Sat
+    const weekend = dow === 0 || dow === 6;
+    // Demo pattern: ramp up over 30d, weekend = 0
+    const base = weekend ? 0 : 2 + Math.round((i < 10 ? 4 : i < 20 ? 3 : 2));
+    // Tier mix: older dues = more firm/final
+    const gentle = weekend ? 0 : Math.max(0, base - 1);
+    const standard = weekend ? 0 : base;
+    const firm = weekend ? 0 : Math.max(0, Math.round(base * 0.6));
+    const final = weekend ? 0 : Math.max(0, Math.round(base * 0.3));
+    const daySum = gentle + standard + firm + final;
+    totalSent += daySum;
+    days.push({
+      date: d.toISOString().slice(0, 10),
+      dayLabel: d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
+      gentle,
+      standard,
+      firm,
+      final,
+    });
+  }
+  const totalReplies = Math.round(totalSent * 0.28);
+  return {
+    dailySends: days,
+    replyRateByChannel: {
+      whatsapp: 0.42,
+      email: 0.18,
+      sms: 0.09,
+    },
+    paymentCorrelation: {
+      gentle:   { reminded: 38, paidWithin7d: 26, pct: 0.68 },
+      standard: { reminded: 44, paidWithin7d: 23, pct: 0.52 },
+      firm:     { reminded: 31, paidWithin7d: 12, pct: 0.39 },
+      final:    { reminded: 14, paidWithin7d: 3,  pct: 0.21 },
+    },
+    totalSent,
+    totalReplies,
+    totalCollected: 8_40_000,
+    totalCost: 280,
+    creditsBurnRate: 15,
+  };
+})();
+
+/** Live state for the Live State hero at the top of Settings →
+ *  Reminders. Computed from REMINDER_SETTINGS + REMINDER_HISTORY. */
+export function computeReminderLiveState() {
+  const active = REMINDER_SETTINGS.filter((s) => s.enabled).length;
+  const paused = REMINDER_SETTINGS.filter((s) => !!s.pauseUntil).length;
+  const optedOut = PARTY_CONTACTS.filter((c) => c.optedOut).length;
+  // Queued for next batch = parties whose nextReminderAt <= today+1
+  const tomorrow = new Date("2026-04-21").getTime();
+  const queued = REMINDER_SETTINGS.filter((s) => {
+    if (!s.enabled) return false;
+    if (!s.nextReminderAt) return false;
+    return new Date(s.nextReminderAt).getTime() <= tomorrow;
+  }).length;
+  const sentThisMonth = REMINDER_HISTORY.filter((h) => {
+    const d = new Date(h.sentAt);
+    return d.getFullYear() === 2026 && d.getMonth() === 3; // April 2026
+  }).length;
+  return {
+    active,
+    paused,
+    optedOut,
+    queued,
+    sentThisMonth,
+    replyRate: 0.34,
+    collectedThisMonth: 8_40_000,
+  };
+}
 

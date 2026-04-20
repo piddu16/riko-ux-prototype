@@ -34,6 +34,7 @@ import {
   Check,
   AlertCircle,
   Plus,
+  Activity,
 } from "lucide-react";
 import {
   TEAM_MEMBERS,
@@ -47,7 +48,15 @@ import {
 import {
   PENDING_INVITE_EXPIRY_DAYS,
   REMINDER_AUTOMATION_DEFAULTS,
+  REMINDER_ANALYTICS_30D,
+  REMINDER_TEMPLATES,
+  RECEIVABLES,
+  renderTemplate,
+  cleanCompanyName,
+  computeReminderLiveState,
   type ReminderAutomationRules,
+  type ReminderTone,
+  type ReminderChannel,
 } from "@/lib/data";
 import { useRbac } from "@/lib/rbac-context";
 
@@ -2929,12 +2938,35 @@ function ToggleRow({
 }
 
 /* ================================================================== */
-/*  RemindersTab — payment reminder automation rules                  */
-/*  (per PRD v2.0 §4 Automation + Open Questions)                     */
+/*  RemindersTab — Control Center for Payment Reminders               */
+/*  (PRD v2.0 §4 Automation — full 8-section redesign)                */
+/*                                                                    */
+/*  Sections (sticky left sub-nav on desktop, linear on mobile):      */
+/*    1. Live state      — 4-tile status hero                         */
+/*    2. Templates       — 4-tier tone library with WABA status       */
+/*    3. Schedule        — quiet hours, min amount, on-account        */
+/*    4. Exclusions      — blacklist + key-account whitelist          */
+/*    5. Escalation      — after-no-reply + final-tier alert + SLA    */
+/*    6. Auto-stop       — payment / STOP / promise / partial         */
+/*    7. Channels        — WA / Email / SMS health + costs            */
+/*    8. Analytics       — 30d sends-by-tier + reply rate + corr      */
 /* ================================================================== */
+
+const REMINDER_SECTIONS: { id: string; label: string; icon: React.ElementType }[] = [
+  { id: "live",        label: "Live state",    icon: Activity },
+  { id: "templates",   label: "Templates",     icon: FileSpreadsheet },
+  { id: "schedule",    label: "Schedule",      icon: Clock },
+  { id: "exclusions",  label: "Exclusions",    icon: Shield },
+  { id: "escalation",  label: "Escalation",    icon: AlertCircle },
+  { id: "stop-rules",  label: "Auto-stop",     icon: CheckCircle2 },
+  { id: "channels",    label: "Channels",      icon: MessageCircle },
+  { id: "analytics",   label: "Analytics",     icon: Activity },
+];
+
 function RemindersTab() {
   const [rules, setRules] = useState<ReminderAutomationRules>(REMINDER_AUTOMATION_DEFAULTS);
   const [saved, setSaved] = useState(false);
+  const [active, setActive] = useState<string>("live");
 
   const update = <K extends keyof ReminderAutomationRules>(
     key: K,
@@ -2948,162 +2980,1369 @@ function RemindersTab() {
     window.setTimeout(() => setSaved(false), 2200);
   };
 
+  // Scrollspy — highlight the section the user has scrolled to.
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActive(entry.target.id);
+          }
+        }
+      },
+      { rootMargin: "-40% 0px -55% 0px" },
+    );
+    REMINDER_SECTIONS.forEach((s) => {
+      const el = document.getElementById(`reminder-section-${s.id}`);
+      if (el) obs.observe(el);
+    });
+    return () => obs.disconnect();
+  }, []);
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* WABA status card */}
-      <SectionCard
-        title="WhatsApp Business API"
-        subtitle="Message templates must be approved by Meta before reminders can batch-send."
-      >
-        <div
-          className="rounded-xl p-4 flex items-center gap-3"
+    <div className="flex gap-5">
+      {/* Sticky sub-nav (desktop) */}
+      <aside className="hidden lg:block flex-shrink-0" style={{ width: 180 }}>
+        <nav
+          className="sticky top-5 rounded-xl p-2 flex flex-col gap-0.5"
           style={{
-            background: rules.wabaApproved
-              ? "color-mix(in srgb, var(--green) 10%, transparent)"
-              : "color-mix(in srgb, var(--yellow) 12%, transparent)",
-            border: `1px solid ${rules.wabaApproved ? "color-mix(in srgb, var(--green) 30%, transparent)" : "color-mix(in srgb, var(--yellow) 30%, transparent)"}`,
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
           }}
         >
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{
-              background: rules.wabaApproved
-                ? "color-mix(in srgb, var(--green) 20%, transparent)"
-                : "color-mix(in srgb, var(--yellow) 20%, transparent)",
-            }}
-          >
-            {rules.wabaApproved ? (
-              <CheckCircle2 size={18} style={{ color: "var(--green)" }} />
-            ) : (
-              <AlertCircle size={18} style={{ color: "var(--yellow)" }} />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p
-              className="text-[13px] font-semibold"
-              style={{ color: rules.wabaApproved ? "var(--green)" : "var(--yellow)" }}
-            >
-              {rules.wabaApproved ? "WABA templates approved" : "Templates pending Meta approval"}
-            </p>
-            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
-              {rules.wabaApproved
-                ? "All 4 tone templates (Gentle · Standard · Firm · Final) are live. Automated WhatsApp reminders will send on schedule."
-                : "Meta typically takes 2–7 days to approve WABA templates. While pending, only manual wa.me sends work."}
-            </p>
-          </div>
-        </div>
-      </SectionCard>
+          {REMINDER_SECTIONS.map(({ id, label, icon: Icon }) => {
+            const activeSection = active === id;
+            return (
+              <a
+                key={id}
+                href={`#reminder-section-${id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  document
+                    .getElementById(`reminder-section-${id}`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  setActive(id);
+                }}
+                className="flex items-center gap-2 text-[11.5px] font-semibold px-2.5 py-2 rounded-md cursor-pointer transition-colors"
+                style={{
+                  background: activeSection
+                    ? "color-mix(in srgb, var(--green) 12%, transparent)"
+                    : "transparent",
+                  color: activeSection ? "var(--green)" : "var(--text-3)",
+                }}
+                onMouseEnter={(e) => {
+                  if (!activeSection)
+                    (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  if (!activeSection)
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                }}
+              >
+                <Icon size={13} />
+                {label}
+              </a>
+            );
+          })}
+        </nav>
+      </aside>
 
-      {/* Schedule & thresholds */}
-      <SectionCard
-        title="Schedule & thresholds"
-        subtitle="How often reminders fire and when a party is flagged for manual outreach."
-      >
-        <div className="flex flex-col gap-4">
-          <NumericRow
-            label="Daily batch limit"
-            desc="Max reminders sent across all parties per day. Cron splits evenly across the 10:00 AM IST window."
-            value={rules.dailyBatchLimit}
-            onChange={(v) => update("dailyBatchLimit", v)}
-            suffix="reminders/day"
-            min={1}
-            max={500}
-          />
-          <NumericRow
-            label="Max reminders per party"
-            desc="Hard cap before we stop auto-sending to a party and flag for manual contact. Counts reset on payment."
-            value={rules.maxRemindersPerParty}
-            onChange={(v) => update("maxRemindersPerParty", v)}
-            suffix="sends"
-            min={1}
-            max={20}
-          />
-          <NumericRow
-            label="Max overdue threshold"
-            desc="Parties overdue more than this are excluded from automated batch sends — they need relationship-manager contact, not another reminder."
-            value={rules.maxOverdueThresholdDays}
-            onChange={(v) => update("maxOverdueThresholdDays", v)}
-            suffix="days"
-            min={30}
-            max={730}
-          />
-          <div
-            className="flex items-center gap-3 px-4 py-3 rounded-lg"
-            style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
-          >
-            <Clock size={14} style={{ color: "var(--text-3)" }} />
-            <div className="flex-1">
-              <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
-                Daily send time
-              </p>
-              <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
-                Cron fires at this IST time every day. Business hours (10 AM) works best for reply rates.
-              </p>
-            </div>
-            <input
-              type="time"
-              value={rules.cronTimeIst}
-              onChange={(e) => update("cronTimeIst", e.target.value)}
-              className="text-[12px] font-semibold px-2 py-1 rounded-md"
-              style={{
-                background: "var(--bg-surface)",
-                color: "var(--text-1)",
-                border: "1px solid var(--border)",
-              }}
-            />
-          </div>
-        </div>
-      </SectionCard>
+      {/* Main column */}
+      <div className="flex-1 min-w-0 flex flex-col gap-5">
+        <section id="reminder-section-live">
+          <LiveStateHero rules={rules} />
+        </section>
 
-      {/* Stop-rules */}
-      <SectionCard
-        title="Auto-stop rules"
-        subtitle="When reminders should stop automatically — prevents awkward follow-ups after payment or opt-out."
-      >
-        <div className="flex flex-col gap-3">
-          <ToggleRow
-            title="Stop on payment received"
-            desc="When Tally sync brings in a receipt voucher for a party, disable their reminders automatically and log the reason."
-            checked={rules.stopOnPaymentReceived}
-            onChange={(v) => update("stopOnPaymentReceived", v)}
-          />
-          <ToggleRow
-            title="Stop on STOP reply"
-            desc="If a party replies STOP to a WhatsApp reminder, mark them opted-out in party_contacts and skip future automated sends across all channels."
-            checked={rules.stopOnOptOut}
-            onChange={(v) => update("stopOnOptOut", v)}
-          />
-        </div>
-      </SectionCard>
+        <section id="reminder-section-templates">
+          <TemplatesSection wabaByTone={rules.wabaApprovalByTone} />
+        </section>
 
-      {/* Save */}
-      <div className="flex items-center justify-end gap-3 pt-2">
-        <AnimatePresence>
-          {saved && (
-            <motion.span
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0 }}
-              className="text-[12px] font-semibold"
-              style={{ color: "var(--green)" }}
-            >
-              ✓ Saved
-            </motion.span>
-          )}
-        </AnimatePresence>
-        <button
-          onClick={handleSave}
-          className="text-[12px] font-semibold px-4 py-2 rounded-lg cursor-pointer"
-          style={{ background: "var(--green)", color: "#fff" }}
+        <section id="reminder-section-schedule">
+          <ScheduleSection rules={rules} update={update} />
+        </section>
+
+        <section id="reminder-section-exclusions">
+          <ExclusionsSection rules={rules} update={update} />
+        </section>
+
+        <section id="reminder-section-escalation">
+          <EscalationSection rules={rules} update={update} />
+        </section>
+
+        <section id="reminder-section-stop-rules">
+          <StopRulesSection rules={rules} update={update} />
+        </section>
+
+        <section id="reminder-section-channels">
+          <ChannelsSection rules={rules} update={update} />
+        </section>
+
+        <section id="reminder-section-analytics">
+          <AnalyticsSection />
+        </section>
+
+        {/* Save bar */}
+        <div
+          className="sticky bottom-0 flex items-center justify-between gap-3 py-3 px-4 rounded-xl mt-2"
+          style={{
+            background: "color-mix(in srgb, var(--bg-surface) 92%, transparent)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid var(--border)",
+          }}
         >
-          Save reminder rules
-        </button>
+          <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+            Changes apply to the next cron run (
+            <span style={{ color: "var(--text-2)" }}>{rules.cronTimeIst}</span> IST)
+          </p>
+          <div className="flex items-center gap-3">
+            <AnimatePresence>
+              {saved && (
+                <motion.span
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="text-[12px] font-semibold"
+                  style={{ color: "var(--green)" }}
+                >
+                  ✓ Saved
+                </motion.span>
+              )}
+            </AnimatePresence>
+            <button
+              onClick={handleSave}
+              className="text-[12px] font-semibold px-4 py-2 rounded-lg cursor-pointer"
+              style={{ background: "var(--green)", color: "#fff" }}
+            >
+              Save reminder rules
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function NumericRow({
+/* ────────────────────────────────────────────────────────────────── */
+/*  1. Live state hero                                                */
+/* ────────────────────────────────────────────────────────────────── */
+function LiveStateHero({ rules }: { rules: ReminderAutomationRules }) {
+  const state = computeReminderLiveState();
+  const monthlyCostEst = (state.sentThisMonth * rules.msg91CostPerMessage).toFixed(2);
+  const creditsRunwayDays =
+    rules.msg91Credits / Math.max(REMINDER_ANALYTICS_30D.creditsBurnRate, 1);
+
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <LiveTile
+        label="Next batch"
+        bigValue="Tomorrow"
+        subValue={`${rules.cronTimeIst} IST · ${state.queued} queued`}
+        color="var(--green)"
+        icon={<Clock size={14} />}
+      />
+      <LiveTile
+        label="Active / Paused"
+        bigValue={`${state.active}`}
+        subValue={`${state.paused} paused · ${state.optedOut} opted out`}
+        color="var(--blue)"
+        icon={<Activity size={14} />}
+        suffix="active"
+      />
+      <LiveTile
+        label="Sent this month"
+        bigValue={`${state.sentThisMonth}`}
+        subValue={`${Math.round(state.replyRate * 100)}% reply rate · ₹${(state.collectedThisMonth / 1e5).toFixed(1)}L collected`}
+        color="var(--purple)"
+        icon={<MessageCircle size={14} />}
+        suffix="sends"
+      />
+      <LiveTile
+        label="Est. monthly cost"
+        bigValue={`₹${monthlyCostEst}`}
+        subValue={`${rules.msg91Credits} credits · ~${Math.round(creditsRunwayDays)}d runway`}
+        color="var(--orange)"
+        icon={<CreditCard size={14} />}
+      />
+    </div>
+  );
+}
+
+function LiveTile({
+  label,
+  bigValue,
+  subValue,
+  color,
+  icon,
+  suffix,
+}: {
+  label: string;
+  bigValue: string;
+  subValue: string;
+  color: string;
+  icon: React.ReactNode;
+  suffix?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.3 }}
+      className="rounded-xl p-4 flex flex-col gap-2"
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderLeft: `3px solid ${color}`,
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+          {label}
+        </span>
+        <span style={{ color }}>{icon}</span>
+      </div>
+      <div className="flex items-baseline gap-1">
+        <p
+          className="text-xl font-bold tabular-nums"
+          style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          {bigValue}
+        </p>
+        {suffix && (
+          <span className="text-[11px] font-medium" style={{ color: "var(--text-4)" }}>
+            {suffix}
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] leading-snug" style={{ color: "var(--text-3)" }}>
+        {subValue}
+      </p>
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  2. Templates section — 4 tone cards × 3 channel approval chips    */
+/* ────────────────────────────────────────────────────────────────── */
+
+const TONE_META: Record<ReminderTone, { label: string; bucket: string; color: string }> = {
+  gentle:   { label: "Gentle",   bucket: "≤ 7 days",      color: "var(--green)"  },
+  standard: { label: "Standard", bucket: "8 – 30 days",   color: "var(--blue)"   },
+  firm:     { label: "Firm",     bucket: "31 – 180 days", color: "var(--orange)" },
+  final:    { label: "Final",    bucket: "180+ days",     color: "var(--red)"    },
+};
+
+function TemplatesSection({
+  wabaByTone,
+}: {
+  wabaByTone: ReminderAutomationRules["wabaApprovalByTone"];
+}) {
+  return (
+    <SectionCard
+      title="Template library"
+      subtitle="4-tier tone ladder × 3 channels. Variables fill automatically per party on send."
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {(Object.keys(TONE_META) as ReminderTone[]).map((tone) => (
+          <TemplateCard key={tone} tone={tone} waba={wabaByTone[tone]} />
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
+function TemplateCard({
+  tone,
+  waba,
+}: {
+  tone: ReminderTone;
+  waba: "approved" | "pending" | "rejected";
+}) {
+  const meta = TONE_META[tone];
+  // Sample render for preview (first 140 chars of WA template)
+  const waTemplate = REMINDER_TEMPLATES.find((t) => t.tone === tone && t.channel === "whatsapp");
+  const previewText = waTemplate
+    ? renderTemplate(waTemplate.body, {
+        party_name: "Nykaa",
+        invoice_no: "NYK-2301",
+        net_amount: "₹12.6L",
+        due_date: "15 Mar 2024",
+        days_overdue: "2,195",
+        company_name: cleanCompanyName("Bandra Soap Pvt Ltd(2020-2024)"),
+      })
+    : "—";
+
+  const channelStatus: Record<ReminderChannel, "approved" | "pending" | "rejected" | "n/a"> = {
+    whatsapp: waba,
+    email:    "approved",
+    sms:      "approved",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.25 }}
+      className="rounded-xl p-4 flex flex-col gap-3"
+      style={{
+        background: "var(--bg-secondary)",
+        border: `1px solid ${meta.color}40`,
+        borderLeft: `3px solid ${meta.color}`,
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-bold" style={{ color: meta.color }}>
+            {meta.label}
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+            {meta.bucket}
+          </p>
+        </div>
+        <button
+          className="text-[10px] font-semibold px-2.5 py-1 rounded-md cursor-pointer"
+          style={{ background: "var(--bg-hover)", color: "var(--text-2)" }}
+        >
+          Edit
+        </button>
+      </div>
+      <p
+        className="text-[11px] leading-relaxed line-clamp-3 rounded-md p-2.5"
+        style={{ background: "var(--bg-primary)", color: "var(--text-2)" }}
+      >
+        {previewText}
+      </p>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => {
+          const st = channelStatus[ch];
+          const chLabel = ch === "whatsapp" ? "WA" : ch === "email" ? "Email" : "SMS";
+          const fg =
+            st === "approved" ? "var(--green)" : st === "pending" ? "var(--yellow)" : "var(--red)";
+          const sym = st === "approved" ? "✓" : st === "pending" ? "…" : "✗";
+          return (
+            <span
+              key={ch}
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded"
+              style={{
+                background: `color-mix(in srgb, ${fg} 12%, transparent)`,
+                color: fg,
+              }}
+              title={`${chLabel}: ${st}`}
+            >
+              {chLabel} {sym}
+            </span>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  3. Schedule section                                               */
+/* ────────────────────────────────────────────────────────────────── */
+function ScheduleSection({
+  rules,
+  update,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(key: K, value: ReminderAutomationRules[K]) => void;
+}) {
+  return (
+    <SectionCard
+      title="Schedule & send rules"
+      subtitle="How often, when, and for which outstanding ranges reminders fire."
+    >
+      <div className="flex flex-col gap-4">
+        <RemNumericRow
+          label="Daily batch limit"
+          desc="Max reminders sent across all parties per day."
+          value={rules.dailyBatchLimit}
+          onChange={(v) => update("dailyBatchLimit", v)}
+          suffix="reminders/day"
+          min={1}
+          max={500}
+        />
+        <RemNumericRow
+          label="Max reminders per party"
+          desc="Hard cap before we stop auto-sending and flag for manual contact."
+          value={rules.maxRemindersPerParty}
+          onChange={(v) => update("maxRemindersPerParty", v)}
+          suffix="sends"
+          min={1}
+          max={20}
+        />
+        <RemNumericRow
+          label="Max overdue threshold"
+          desc="Parties overdue more than this are excluded — they need relationship-manager contact, not another reminder."
+          value={rules.maxOverdueThresholdDays}
+          onChange={(v) => update("maxOverdueThresholdDays", v)}
+          suffix="days"
+          min={30}
+          max={730}
+        />
+        <RemNumericRow
+          label="Minimum outstanding"
+          desc="Don't auto-remind below this amount — avoids nagging customers for trivial balances."
+          value={rules.minOutstandingAmount}
+          onChange={(v) => update("minOutstandingAmount", v)}
+          suffix="₹"
+          min={0}
+          max={100000}
+        />
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-lg"
+          style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+        >
+          <Clock size={14} style={{ color: "var(--text-3)" }} />
+          <div className="flex-1">
+            <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+              Daily send time
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              Cron fires at this IST time. Business hours (10 AM) works best for reply rates.
+            </p>
+          </div>
+          <input
+            type="time"
+            value={rules.cronTimeIst}
+            onChange={(e) => update("cronTimeIst", e.target.value)}
+            className="text-[12px] font-semibold px-2 py-1 rounded-md"
+            style={{
+              background: "var(--bg-surface)",
+              color: "var(--text-1)",
+              border: "1px solid var(--border)",
+            }}
+          />
+        </div>
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-lg flex-wrap"
+          style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+        >
+          <Clock size={14} style={{ color: "var(--text-3)" }} />
+          <div className="flex-1 min-w-[180px]">
+            <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+              Quiet hours
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              Reminders only fire within this window — skips nights + early mornings.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="time"
+              value={rules.quietHoursStart}
+              onChange={(e) => update("quietHoursStart", e.target.value)}
+              className="text-[12px] font-semibold px-2 py-1 rounded-md"
+              style={{ background: "var(--bg-surface)", color: "var(--text-1)", border: "1px solid var(--border)" }}
+            />
+            <span className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              to
+            </span>
+            <input
+              type="time"
+              value={rules.quietHoursEnd}
+              onChange={(e) => update("quietHoursEnd", e.target.value)}
+              className="text-[12px] font-semibold px-2 py-1 rounded-md"
+              style={{ background: "var(--bg-surface)", color: "var(--text-1)", border: "1px solid var(--border)" }}
+            />
+          </div>
+        </div>
+        <ToggleRow
+          title="Skip weekends"
+          desc="Cron won't fire on Saturday or Sunday. Reply rates drop ~60% on weekends anyway."
+          checked={rules.skipWeekends}
+          onChange={(v) => update("skipWeekends", v)}
+        />
+        <ToggleRow
+          title="Skip Indian public holidays"
+          desc="Pulls from a built-in holiday list (Diwali, Holi, Eid, Republic Day, etc.). Updated annually."
+          checked={rules.skipHolidays}
+          onChange={(v) => update("skipHolidays", v)}
+        />
+        <ToggleRow
+          title="Deduct on-account credits"
+          desc="Subtract on_account from outstanding before ranking urgency. A party owing ₹5.7L with ₹5.1L on-account ranks lower than one owing ₹1L fresh."
+          checked={rules.onAccountDeduction}
+          onChange={(v) => update("onAccountDeduction", v)}
+        />
+      </div>
+    </SectionCard>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  4. Exclusions section — blacklist + key-account whitelist         */
+/* ────────────────────────────────────────────────────────────────── */
+function ExclusionsSection({
+  rules,
+  update,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(key: K, value: ReminderAutomationRules[K]) => void;
+}) {
+  const [addingBlacklist, setAddingBlacklist] = useState(false);
+  const [addingKey, setAddingKey] = useState(false);
+  const availableParties = RECEIVABLES
+    .map((r) => r.name)
+    .filter((n) => !rules.blacklistedParties.includes(n) && !rules.keyAccountParties.includes(n));
+
+  return (
+    <SectionCard
+      title="Smart exclusions"
+      subtitle="Parties that never receive automated sends, or require special handling."
+    >
+      <div className="flex flex-col gap-5">
+        {/* Blacklist */}
+        <ExclusionList
+          heading="Blacklist"
+          subheading="Never auto-send — owner can still send manually from the party drawer"
+          parties={rules.blacklistedParties}
+          color="var(--red)"
+          icon={<X size={12} />}
+          adding={addingBlacklist}
+          setAdding={setAddingBlacklist}
+          onRemove={(name) =>
+            update(
+              "blacklistedParties",
+              rules.blacklistedParties.filter((p) => p !== name),
+            )
+          }
+          onAdd={(name) => {
+            update("blacklistedParties", [...rules.blacklistedParties, name]);
+            setAddingBlacklist(false);
+          }}
+          options={availableParties}
+        />
+
+        {/* Key accounts */}
+        <ExclusionList
+          heading="Key accounts"
+          subheading="Automated reminder becomes a to-do for the owner — no WhatsApp / Email sent directly"
+          parties={rules.keyAccountParties}
+          color="var(--purple)"
+          icon={<Shield size={12} />}
+          adding={addingKey}
+          setAdding={setAddingKey}
+          onRemove={(name) =>
+            update(
+              "keyAccountParties",
+              rules.keyAccountParties.filter((p) => p !== name),
+            )
+          }
+          onAdd={(name) => {
+            update("keyAccountParties", [...rules.keyAccountParties, name]);
+            setAddingKey(false);
+          }}
+          options={availableParties}
+        />
+      </div>
+    </SectionCard>
+  );
+}
+
+function ExclusionList({
+  heading,
+  subheading,
+  parties,
+  color,
+  icon,
+  adding,
+  setAdding,
+  onRemove,
+  onAdd,
+  options,
+}: {
+  heading: string;
+  subheading: string;
+  parties: string[];
+  color: string;
+  icon: React.ReactNode;
+  adding: boolean;
+  setAdding: (v: boolean) => void;
+  onRemove: (name: string) => void;
+  onAdd: (name: string) => void;
+  options: string[];
+}) {
+  return (
+    <div
+      className="rounded-xl p-4"
+      style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+          {heading}
+        </p>
+        <span
+          className="text-[10px] font-bold px-1.5 py-0.5 rounded-md tabular-nums"
+          style={{
+            background: `color-mix(in srgb, ${color} 15%, transparent)`,
+            color,
+          }}
+        >
+          {parties.length}
+        </span>
+      </div>
+      <p className="text-[11px] mb-3" style={{ color: "var(--text-3)" }}>
+        {subheading}
+      </p>
+      {parties.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {parties.map((p) => (
+            <span
+              key={p}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md"
+              style={{
+                background: `color-mix(in srgb, ${color} 10%, transparent)`,
+                color,
+                border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
+              }}
+            >
+              {icon}
+              {p}
+              <button
+                onClick={() => onRemove(p)}
+                className="ml-0.5 cursor-pointer hover:opacity-70"
+                aria-label={`Remove ${p}`}
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] mb-3 italic" style={{ color: "var(--text-4)" }}>
+          No parties in this list yet.
+        </p>
+      )}
+      {adding ? (
+        <div className="flex items-center gap-2">
+          <select
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value) onAdd(e.target.value);
+            }}
+            className="flex-1 text-[12px] px-2 py-1.5 rounded-md cursor-pointer"
+            style={{
+              background: "var(--bg-surface)",
+              color: "var(--text-1)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <option value="" disabled>
+              Pick a party…
+            </option>
+            {options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setAdding(false)}
+            className="text-[11px] px-2 py-1.5 rounded-md cursor-pointer"
+            style={{ color: "var(--text-4)" }}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+          style={{ color }}
+        >
+          <Plus size={11} />
+          Add party
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  5. Escalation section                                             */
+/* ────────────────────────────────────────────────────────────────── */
+function EscalationSection({
+  rules,
+  update,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(key: K, value: ReminderAutomationRules[K]) => void;
+}) {
+  return (
+    <SectionCard
+      title="Escalation rules"
+      subtitle="What happens when reminders aren't working — route to a human before the relationship sours."
+    >
+      <div className="flex flex-col gap-4">
+        <div
+          className="flex items-start gap-3 px-4 py-3 rounded-lg flex-wrap"
+          style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+        >
+          <div className="flex-1 min-w-[200px]">
+            <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+              Auto-escalate after no reply
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+              Creates a to-do for the assigned role. Useful when reminders alone aren&apos;t working.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={rules.escalateAfterDays}
+              onChange={(e) => {
+                const n = parseInt(e.target.value, 10);
+                if (!Number.isNaN(n)) update("escalateAfterDays", Math.min(Math.max(n, 1), 60));
+              }}
+              className="w-16 text-[12px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--text-1)",
+                border: "1px solid var(--border)",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            />
+            <span className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              days → assign to
+            </span>
+            <select
+              value={rules.escalateTo}
+              onChange={(e) => update("escalateTo", e.target.value as ReminderAutomationRules["escalateTo"])}
+              className="text-[12px] font-semibold px-2 py-1 rounded-md cursor-pointer"
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--text-1)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <option value="accounts">Accounts</option>
+              <option value="accounts-head">Accounts Head</option>
+              <option value="sales">Sales</option>
+              <option value="admin">Admin / Owner</option>
+            </select>
+          </div>
+        </div>
+        <ToggleRow
+          title="Alert owner on Final tier"
+          desc="When a party crosses into Final tone (180d+), ping the admin / owner on WhatsApp so they can intervene directly."
+          checked={rules.finalTierAlert}
+          onChange={(v) => update("finalTierAlert", v)}
+        />
+        <RemNumericRow
+          label="SLA after Final tier"
+          desc="Days we keep trying after Final tone before flagging the party for formal recovery / legal action."
+          value={rules.slaAfterFinalDays}
+          onChange={(v) => update("slaAfterFinalDays", v)}
+          suffix="days"
+          min={7}
+          max={180}
+        />
+      </div>
+    </SectionCard>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  6. Auto-stop rules — extended                                     */
+/* ────────────────────────────────────────────────────────────────── */
+function StopRulesSection({
+  rules,
+  update,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(key: K, value: ReminderAutomationRules[K]) => void;
+}) {
+  return (
+    <SectionCard
+      title="Auto-stop rules"
+      subtitle="When reminders should stop automatically — prevents awkward follow-ups after intent-to-pay signals."
+    >
+      <div className="flex flex-col gap-3">
+        <ToggleRow
+          title="Stop on payment received"
+          desc="When Tally sync brings in a receipt voucher for a party, disable their reminders automatically and log the reason."
+          checked={rules.stopOnPaymentReceived}
+          onChange={(v) => update("stopOnPaymentReceived", v)}
+        />
+        <ToggleRow
+          title="Stop on STOP reply"
+          desc="If a party replies STOP to a WhatsApp reminder, mark them opted-out in party_contacts and skip future automated sends across all channels."
+          checked={rules.stopOnOptOut}
+          onChange={(v) => update("stopOnOptOut", v)}
+        />
+        <ToggleRow
+          title='Pause on "promise to pay"'
+          desc='If the reply matches "paying soon", "will clear", "promise" (and similar), pause reminders for 7 days. Resumes if no payment arrives.'
+          checked={rules.stopOnPromiseToPay}
+          onChange={(v) => update("stopOnPromiseToPay", v)}
+        />
+        <div
+          className="flex items-start gap-3 px-4 py-3 rounded-lg flex-wrap"
+          style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+        >
+          <div className="flex-1 min-w-[220px]">
+            <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+              Stop on partial payment
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+              Don&apos;t nag once they&apos;ve paid most of it. Threshold is the % of outstanding cleared.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => update("stopOnPartialPayment", !rules.stopOnPartialPayment)}
+              className="relative inline-flex h-5 w-9 rounded-full transition-colors cursor-pointer"
+              style={{
+                background: rules.stopOnPartialPayment ? "var(--green)" : "var(--bg-surface)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <motion.span
+                animate={{ x: rules.stopOnPartialPayment ? 16 : 2 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-0.5 w-3.5 h-3.5 rounded-full"
+                style={{ background: rules.stopOnPartialPayment ? "#fff" : "var(--text-4)" }}
+              />
+            </button>
+            <select
+              value={rules.partialPaymentThreshold}
+              onChange={(e) => update("partialPaymentThreshold", parseFloat(e.target.value))}
+              disabled={!rules.stopOnPartialPayment}
+              className="text-[12px] font-semibold px-2 py-1 rounded-md cursor-pointer disabled:opacity-50"
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--text-1)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <option value={0.5}>≥ 50% paid</option>
+              <option value={0.7}>≥ 70% paid</option>
+              <option value={0.8}>≥ 80% paid</option>
+              <option value={0.9}>≥ 90% paid</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  7. Channel health section — WA / Email / SMS accordions           */
+/* ────────────────────────────────────────────────────────────────── */
+function ChannelsSection({
+  rules,
+  update,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(key: K, value: ReminderAutomationRules[K]) => void;
+}) {
+  return (
+    <SectionCard
+      title="Channel health"
+      subtitle="Per-channel configuration + cost + credit balance. Expand each for details."
+    >
+      <div className="flex flex-col gap-3">
+        <ChannelAccordion
+          label="WhatsApp (MSG91 · WABA)"
+          color="var(--green)"
+          icon={<MessageCircle size={14} />}
+          defaultOpen
+          summary={
+            <div className="flex items-center gap-3 flex-wrap text-[11px]" style={{ color: "var(--text-3)" }}>
+              <StatusDot color="var(--green)" label="Connected" />
+              <span>
+                ₹{rules.msg91CostPerMessage.toFixed(2)} / msg
+              </span>
+              <span>
+                {rules.msg91Credits} credits left
+              </span>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <HealthTile label="Credits" value={String(rules.msg91Credits)} sub="Approx 5 mo @ current pace" />
+            <HealthTile label="Cost per message" value={`₹${rules.msg91CostPerMessage}`} sub="MSG91 utility template rate" />
+            <HealthTile label="Approved templates" value="3 of 4" sub="Final tier still pending Meta review" color="var(--yellow)" />
+            <HealthTile label="Daily cap (MSG91)" value="1,000 msg" sub="Platform limit · auto throttle" />
+          </div>
+          <button
+            className="self-start text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer mt-3"
+            style={{ background: "var(--bg-hover)", color: "var(--text-2)" }}
+          >
+            Open MSG91 dashboard →
+          </button>
+        </ChannelAccordion>
+
+        <ChannelAccordion
+          label="Email (Resend)"
+          color="var(--blue)"
+          icon={<Mail size={14} />}
+          summary={
+            <div className="flex items-center gap-3 flex-wrap text-[11px]" style={{ color: "var(--text-3)" }}>
+              <StatusDot color="var(--green)" label="Verified" />
+              <span className="truncate">From: {rules.emailFromAddress}</span>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FieldInput
+              label="From address"
+              value={rules.emailFromAddress}
+              onChange={(v) => update("emailFromAddress", v)}
+            />
+            <FieldInput
+              label="Reply-to"
+              value={rules.emailReplyTo}
+              onChange={(v) => update("emailReplyTo", v)}
+            />
+          </div>
+          <div className="mt-3">
+            <p className="text-[10px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: "var(--text-4)" }}>
+              Signature
+            </p>
+            <textarea
+              value={rules.emailSignature}
+              onChange={(e) => update("emailSignature", e.target.value)}
+              rows={4}
+              className="w-full text-[12px] p-2.5 rounded-md"
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--text-2)",
+                border: "1px solid var(--border)",
+                resize: "vertical",
+              }}
+            />
+          </div>
+        </ChannelAccordion>
+
+        <ChannelAccordion
+          label="SMS (MSG91 · DLT compliant)"
+          color="var(--text-2)"
+          icon={<MessageCircle size={14} />}
+          summary={
+            <div className="flex items-center gap-3 flex-wrap text-[11px]" style={{ color: "var(--text-3)" }}>
+              <StatusDot color="var(--green)" label="DLT registered" />
+              <span>₹{rules.smsCostPerMessage.toFixed(2)} / msg</span>
+              <span>Header: {rules.smsDltHeader}</span>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <FieldInput
+              label="DLT header"
+              value={rules.smsDltHeader}
+              onChange={(v) => update("smsDltHeader", v)}
+              hint="6-char TRAI-registered header"
+            />
+            <FieldInput
+              label="Sender ID"
+              value={rules.smsSenderId}
+              onChange={(v) => update("smsSenderId", v)}
+              hint="Same as DLT header for most senders"
+            />
+          </div>
+          <p className="text-[11px] mt-3" style={{ color: "var(--text-4)" }}>
+            SMS is the fallback channel — lower reply rate (~9%) but 100% delivery. Used when
+            WhatsApp templates aren&apos;t approved yet or the party has opted out of WA.
+          </p>
+        </ChannelAccordion>
+      </div>
+    </SectionCard>
+  );
+}
+
+function ChannelAccordion({
+  label,
+  color,
+  icon,
+  summary,
+  children,
+  defaultOpen,
+}: {
+  label: string;
+  color: string;
+  icon: React.ReactNode;
+  summary: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+    >
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors"
+      >
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{
+            background: `color-mix(in srgb, ${color} 15%, transparent)`,
+            color,
+          }}
+        >
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="text-[13px] font-semibold truncate" style={{ color: "var(--text-1)" }}>
+            {label}
+          </p>
+          {summary}
+        </div>
+        <ChevronDown
+          size={16}
+          style={{
+            color: "var(--text-3)",
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.2s",
+          }}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 flex flex-col gap-2" style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function StatusDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span
+        className="w-1.5 h-1.5 rounded-full"
+        style={{ background: color }}
+      />
+      <span style={{ color }}>{label}</span>
+    </span>
+  );
+}
+
+function HealthTile({
+  label,
+  value,
+  sub,
+  color = "var(--text-1)",
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  color?: string;
+}) {
+  return (
+    <div
+      className="rounded-lg p-3"
+      style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}
+    >
+      <p className="text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color: "var(--text-4)" }}>
+        {label}
+      </p>
+      <p
+        className="text-base font-bold tabular-nums"
+        style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {value}
+      </p>
+      <p className="text-[10px] mt-0.5" style={{ color: "var(--text-4)" }}>
+        {sub}
+      </p>
+    </div>
+  );
+}
+
+function FieldInput({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: "var(--text-4)" }}>
+        {label}
+      </p>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full text-[12px] px-2.5 py-1.5 rounded-md"
+        style={{
+          background: "var(--bg-surface)",
+          color: "var(--text-1)",
+          border: "1px solid var(--border)",
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      />
+      {hint && (
+        <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  8. Analytics section — 30d sends + reply rates + correlation      */
+/* ────────────────────────────────────────────────────────────────── */
+function AnalyticsSection() {
+  const a = REMINDER_ANALYTICS_30D;
+  const maxDaily = Math.max(
+    ...a.dailySends.map((d) => d.gentle + d.standard + d.firm + d.final),
+    1,
+  );
+
+  return (
+    <SectionCard
+      title="Last 30 days"
+      subtitle="How reminders actually performed — tune your rules above based on what's working."
+    >
+      <div className="flex flex-col gap-5">
+        {/* Summary row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <SummaryStat
+            label="Total sent"
+            value={String(a.totalSent)}
+            sub={`${a.totalReplies} replies · ${Math.round((a.totalReplies / Math.max(a.totalSent, 1)) * 100)}%`}
+            color="var(--blue)"
+          />
+          <SummaryStat
+            label="Collected"
+            value={`₹${(a.totalCollected / 1e5).toFixed(1)}L`}
+            sub={`Correlated within 7d of reminder`}
+            color="var(--green)"
+          />
+          <SummaryStat
+            label="Monthly cost"
+            value={`₹${a.totalCost}`}
+            sub={`~₹${(a.totalCost / Math.max(a.totalSent, 1)).toFixed(2)} per send avg`}
+            color="var(--orange)"
+          />
+          <SummaryStat
+            label="Credits burn"
+            value={`${a.creditsBurnRate}/day`}
+            sub="Monitor to avoid mid-month top-ups"
+            color="var(--purple)"
+          />
+        </div>
+
+        {/* 30-day stacked bar chart */}
+        <div>
+          <p className="text-[11px] font-semibold mb-2" style={{ color: "var(--text-3)" }}>
+            Daily sends by tier
+          </p>
+          <div
+            className="rounded-xl p-3 flex items-end gap-1"
+            style={{ background: "var(--bg-hover)", border: "1px solid var(--border)", minHeight: 140 }}
+          >
+            {a.dailySends.map((d) => {
+              const total = d.gentle + d.standard + d.firm + d.final;
+              const h = total === 0 ? 0 : (total / maxDaily) * 100;
+              return (
+                <div
+                  key={d.date}
+                  className="flex-1 flex flex-col items-center justify-end gap-1"
+                  title={`${d.dayLabel} · ${total} sends (${d.gentle}G + ${d.standard}S + ${d.firm}F + ${d.final}Fi)`}
+                >
+                  <div className="w-full flex flex-col-reverse" style={{ height: 110 }}>
+                    {total > 0 && (
+                      <>
+                        <div
+                          style={{
+                            height: `${(d.gentle / total) * h}%`,
+                            background: "var(--green)",
+                            opacity: 0.85,
+                          }}
+                        />
+                        <div
+                          style={{
+                            height: `${(d.standard / total) * h}%`,
+                            background: "var(--blue)",
+                            opacity: 0.85,
+                          }}
+                        />
+                        <div
+                          style={{
+                            height: `${(d.firm / total) * h}%`,
+                            background: "var(--orange)",
+                            opacity: 0.85,
+                          }}
+                        />
+                        <div
+                          style={{
+                            height: `${(d.final / total) * h}%`,
+                            background: "var(--red)",
+                            opacity: 0.85,
+                          }}
+                        />
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between text-[10px] mt-2" style={{ color: "var(--text-4)" }}>
+            <span>{a.dailySends[0]?.dayLabel}</span>
+            <div className="flex items-center gap-3">
+              {(["gentle", "standard", "firm", "final"] as ReminderTone[]).map((t) => (
+                <span key={t} className="flex items-center gap-1 capitalize">
+                  <span
+                    className="inline-block w-2 h-2 rounded-sm"
+                    style={{ background: TONE_META[t].color }}
+                  />
+                  {t}
+                </span>
+              ))}
+            </div>
+            <span>{a.dailySends[a.dailySends.length - 1]?.dayLabel}</span>
+          </div>
+        </div>
+
+        {/* Reply rate by channel */}
+        <div>
+          <p className="text-[11px] font-semibold mb-2" style={{ color: "var(--text-3)" }}>
+            Reply rate by channel
+          </p>
+          <div className="flex flex-col gap-2">
+            {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => {
+              const rate = a.replyRateByChannel[ch];
+              const color = ch === "whatsapp" ? "var(--green)" : ch === "email" ? "var(--blue)" : "var(--text-3)";
+              const label = ch === "whatsapp" ? "WhatsApp" : ch === "email" ? "Email" : "SMS";
+              return (
+                <div key={ch} className="flex items-center gap-3">
+                  <span className="text-[11px] font-semibold w-20 flex-shrink-0" style={{ color: "var(--text-2)" }}>
+                    {label}
+                  </span>
+                  <div
+                    className="flex-1 h-5 rounded-md overflow-hidden"
+                    style={{ background: "var(--bg-hover)" }}
+                  >
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: `${rate * 100}%` }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.6, delay: 0.1 }}
+                      className="h-full rounded-md"
+                      style={{ background: color }}
+                    />
+                  </div>
+                  <span
+                    className="text-[11px] font-bold tabular-nums w-10 text-right"
+                    style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}
+                  >
+                    {Math.round(rate * 100)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Payment correlation by tone */}
+        <div>
+          <p className="text-[11px] font-semibold mb-2" style={{ color: "var(--text-3)" }}>
+            Paid within 7 days of reminder, by tone
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {(Object.keys(TONE_META) as ReminderTone[]).map((t) => {
+              const c = a.paymentCorrelation[t];
+              return (
+                <div
+                  key={t}
+                  className="rounded-lg p-3 flex flex-col gap-1"
+                  style={{
+                    background: "var(--bg-primary)",
+                    border: "1px solid var(--border)",
+                    borderLeft: `3px solid ${TONE_META[t].color}`,
+                  }}
+                >
+                  <span className="text-[10px] font-semibold capitalize" style={{ color: "var(--text-4)" }}>
+                    {t}
+                  </span>
+                  <p
+                    className="text-lg font-bold tabular-nums"
+                    style={{ color: TONE_META[t].color, fontFamily: "'Space Grotesk', sans-serif" }}
+                  >
+                    {Math.round(c.pct * 100)}%
+                  </p>
+                  <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                    {c.paidWithin7d} of {c.reminded} paid
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] mt-2 italic" style={{ color: "var(--text-4)" }}>
+            Gentle tone converts best — but only because it hits recent dues. Final tier is
+            selection bias: these parties were already unlikely to pay.
+          </p>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+function SummaryStat({
+  label,
+  value,
+  sub,
+  color,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  color: string;
+}) {
+  return (
+    <div
+      className="rounded-lg p-3"
+      style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+    >
+      <p className="text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color: "var(--text-4)" }}>
+        {label}
+      </p>
+      <p
+        className="text-lg font-bold tabular-nums"
+        style={{ color, fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {value}
+      </p>
+      <p className="text-[10px] mt-0.5" style={{ color: "var(--text-3)" }}>
+        {sub}
+      </p>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  Shared: numeric input row (kept local to avoid name clash)        */
+/* ────────────────────────────────────────────────────────────────── */
+function RemNumericRow({
   label,
   desc,
   value,
