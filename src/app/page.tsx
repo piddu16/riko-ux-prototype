@@ -24,14 +24,6 @@ import { useRbac } from "@/lib/rbac-context";
 import { useCompany } from "@/lib/company-context";
 import { ArrowLeft } from "lucide-react";
 
-const BOTTOM_MAP: Record<string, TabId> = {
-  dashboard: "dashboard",
-  chat: "chat",
-  clients: "clients",
-  outstanding: "outstanding",
-  reports: "reports",
-};
-
 export default function Home() {
   const [tab, setTab] = useState<TabId>("dashboard");
   const [moreOpen, setMoreOpen] = useState(false);
@@ -43,18 +35,18 @@ export default function Home() {
     setPendingChatQuestion(q);
     setTab("chat");
   };
-  const { role, canSee, roleConfig } = useRbac();
+  const { role, roleConfig } = useRbac();
   const { current: COMPANY, resetToDefault, isCustomSelection } = useCompany();
 
-  /* Only redirect when the ROLE changes, not when the tab changes.
-     When the user navigates, the sidebar already filters to visible tabs —
-     so any tab they can click is one they can see. Re-checking on tab
-     change caused a race during hydration that bounced the user back. */
+  /* Role-switch behavior: ALWAYS redirect to the new role's homeTab.
+     Prior behavior only redirected if the current tab was forbidden —
+     but that left users on tabs the role technically "can see" yet
+     shouldn't be their landing page (e.g. Sales role has dashboard.view
+     but lands on full CFO dashboard instead of their Sales home).
+     Always-redirect makes "viewing as X" a clean point-in-time switch. */
   useEffect(() => {
-    if (!canSee(tab)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setTab(roleConfig.homeTab as TabId);
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTab(roleConfig.homeTab as TabId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
 
@@ -73,8 +65,11 @@ export default function Home() {
     return () => window.removeEventListener("riko:navigate", handler as EventListener);
   }, []);
 
+  /* BottomNav owns its own role-aware tab picking (via pickBottomTabs).
+     Every id it emits is already a valid TabId — no need for a lookup
+     map here. */
   const handleBottomNav = (id: string) => {
-    setTab(BOTTOM_MAP[id] || "dashboard");
+    setTab(id as TabId);
   };
 
   return (
