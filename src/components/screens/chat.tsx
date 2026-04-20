@@ -86,7 +86,17 @@ import {
   shareToWhatsApp,
   slugify,
 } from "@/components/ui/chart-export";
-import { COHORT_RETENTION } from "@/lib/data";
+import {
+  COHORT_RETENTION,
+  CYCLIC_TRANSACTIONS,
+  RELATED_PARTY_SALES,
+  RELATED_PARTY_PURCHASES,
+  RECURRING_REVENUE,
+  HSN_WISE_SALES,
+  STATE_WISE_SALES,
+  FILING_DELAYS,
+  FILING_STATS,
+} from "@/lib/data";
 
 /* ═══════════════════════════════════════════════════════════════
    Intents — what a message can be about
@@ -110,6 +120,13 @@ type Intent =
   | "cohort-retention"
   | "money-flow"
   | "customer-ltv"
+  // GST API parity additions (sourced from consented GST provider)
+  | "cyclic-transactions"
+  | "related-party"
+  | "recurring-revenue"
+  | "hsn-wise"
+  | "state-wise"
+  | "filing-delay"
   | "unknown";
 
 type ChatMessage =
@@ -124,6 +141,21 @@ function classifyIntent(text: string): Intent {
   if (!q) return "unknown";
 
   // Order matters — more specific first
+
+  // GST API parity intents checked before the more generic ones
+  if (/cyclic|round.?trip|same.*party.*(customer|supplier)|both.*customer.*supplier/.test(q))
+    return "cyclic-transactions";
+  if (/related.*party|sister.*concern|group.*company|rpt\b|40a.?2/.test(q))
+    return "related-party";
+  if (/recurring.*revenue|repeat.*customer|sticky|stickiness|customer.*retention.*\$|revenue.*quality/.test(q))
+    return "recurring-revenue";
+  if (/\bhsn\b|product.*mix|service.*code|sac.*code|hsn.*wise/.test(q))
+    return "hsn-wise";
+  if (/state.?wise|geo.*split|geographic|regional.*sales|by.*state|interstate.*revenue/.test(q))
+    return "state-wise";
+  if (/filing.*delay|late.*filing|filing.*calendar|delay.*day|filing.*history/.test(q))
+    return "filing-delay";
+
   if (/recon|gstr.?2b|2b\b|match.*invoice|itc.*risk/.test(q)) return "gst-recon";
   if (/gst.*health|gst.*score|filing.*streak|compliance.*health/.test(q))
     return "gst-health";
@@ -1471,6 +1503,258 @@ function ExchangeCustomerLtv({ onFollowup }: { onFollowup: (q: string) => void }
   );
 }
 
+/* ── Cyclic transactions (round-trip flag) ── */
+function ExchangeCyclicTransactions({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const highSev = CYCLIC_TRANSACTIONS.filter((c) => c.severity === "high").length;
+  const totalSales = CYCLIC_TRANSACTIONS.reduce((s, c) => s + c.totalSales, 0);
+  const totalPurchases = CYCLIC_TRANSACTIONS.reduce((s, c) => s + c.totalPurchases, 0);
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Cyclic transactions (round-trip flag)
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              {CYCLIC_TRANSACTIONS.length} parties appear as BOTH customer and supplier · {highSev} high severity
+            </p>
+          </div>
+          <Pill color={highSev > 0 ? "var(--red)" : "var(--yellow)"}>
+            ₹{(Math.min(totalSales, totalPurchases) / 1e5).toFixed(1)}L at risk
+          </Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--red)" icon="⚠️" title="Why this matters">
+        <p>
+          When the same PAN is both customer and supplier, the tax officer
+          flags it as potential round-tripping. <strong>Patel Traders</strong>{" "}
+          is 70% cycled (purchases nearly match sales). Explain this with
+          genuine business rationale before GST scrutiny — or restructure.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["Related party transactions", "Biggest receivables", "Top suppliers"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/* ── Related-party transactions ── */
+function ExchangeRelatedParty({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const salesTotal = RELATED_PARTY_SALES.reduce((s, r) => s + r.invoiceValue, 0);
+  const purchTotal = RELATED_PARTY_PURCHASES.reduce((s, r) => s + r.invoiceValue, 0);
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Related-party transactions
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              Sales ₹{(salesTotal / 1e5).toFixed(1)}L · Purchases ₹{(purchTotal / 1e5).toFixed(1)}L · {RELATED_PARTY_SALES.length + RELATED_PARTY_PURCHASES.length} parties flagged
+            </p>
+          </div>
+          <Pill color="var(--orange)">Section 40A(2)</Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Compliance angle">
+        <p>
+          Related-party transactions must be at arm&apos;s-length or face
+          Section 40A(2) disallowance. Keep: (1) third-party price benchmarks
+          for each SKU sold to sister concerns, (2) a signed transfer-pricing
+          policy, (3) board minutes documenting the commercial rationale.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["Cyclic transactions", "Top customers", "Biggest payables"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/* ── Recurring revenue quality ── */
+function ExchangeRecurringRevenue({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const r = RECURRING_REVENUE;
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Recurring revenue quality
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              ₹{(r.recurringRevenue / 1e7).toFixed(2)}Cr of ₹{(r.totalRevenue / 1e7).toFixed(2)}Cr total · {r.recurringPartyCount} of {r.totalCustomerCount} customers repeat
+            </p>
+          </div>
+          <Pill color={r.recurringPct > 80 ? "var(--green)" : "var(--yellow)"}>
+            {r.recurringPct.toFixed(0)}% recurring
+          </Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--green)" icon="💡" title="Why this is your best metric">
+        <p>
+          <strong>{r.recurringPct.toFixed(0)}% recurring revenue</strong> is
+          excellent — the business is sticky. {r.newCustomerCount} new customers
+          acquired this FY, {r.lostCustomerCount} lost. Net customer growth:{" "}
+          <strong>+{r.newCustomerCount - r.lostCustomerCount}</strong>. The
+          monthly mix shows repeat % climbing from 68% (Apr) → 92% (Dec) —
+          product-market fit is improving.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["Cohort retention", "Top customers", "Customer LTV scatter"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/* ── HSN-wise sales ── */
+function ExchangeHsnWise({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const totalTaxable = HSN_WISE_SALES.reduce((s, h) => s + h.taxableValue, 0);
+  const topHsn = HSN_WISE_SALES[0];
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Sales by HSN code
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              {HSN_WISE_SALES.length} HSN codes · ₹{(totalTaxable / 1e7).toFixed(2)}Cr taxable · GSTR-1 Table 12 summary
+            </p>
+          </div>
+          <Pill color="var(--purple)">HSN</Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Top HSN is <strong>{topHsn.hsn}</strong> ({topHsn.particulars}) at ₹
+          {(topHsn.taxableValue / 1e7).toFixed(2)}Cr —{" "}
+          {((topHsn.taxableValue / totalTaxable) * 100).toFixed(0)}% of taxable
+          turnover. For GSTR-1 Table 12, the GST portal requires HSN summary
+          for all B2B invoices when turnover {">"} ₹5Cr. You&apos;re already compliant.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["State-wise sales", "Top customers", "GST 2B reconciliation"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/* ── State-wise sales ── */
+function ExchangeStateWise({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const total = STATE_WISE_SALES.reduce((s, st) => s + st.taxableValue, 0);
+  const top3 = STATE_WISE_SALES.slice(0, 3);
+  const top3Share = (top3.reduce((s, st) => s + st.taxableValue, 0) / total) * 100;
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Sales by state
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              {STATE_WISE_SALES.length} states with material volume · ₹{(total / 1e7).toFixed(2)}Cr taxable
+            </p>
+          </div>
+          <Pill color="var(--blue)">{top3Share.toFixed(0)}% in top 3</Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          {top3[0].state}, {top3[1].state}, and {top3[2].state} drive{" "}
+          <strong>{top3Share.toFixed(0)}%</strong> of taxable sales. If you&apos;re
+          paying IGST on all interstate shipments, consider registering in a
+          consumption state (UP or Haryana) to collect CGST+SGST locally and
+          cut your interstate share.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["HSN-wise sales", "Top customers", "Returns by channel"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/* ── Filing delay calendar ── */
+function ExchangeFilingDelay({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const onTimePct = (FILING_STATS.onTimeMonths / FILING_STATS.totalMonthsTracked) * 100;
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Filing delay calendar (24 months)
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              {FILING_STATS.onTimeMonths} of {FILING_STATS.totalMonthsTracked} filings on time · best streak {FILING_STATS.maxStreakMonths} months
+            </p>
+          </div>
+          <Pill color={onTimePct > 90 ? "var(--green)" : onTimePct > 75 ? "var(--yellow)" : "var(--red)"}>
+            {onTimePct.toFixed(0)}% on time
+          </Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Late pattern">
+        <p>
+          Average delay when late: <strong>{FILING_STATS.avgDelayWhenLate.toFixed(1)} days</strong>.
+          Most slippages are in GSTR-3B not GSTR-1 — the filing happens once
+          you have cash to pay the liability. Consider setting a reminder on
+          the 15th of every month to prepare 3B even before funds are
+          available — you can file with zero-cash-pay if ITC covers the
+          liability.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["GST Health score", "Reconcile March 2B", "Generate GSTR-3B"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
 /* ── Unknown fallback ── */
 function ExchangeUnknown({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
@@ -1539,6 +1823,12 @@ const EXCHANGE_RENDERERS: Record<
   "cohort-retention": ExchangeCohortRetention,
   "money-flow": ExchangeMoneyFlow,
   "customer-ltv": ExchangeCustomerLtv,
+  "cyclic-transactions": ExchangeCyclicTransactions,
+  "related-party": ExchangeRelatedParty,
+  "recurring-revenue": ExchangeRecurringRevenue,
+  "hsn-wise": ExchangeHsnWise,
+  "state-wise": ExchangeStateWise,
+  "filing-delay": ExchangeFilingDelay,
   unknown: ExchangeUnknown,
 };
 
@@ -1557,6 +1847,12 @@ const INTENT_LABELS: Record<Intent, string> = {
   "cohort-retention": "Cohort retention",
   "money-flow": "Money flow",
   "customer-ltv": "Customer LTV",
+  "cyclic-transactions": "Cyclic transactions",
+  "related-party": "Related-party transactions",
+  "recurring-revenue": "Recurring revenue",
+  "hsn-wise": "HSN-wise sales",
+  "state-wise": "State-wise sales",
+  "filing-delay": "Filing delay calendar",
   "cash-flow": "Cash flow forecast",
   runway: "Runway",
   "expense-breakdown": "Expense breakdown",
@@ -1990,6 +2286,121 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     };
     return <ChartRenderer shape={shape} defaultType="bar" />;
   },
+  // Cyclic transactions: categorical bar sized by min(sales,purchases).
+  // The min side is the "cycled amount" — that's what's actually at risk.
+  "cyclic-transactions": () => {
+    const shape: DataShape = {
+      kind: "categorical",
+      title: "Cyclic transactions · same party as buyer + seller",
+      subtitle:
+        "Bar = cycled amount (min of sales, purchases) · color = severity",
+      entries: CYCLIC_TRANSACTIONS.map((c) => ({
+        label: c.partyName,
+        value: Math.min(c.totalSales, c.totalPurchases),
+        color:
+          c.severity === "high"
+            ? "var(--red)"
+            : c.severity === "medium"
+            ? "var(--orange)"
+            : "var(--yellow)",
+        caption: `Sold ₹${(c.totalSales / 1e5).toFixed(1)}L · Bought ₹${(c.totalPurchases / 1e5).toFixed(1)}L · ${c.flag}`,
+      })),
+    };
+    return <ChartRenderer shape={shape} defaultType="bar" />;
+  },
+  // Related-party: combined sales + purchases view as composition.
+  "related-party": () => {
+    const entries = [
+      ...RELATED_PARTY_SALES.map((r) => ({
+        label: `(Sale) ${r.partyName}`,
+        value: r.invoiceValue,
+        color: "var(--green)",
+        caption: `${r.relationship} · ${r.invoiceCount} invoices`,
+      })),
+      ...RELATED_PARTY_PURCHASES.map((r) => ({
+        label: `(Purchase) ${r.partyName}`,
+        value: r.invoiceValue,
+        color: "var(--red)",
+        caption: `${r.relationship} · ${r.invoiceCount} invoices`,
+      })),
+    ];
+    const shape: DataShape = {
+      kind: "categorical",
+      title: "Related-party transactions",
+      subtitle: "Green = outward (sales) · red = inward (purchases)",
+      entries,
+    };
+    return <ChartRenderer shape={shape} defaultType="bar" />;
+  },
+  // Recurring revenue: monthly new vs repeat as a composition-over-time.
+  // Using the timeseries shape with repeat % — cleaner than stacked bars.
+  "recurring-revenue": () => {
+    const shape: DataShape = {
+      kind: "timeseries",
+      title: "Repeat customer revenue %",
+      subtitle: `Sticky-revenue trend · FY total: ${RECURRING_REVENUE.recurringPct.toFixed(0)}% recurring`,
+      points: RECURRING_REVENUE.monthly.map((m) => ({
+        x: m.month,
+        y: m.repeatPct,
+      })),
+      color: "var(--green)",
+      highlight: {
+        index: RECURRING_REVENUE.monthly.reduce(
+          (best, m, i, arr) =>
+            m.repeatPct > arr[best].repeatPct ? i : best,
+          0
+        ),
+        label: "",
+      },
+    };
+    return <ChartRenderer shape={shape} defaultType="area" />;
+  },
+  // HSN-wise sales: categorical bar of top 8 HSN codes by taxable value.
+  "hsn-wise": () => {
+    const shape: DataShape = {
+      kind: "categorical",
+      title: "Sales by HSN code",
+      subtitle: `${HSN_WISE_SALES.length} codes · GSTR-1 Table 12`,
+      entries: HSN_WISE_SALES.map((h) => ({
+        label: `${h.hsn} · ${h.particulars.slice(0, 30)}${h.particulars.length > 30 ? "…" : ""}`,
+        value: h.taxableValue,
+        color: "var(--purple)",
+        caption: `${h.invoiceCount} invoices · ${h.avgRate}% rate`,
+      })),
+    };
+    return <ChartRenderer shape={shape} defaultType="bar" />;
+  },
+  // State-wise sales: categorical bar of top 14 states.
+  "state-wise": () => {
+    const shape: DataShape = {
+      kind: "categorical",
+      title: "Sales by state",
+      subtitle: "Taxable value per state · colors reflect home state vs outside",
+      entries: STATE_WISE_SALES.map((s) => ({
+        label: s.state,
+        value: s.taxableValue,
+        // Maharashtra (home) in green; other major destinations in blue
+        color: s.stateCode === "27" ? "var(--green)" : "var(--blue)",
+        caption: `${s.invoiceCount} invoices · tax ₹${(s.tax / 1e5).toFixed(1)}L`,
+      })),
+    };
+    return <ChartRenderer shape={shape} defaultType="bar" />;
+  },
+  // Filing delay: 2-row matrix (return type × month), heatmap colors.
+  // colorDirection=higher-worse because higher delay-days = worse.
+  "filing-delay": () => {
+    const shape: DataShape = {
+      kind: "matrix",
+      title: "Filing delay days · 24 months",
+      subtitle: "Green = on time · red = late · rows are GSTR-1 and GSTR-3B",
+      rows: [...FILING_DELAYS.returnTypes],
+      cols: FILING_DELAYS.months,
+      values: FILING_DELAYS.delayDays,
+      format: "number",
+      colorDirection: "higher-worse",
+    };
+    return <ChartRenderer shape={shape} defaultType="heatmap" />;
+  },
   unknown: () => (
     <div
       className="rounded-xl p-5 text-center"
@@ -2031,9 +2442,9 @@ const PROMPT_CATEGORIES = [
     color: "var(--blue)",
     prompts: [
       "Reconcile March 2B",
-      "How's my GST health?",
-      "Generate GSTR-3B",
-      "Excess ITC — how to claim?",
+      "Filing delay calendar",
+      "Cyclic transactions",
+      "Related-party transactions",
     ],
   },
   {
@@ -2042,9 +2453,9 @@ const PROMPT_CATEGORIES = [
     color: "var(--purple)",
     prompts: [
       "Revenue trend this year",
+      "Recurring revenue %",
       "Top customers by revenue",
       "Customer LTV vs recency",
-      "Cohort retention",
     ],
   },
   {
@@ -2052,10 +2463,10 @@ const PROMPT_CATEGORIES = [
     Icon: Package,
     color: "var(--orange)",
     prompts: [
+      "State-wise sales",
+      "HSN-wise sales",
       "Dead stock SKUs",
-      "Expense breakdown",
       "Money flow diagram",
-      "Business health score",
     ],
   },
 ];

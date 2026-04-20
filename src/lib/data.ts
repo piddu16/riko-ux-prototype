@@ -761,5 +761,189 @@ export const BANK_RECON_SUMMARY = {
    ============================================================ */
 export const PENDING_INVITE_EXPIRY_DAYS = 7;
 
+/* ============================================================
+   GST API DATASETS — structured to mirror the consented GST API's
+   output sheets so the mock → real swap is a one-line change later.
+   Sheet refs are from "Consented GST Advance Consolidated Excel":
+     • Cyclic Transactions sheet → CYCLIC_TRANSACTIONS
+     • Related Party Sales / Purchases → RELATED_PARTY_*
+     • Comparison Sheet (Recurring Revenue %) → RECURRING_REVENUE
+     • HSN-wise Sales → HSN_WISE_SALES
+     • State-wise Sales → STATE_WISE_SALES
+     • Compliance sheet (filing delay days) → FILING_DELAYS
+   ============================================================ */
 
+/** Parties that appear as BOTH customer AND supplier in the same FY.
+ *  Flagged by the API as potential round-tripping — always worth a CA's
+ *  review. Ratio = min(sales,purchases) / max(sales,purchases). */
+export const CYCLIC_TRANSACTIONS = [
+  {
+    partyName: "Patel Traders Pvt Ltd",
+    pan: "AABCP1234R",
+    gstin: "29AABCP1234R1Z8",
+    totalSales: 4520000,
+    totalPurchases: 3180000,
+    cycleRatio: 0.70,
+    severity: "high" as const,
+    flag: "Purchases are 70% of sales — investigate",
+  },
+  {
+    partyName: "Mumbai Packaging Ltd",
+    pan: "AACCM5555P",
+    gstin: "27AACCM5555P1Z2",
+    totalSales: 2850000,
+    totalPurchases: 640000,
+    cycleRatio: 0.22,
+    severity: "medium" as const,
+    flag: "Material cyclic volume",
+  },
+  {
+    partyName: "Shiprocket Logistics",
+    pan: "AAGCS5867P",
+    gstin: "07AAGCS5867P1Z9",
+    totalSales: 180000,
+    totalPurchases: 1540000,
+    cycleRatio: 0.12,
+    severity: "low" as const,
+    flag: "Freight provider; reverse charge likely",
+  },
+];
+
+/** Transactions flagged as related-party (same group / sister concern /
+ *  shared directors). Section 40A(2) disallowance risk + transfer
+ *  pricing scrutiny. */
+export const RELATED_PARTY_SALES = [
+  {
+    partyName: "Bandra Soap Exports (sister concern)",
+    pan: "AAECB9998R",
+    gstin: "27AAECB9998R1Z5",
+    relationship: "Common directors",
+    taxableValue: 2500000,
+    invoiceValue: 2950000,
+    invoiceCount: 18,
+    flagged: true,
+  },
+  {
+    partyName: "RIKO Cosmetics Pvt Ltd (group)",
+    pan: "AABCR7788K",
+    gstin: "27AABCR7788K1Z3",
+    relationship: "Common ownership > 20%",
+    taxableValue: 1180000,
+    invoiceValue: 1392400,
+    invoiceCount: 12,
+    flagged: true,
+  },
+];
+
+export const RELATED_PARTY_PURCHASES = [
+  {
+    partyName: "Patel Raw Materials Ltd (director-owned)",
+    pan: "AACCP4432N",
+    gstin: "27AACCP4432N1Z9",
+    relationship: "Director also holds 30% of this party",
+    taxableValue: 3640000,
+    invoiceValue: 4295200,
+    invoiceCount: 42,
+    flagged: true,
+  },
+];
+
+/** Recurring revenue = revenue from PANs that bought in >= 2 months
+ *  across the FY. Higher % = stickier business. This is a quality
+ *  metric CAs and investors both care about. */
+export const RECURRING_REVENUE = {
+  fy: "FY 2024-25",
+  recurringRevenue: 78744125,
+  totalRevenue: 92523800,
+  recurringPct: 85.1,
+  recurringPartyCount: 147,
+  totalCustomerCount: 294,
+  newCustomerCount: 87,
+  lostCustomerCount: 61,
+  // Per-month split: how much of that month's revenue came from repeat vs new customers
+  monthly: [
+    { month: "Apr", newPct: 32, repeatPct: 68 },
+    { month: "May", newPct: 18, repeatPct: 82 },
+    { month: "Jun", newPct: 22, repeatPct: 78 },
+    { month: "Jul", newPct: 15, repeatPct: 85 },
+    { month: "Aug", newPct: 12, repeatPct: 88 },
+    { month: "Sep", newPct: 11, repeatPct: 89 },
+    { month: "Oct", newPct: 14, repeatPct: 86 },
+    { month: "Nov", newPct: 9, repeatPct: 91 },
+    { month: "Dec", newPct: 8, repeatPct: 92 },
+    { month: "Jan", newPct: 10, repeatPct: 90 },
+    { month: "Feb", newPct: 12, repeatPct: 88 },
+    { month: "Mar", newPct: 13, repeatPct: 87 },
+  ],
+};
+
+/** HSN-wise sales — each product/service code with volume + rate.
+ *  GSTR-1 Table 12 requires this summary for businesses > ₹5Cr turnover. */
+export const HSN_WISE_SALES = [
+  { hsn: "33059011", particulars: "Hair oil preparations", invoiceCount: 1245, taxableValue: 34200000, tax: 6156000, invoiceValue: 40356000, avgRate: 18 },
+  { hsn: "34022090", particulars: "Organic surface-active agents (face wash)", invoiceCount: 892, taxableValue: 18500000, tax: 3330000, invoiceValue: 21830000, avgRate: 18 },
+  { hsn: "33049990", particulars: "Beauty / make-up preparations (serums)", invoiceCount: 648, taxableValue: 14800000, tax: 2664000, invoiceValue: 17464000, avgRate: 18 },
+  { hsn: "33051090", particulars: "Shampoos n.e.s.", invoiceCount: 324, taxableValue: 9800000, tax: 1764000, invoiceValue: 11564000, avgRate: 18 },
+  { hsn: "33079090", particulars: "Other perfumery / toilet preparations", invoiceCount: 198, taxableValue: 6300000, tax: 1134000, invoiceValue: 7434000, avgRate: 18 },
+  { hsn: "34011900", particulars: "Soaps (bar, organic)", invoiceCount: 156, taxableValue: 3900000, tax: 702000, invoiceValue: 4602000, avgRate: 18 },
+  { hsn: "3923", particulars: "Plastic packaging (resale)", invoiceCount: 48, taxableValue: 950000, tax: 171000, invoiceValue: 1121000, avgRate: 18 },
+  { hsn: "9983", particulars: "Other professional / technical services", invoiceCount: 24, taxableValue: 280000, tax: 50400, invoiceValue: 330400, avgRate: 18 },
+];
+
+/** State-wise sales — invoices to parties in each state code.
+ *  29 states + 7 UTs but we only carry the ones with material volume. */
+export const STATE_WISE_SALES = [
+  { stateCode: "27", state: "Maharashtra", invoiceCount: 428, taxableValue: 22500000, tax: 4050000, invoiceValue: 26550000 },
+  { stateCode: "29", state: "Karnataka", invoiceCount: 312, taxableValue: 14200000, tax: 2556000, invoiceValue: 16756000 },
+  { stateCode: "07", state: "Delhi", invoiceCount: 198, taxableValue: 9800000, tax: 1764000, invoiceValue: 11564000 },
+  { stateCode: "09", state: "Uttar Pradesh", invoiceCount: 178, taxableValue: 8400000, tax: 1512000, invoiceValue: 9912000 },
+  { stateCode: "06", state: "Haryana", invoiceCount: 148, taxableValue: 6900000, tax: 1242000, invoiceValue: 8142000 },
+  { stateCode: "33", state: "Tamil Nadu", invoiceCount: 132, taxableValue: 6200000, tax: 1116000, invoiceValue: 7316000 },
+  { stateCode: "24", state: "Gujarat", invoiceCount: 116, taxableValue: 5400000, tax: 972000, invoiceValue: 6372000 },
+  { stateCode: "36", state: "Telangana", invoiceCount: 98, taxableValue: 4500000, tax: 810000, invoiceValue: 5310000 },
+  { stateCode: "19", state: "West Bengal", invoiceCount: 92, taxableValue: 4100000, tax: 738000, invoiceValue: 4838000 },
+  { stateCode: "32", state: "Kerala", invoiceCount: 64, taxableValue: 2800000, tax: 504000, invoiceValue: 3304000 },
+  { stateCode: "08", state: "Rajasthan", invoiceCount: 58, taxableValue: 2400000, tax: 432000, invoiceValue: 2832000 },
+  { stateCode: "23", state: "Madhya Pradesh", invoiceCount: 42, taxableValue: 1800000, tax: 324000, invoiceValue: 2124000 },
+  { stateCode: "03", state: "Punjab", invoiceCount: 38, taxableValue: 1600000, tax: 288000, invoiceValue: 1888000 },
+  { stateCode: "30", state: "Goa", invoiceCount: 22, taxableValue: 850000, tax: 153000, invoiceValue: 1003000 },
+];
+
+/** Filing delay matrix — 24 months × 2 return types. Zero = on time,
+ *  positive = days late. Source: Compliance sheet in the API output. */
+export const FILING_DELAYS = {
+  months: [
+    "Apr-24", "May-24", "Jun-24", "Jul-24", "Aug-24", "Sep-24",
+    "Oct-24", "Nov-24", "Dec-24", "Jan-25", "Feb-25", "Mar-25",
+    "Apr-25", "May-25", "Jun-25", "Jul-25", "Aug-25", "Sep-25",
+    "Oct-25", "Nov-25", "Dec-25", "Jan-26", "Feb-26", "Mar-26",
+  ],
+  returnTypes: ["GSTR-1", "GSTR-3B"] as const,
+  // [row = return type][col = month]
+  // Months April 2024 → March 2026. 0 = on time. Recent months show
+  // some slippage consistent with the company being under cash pressure.
+  delayDays: [
+    // GSTR-1: 11th of following month
+    [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 0, 1, 0, 0],
+    // GSTR-3B: 20th of following month
+    [0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 3, 0, 0, 4, 2, 0, 1, 0],
+  ],
+};
+
+/** Derived stats used for GST Health scoring. */
+export const FILING_STATS = {
+  totalMonthsTracked: 48, // 24 months × 2 returns
+  onTimeMonths: FILING_DELAYS.delayDays
+    .flat()
+    .filter((d) => d === 0).length,
+  missedDeadlines: FILING_DELAYS.delayDays.flat().filter((d) => d > 7).length,
+  avgDelayWhenLate:
+    (() => {
+      const late = FILING_DELAYS.delayDays.flat().filter((d) => d > 0);
+      return late.length
+        ? late.reduce((s, d) => s + d, 0) / late.length
+        : 0;
+    })(),
+  maxStreakMonths: 18, // longest on-time streak in window
+};
 
