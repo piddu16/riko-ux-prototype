@@ -58,6 +58,21 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
 
+  /* Listen for cross-screen navigation events (e.g. Day Book links to
+     Entries, Bank Recon "Create matching entry" → Entries). Any screen
+     can dispatch `window.dispatchEvent(new CustomEvent("riko:navigate",
+     { detail: "<tabId>" }))` to jump tabs. */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (typeof detail === "string") {
+        setTab(detail as TabId);
+      }
+    };
+    window.addEventListener("riko:navigate", handler as EventListener);
+    return () => window.removeEventListener("riko:navigate", handler as EventListener);
+  }, []);
+
   const handleBottomNav = (id: string) => {
     setTab(BOTTOM_MAP[id] || "dashboard");
   };
@@ -129,6 +144,7 @@ export default function Home() {
             <Chat
               initialQuestion={pendingChatQuestion}
               onQuestionConsumed={() => setPendingChatQuestion(null)}
+              onOpenTab={(id) => setTab(id as TabId)}
             />
           )}
           {tab === "clients" && <Clients />}

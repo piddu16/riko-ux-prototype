@@ -56,10 +56,12 @@ type SettingsTab =
   | "billing"
   | "integrations"
   | "api"
-  | "notifications";
+  | "notifications"
+  | "approvals";
 
 const SETTINGS_TABS: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
   { id: "team", label: "Team", icon: Users },
+  { id: "approvals", label: "Approvals", icon: ShieldCheck },
   { id: "profile", label: "Profile", icon: UserCircle },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Puzzle },
@@ -154,6 +156,7 @@ export function SettingsScreen() {
 
         {/* Tab content */}
         {activeTab === "team" && <TeamTab />}
+        {activeTab === "approvals" && <ApprovalsTab />}
         {activeTab === "profile" && <ProfileTab />}
         {activeTab === "billing" && <BillingTab />}
         {activeTab === "integrations" && <IntegrationsTab />}
@@ -2620,6 +2623,300 @@ function RolePillSelector({ role, onChange }: RolePillSelectorProps) {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  ApprovalsTab — maker-checker thresholds + routing rules           */
+/* ================================================================== */
+function ApprovalsTab() {
+  // Default thresholds — seeded from rbac.ts APPROVAL_THRESHOLDS but
+  // editable here for the per-company config. Demo only; no persistence.
+  const [thresholds, setThresholds] = useState([
+    { maxValue: 10_000, label: "< ₹10,000", approver: "Any approver", color: "var(--green)" },
+    { maxValue: 100_000, label: "₹10K – ₹1L", approver: "Accounts team", color: "var(--blue)" },
+    { maxValue: 1_000_000, label: "₹1L – ₹10L", approver: "Accounts Head", color: "var(--yellow)" },
+    { maxValue: Infinity, label: "> ₹10L", approver: "Admin / Owner", color: "var(--red)" },
+  ]);
+  const [makerChecker, setMakerChecker] = useState(true);
+  const [dualApproval, setDualApproval] = useState(false);
+  const [adminOverride, setAdminOverride] = useState(true);
+  const [saved, setSaved] = useState(false);
+
+  const updateThreshold = (i: number, field: "maxValue" | "approver", value: string | number) => {
+    setThresholds((prev) => prev.map((t, idx) => (idx === i ? { ...t, [field]: value } : t)));
+  };
+
+  const formatINR = (v: number) => {
+    if (v === Infinity) return "No limit";
+    if (v >= 1e7) return `₹${(v / 1e7).toFixed(1)}Cr`;
+    if (v >= 1e5) return `₹${(v / 1e5).toFixed(1)}L`;
+    return `₹${v.toLocaleString("en-IN")}`;
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <SectionCard
+        title="Approval thresholds"
+        subtitle="Who can approve an entry depends on its value. Higher amounts route to more senior reviewers."
+      >
+        <div className="flex flex-col gap-3 mt-4">
+          {thresholds.map((t, i) => (
+            <div
+              key={i}
+              className="flex flex-col md:flex-row md:items-center gap-3 px-4 py-3 rounded-lg"
+              style={{
+                background: "var(--bg-hover)",
+                border: "1px solid var(--border)",
+                borderLeft: `3px solid ${t.color}`,
+              }}
+            >
+              <div className="flex-shrink-0 min-w-[100px]">
+                <p
+                  className="text-[10px] uppercase tracking-wider font-medium"
+                  style={{ color: "var(--text-4)" }}
+                >
+                  Tier {i + 1}
+                </p>
+                <p
+                  className="text-sm font-bold"
+                  style={{
+                    color: t.color,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {t.label}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-1 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <label
+                    className="text-[11px] font-medium"
+                    style={{ color: "var(--text-3)" }}
+                  >
+                    Up to
+                  </label>
+                  <input
+                    type="number"
+                    disabled={t.maxValue === Infinity}
+                    value={t.maxValue === Infinity ? "" : t.maxValue}
+                    onChange={(e) => updateThreshold(i, "maxValue", Number(e.target.value))}
+                    placeholder={t.maxValue === Infinity ? "No limit" : ""}
+                    className="w-28 px-2 py-1 rounded text-[12px] tabular-nums"
+                    style={{
+                      background: t.maxValue === Infinity ? "var(--bg-surface)" : "var(--bg-primary)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-1)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  />
+                </div>
+                <span style={{ color: "var(--text-4)" }}>→</span>
+                <div className="flex items-center gap-2 flex-1">
+                  <label
+                    className="text-[11px] font-medium"
+                    style={{ color: "var(--text-3)" }}
+                  >
+                    Routes to
+                  </label>
+                  <select
+                    value={t.approver}
+                    onChange={(e) => updateThreshold(i, "approver", e.target.value)}
+                    className="flex-1 px-2 py-1 rounded text-[12px]"
+                    style={{
+                      background: "var(--bg-primary)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text-1)",
+                    }}
+                  >
+                    <option>Any approver</option>
+                    <option>Accounts team</option>
+                    <option>Accounts Head</option>
+                    <option>Admin / Owner</option>
+                  </select>
+                </div>
+              </div>
+              <p
+                className="text-[11px]"
+                style={{ color: "var(--text-4)" }}
+              >
+                {formatINR(t.maxValue)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Routing rules" subtitle="Additional guardrails on the approval flow">
+        <div className="flex flex-col gap-3 mt-3">
+          <ToggleRow
+            title="Maker-checker separation"
+            desc="The person who drafts an entry cannot be the sole approver. Another authorised user must sign off — even if the drafter has approval rights."
+            checked={makerChecker}
+            onChange={setMakerChecker}
+          />
+          <ToggleRow
+            title="Dual approval above ₹10L"
+            desc="High-value entries require two independent approvers (e.g. Accounts Head + Admin) to reduce single-point-of-failure risk."
+            checked={dualApproval}
+            onChange={setDualApproval}
+          />
+          <ToggleRow
+            title="Admin override with audit"
+            desc="Admin can bypass the approval chain for year-end close or emergency adjustments. Every override is logged with reason + flagged in the audit trail."
+            checked={adminOverride}
+            onChange={setAdminOverride}
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Voucher type permissions" subtitle="Which roles can draft, approve, and post each voucher type">
+        <div className="overflow-x-auto mt-3">
+          <table className="w-full text-[11px] min-w-[640px]">
+            <thead>
+              <tr style={{ color: "var(--text-4)" }}>
+                <th className="text-left py-2 px-2 font-medium">Voucher type</th>
+                <th className="text-center py-2 px-2 font-medium">Admin</th>
+                <th className="text-center py-2 px-2 font-medium">Accts Head</th>
+                <th className="text-center py-2 px-2 font-medium">Accounts</th>
+                <th className="text-center py-2 px-2 font-medium">Jr. Accts</th>
+                <th className="text-center py-2 px-2 font-medium">Manager</th>
+                <th className="text-center py-2 px-2 font-medium">Sales</th>
+                <th className="text-center py-2 px-2 font-medium">Field Sales</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { type: "Sales", row: ["DAP", "DAP", "DAP", "D", "DAP", "DA", "D"] },
+                { type: "Purchase", row: ["DAP", "DAP", "DAP", "D", "DA", "—", "—"] },
+                { type: "Receipt", row: ["DAP", "DAP", "DAP", "D", "DAP", "DA", "D"] },
+                { type: "Payment", row: ["DAP", "DAP", "DAP", "D", "DA*", "—", "—"] },
+                { type: "Contra", row: ["DAP", "DAP", "DAP", "D", "—", "—", "—"] },
+                { type: "Journal", row: ["DAP", "DAP", "DAP", "—", "—", "—", "—"] },
+                { type: "Credit/Debit note", row: ["DAP", "DAP", "DAP", "D", "DA", "D", "—"] },
+                { type: "Bank recon", row: ["DAP", "DAP", "DAP", "—", "DA", "—", "—"] },
+              ].map((r, i) => (
+                <tr
+                  key={i}
+                  style={{ borderTop: "1px solid var(--border)" }}
+                >
+                  <td className="py-2 px-2 font-medium" style={{ color: "var(--text-1)" }}>
+                    {r.type}
+                  </td>
+                  {r.row.map((cell, ci) => (
+                    <td
+                      key={ci}
+                      className="py-2 px-2 text-center tabular-nums"
+                      style={{
+                        color:
+                          cell === "—"
+                            ? "var(--text-4)"
+                            : cell.includes("P")
+                            ? "var(--green)"
+                            : cell.includes("A")
+                            ? "var(--yellow)"
+                            : "var(--blue)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p
+            className="text-[10px] mt-3 flex items-center gap-4 flex-wrap"
+            style={{ color: "var(--text-4)" }}
+          >
+            <span>
+              <span style={{ color: "var(--blue)", fontWeight: 600 }}>D</span> = Draft
+            </span>
+            <span>
+              <span style={{ color: "var(--yellow)", fontWeight: 600 }}>A</span> = Approve
+            </span>
+            <span>
+              <span style={{ color: "var(--green)", fontWeight: 600 }}>P</span> = Post to Tally
+            </span>
+            <span>* Payment &gt;₹1L routes to Accounts regardless</span>
+          </p>
+        </div>
+      </SectionCard>
+
+      <div className="flex items-center gap-2 justify-end">
+        <AnimatePresence>
+          {saved && (
+            <motion.span
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }}
+              className="text-[12px] font-medium"
+              style={{ color: "var(--green)" }}
+            >
+              ✓ Saved
+            </motion.span>
+          )}
+        </AnimatePresence>
+        <button
+          onClick={() => {
+            setSaved(true);
+            window.setTimeout(() => setSaved(false), 2000);
+          }}
+          className="text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+          style={{ background: "var(--green)", color: "white" }}
+        >
+          Save approval rules
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ToggleRow({
+  title,
+  desc,
+  checked,
+  onChange,
+}: {
+  title: string;
+  desc: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div
+      className="flex items-start gap-3 px-4 py-3 rounded-lg"
+      style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+          {title}
+        </p>
+        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+          {desc}
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className="flex-shrink-0 relative inline-flex h-5 w-9 rounded-full transition-colors cursor-pointer mt-0.5"
+        style={{
+          background: checked ? "var(--green)" : "var(--bg-surface)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <motion.span
+          animate={{ x: checked ? 16 : 2 }}
+          transition={{ duration: 0.15 }}
+          className="absolute top-0.5 w-3.5 h-3.5 rounded-full"
+          style={{ background: checked ? "#fff" : "var(--text-4)" }}
+        />
+      </button>
     </div>
   );
 }

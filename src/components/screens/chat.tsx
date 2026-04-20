@@ -97,6 +97,9 @@ import {
   STATE_WISE_SALES,
   FILING_DELAYS,
   FILING_STATS,
+  ENTRIES,
+  ENTRY_TYPE_LABELS,
+  ENTRY_STATE_META,
 } from "@/lib/data";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -128,6 +131,7 @@ type Intent =
   | "hsn-wise"
   | "state-wise"
   | "filing-delay"
+  | "create-entry"
   | "unknown";
 
 type ChatMessage =
@@ -150,6 +154,11 @@ function classifyIntent(text: string): Intent {
   if (!q) return "unknown";
 
   // Order matters — more specific first
+
+  // Tally write-back: create-entry takes priority so "create invoice"
+  // doesn't fall into "revenue" or "customers" intents.
+  if (/create.*(sales.*)?invoice|create.*voucher|record.*(payment|receipt)|bill.*from|invoice.*to\b|draft.*(entry|voucher)|new.*(entry|voucher)/.test(q))
+    return "create-entry";
 
   // GST API parity intents checked before the more generic ones
   if (/cyclic|round.?trip|same.*party.*(customer|supplier)|both.*customer.*supplier/.test(q))
@@ -1882,6 +1891,129 @@ function ExchangeFilingDelay({ onFollowup }: { onFollowup: (q: string) => void }
   );
 }
 
+/* ── Create entry (Tally write-back from chat) ──────────────
+   User says "Create sales invoice to Nykaa for ₹12.6L" → Riko parses,
+   drafts a voucher, and shows this inline card with "open in Entries".
+   The first pending entry in ENTRIES is used as the fake-drafted result. */
+function ExchangeCreateEntry({ onFollowup }: { onFollowup: (q: string) => void }) {
+  // Pick the first pending sales entry as the "just-drafted" one for demo.
+  const drafted = ENTRIES.find((e) => e.state === "pending" && e.source === "chat")
+    ?? ENTRIES.find((e) => e.state === "pending")
+    ?? ENTRIES[0];
+  const typeLabel = ENTRY_TYPE_LABELS[drafted.type];
+  const approverLabelFor = (req: string) => ({
+    any: "any approver",
+    accounts: "Accounts team",
+    "accounts-head": "Accounts Head",
+    admin: "Admin",
+  } as const)[req as "any" | "accounts" | "accounts-head" | "admin"] ?? req;
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{
+          background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
+          border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <span
+            className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--green) 15%, transparent)",
+              color: "var(--green)",
+            }}
+          >
+            ✦ Drafted
+          </span>
+          <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+            {typeLabel}
+          </span>
+          <span style={{ color: "var(--text-4)" }}>·</span>
+          <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            Not yet in Tally
+          </span>
+        </div>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              {drafted.partyName}
+            </p>
+            {drafted.partyGstin && (
+              <p className="text-[10px] font-mono" style={{ color: "var(--text-4)" }}>
+                {drafted.partyGstin}
+              </p>
+            )}
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+              {drafted.particulars}
+            </p>
+          </div>
+          <p
+            className="text-xl font-bold tabular-nums"
+            style={{
+              color: "var(--green)",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            ₹{(drafted.amount / 1e5).toFixed(1)}L
+          </p>
+        </div>
+
+        <div
+          className="mt-3 pt-3 grid grid-cols-2 gap-3"
+          style={{ borderTop: "1px solid color-mix(in srgb, var(--green) 18%, transparent)" }}
+        >
+          <div>
+            <p
+              className="text-[9px] uppercase tracking-wider font-medium"
+              style={{ color: "var(--text-4)" }}
+            >
+              Ledger cascade
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-2)" }}>
+              {drafted.ledgerImpact.length} accounts · GST register · inventory
+            </p>
+          </div>
+          <div>
+            <p
+              className="text-[9px] uppercase tracking-wider font-medium"
+              style={{ color: "var(--text-4)" }}
+            >
+              Routes to
+            </p>
+            <p className="text-[11px] mt-0.5 font-semibold" style={{ color: "var(--text-1)" }}>
+              {approverLabelFor(drafted.requiredApprover)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Parsed your request as a <strong>{typeLabel.toLowerCase()}</strong> to{" "}
+          <strong>{drafted.partyName}</strong> for{" "}
+          <strong>₹{(drafted.amount / 1e5).toFixed(1)}L</strong>. Tax computed at 18%
+          IGST since {drafted.partyName} is outside your home state. The draft is
+          in your Entries queue — click through to review before it goes to{" "}
+          {approverLabelFor(drafted.requiredApprover)}.
+        </p>
+      </Layer>
+
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
+      <Chips
+        items={[
+          "Open in Entries",
+          "Edit the draft",
+          "Cancel draft",
+        ]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
 /* ── Unknown fallback ── */
 function ExchangeUnknown({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
@@ -1956,6 +2088,7 @@ const EXCHANGE_RENDERERS: Record<
   "hsn-wise": ExchangeHsnWise,
   "state-wise": ExchangeStateWise,
   "filing-delay": ExchangeFilingDelay,
+  "create-entry": ExchangeCreateEntry,
   unknown: ExchangeUnknown,
 };
 
@@ -2018,6 +2151,8 @@ const INTENT_REASONING: Record<Intent, string> = {
     "Grouped GSTR-1 sales by buyer state code. Computed per-state share and flagged the home state (Maharashtra) separately.",
   "filing-delay":
     "Pulled 24 months of GSTR-1 and GSTR-3B filing dates. Computed delay days vs each return's statutory due date.",
+  "create-entry":
+    "Parsed the voucher type, party, amount, and tax from your request. Matched the party against Tally ledger master. Routed to the correct approver based on the value threshold.",
   unknown:
     "Couldn't confidently map your query to a known topic. Showing starter questions across cash, compliance, growth, and operations.",
 };
@@ -2037,6 +2172,7 @@ const INTENT_LABELS: Record<Intent, string> = {
   "hsn-wise": "HSN-wise sales",
   "state-wise": "State-wise sales",
   "filing-delay": "Filing delay calendar",
+  "create-entry": "Drafted Tally voucher",
   "cash-flow": "Cash flow forecast",
   runway: "Runway",
   "expense-breakdown": "Expense breakdown",
@@ -2614,6 +2750,134 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     };
     return <ChartRenderer shape={shape} defaultType="heatmap" />;
   },
+  // Create-entry result panel: mini EntryDetail preview showing what
+  // Riko has drafted — ledger impact + routing + next step.
+  "create-entry": () => {
+    const drafted = ENTRIES.find((e) => e.state === "pending" && e.source === "chat")
+      ?? ENTRIES.find((e) => e.state === "pending")
+      ?? ENTRIES[0];
+    const typeLabel = ENTRY_TYPE_LABELS[drafted.type];
+    const stateMeta = ENTRY_STATE_META[drafted.state];
+    const approverLbl = ({
+      any: "Any approver",
+      accounts: "Accounts team",
+      "accounts-head": "Accounts Head",
+      admin: "Admin / Owner",
+    } as const)[drafted.requiredApprover as "any" | "accounts" | "accounts-head" | "admin"];
+
+    return (
+      <div className="space-y-3">
+        <div
+          className="rounded-xl p-5"
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
+            borderLeft: `4px solid ${stateMeta.color}`,
+          }}
+        >
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span
+              className="text-[10px] font-bold uppercase tracking-widest"
+              style={{ color: "var(--text-4)" }}
+            >
+              {typeLabel}
+            </span>
+            <span
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-md"
+              style={{ background: stateMeta.bgColor, color: stateMeta.color }}
+            >
+              {stateMeta.label}
+            </span>
+          </div>
+          <h2 className="text-lg font-bold" style={{ color: "var(--text-1)" }}>
+            {drafted.partyName}
+          </h2>
+          <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            {drafted.particulars}
+          </p>
+          <p
+            className="text-3xl font-bold mt-3 tabular-nums"
+            style={{
+              color: "var(--green)",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            ₹{drafted.amount.toLocaleString("en-IN")}
+          </p>
+        </div>
+
+        <div
+          className="rounded-xl p-4"
+          style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+        >
+          <p
+            className="text-[10px] uppercase tracking-wider font-bold mb-2"
+            style={{ color: "var(--text-4)" }}
+          >
+            Ledger cascade on post
+          </p>
+          <table className="w-full text-[11px]">
+            <tbody>
+              {drafted.ledgerImpact.map((l, i) => (
+                <tr
+                  key={i}
+                  style={{
+                    borderTop: i > 0 ? "1px solid var(--border)" : "none",
+                  }}
+                >
+                  <td className="py-1.5" style={{ color: "var(--text-1)" }}>
+                    {l.ledger}
+                  </td>
+                  <td
+                    className="py-1.5 text-right tabular-nums"
+                    style={{
+                      color: l.debit ? "var(--text-2)" : "var(--text-4)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Dr {l.debit ? `₹${l.debit.toLocaleString("en-IN")}` : "—"}
+                  </td>
+                  <td
+                    className="py-1.5 text-right tabular-nums"
+                    style={{
+                      color: l.credit ? "var(--text-2)" : "var(--text-4)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}
+                  >
+                    Cr {l.credit ? `₹${l.credit.toLocaleString("en-IN")}` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          className="rounded-xl p-4 flex items-center gap-3"
+          style={{
+            background: "color-mix(in srgb, var(--yellow) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
+          }}
+        >
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: "color-mix(in srgb, var(--yellow) 20%, transparent)" }}
+          >
+            <span style={{ color: "var(--yellow)", fontSize: 16 }}>⚡</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-bold" style={{ color: "var(--text-1)" }}>
+              Next: approval from {approverLbl}
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              Value band ₹{(drafted.amount / 1e5).toFixed(1)}L routes to {approverLbl.toLowerCase()}.
+              They&apos;ll see this in their queue; rejected drafts return with a reason.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  },
   unknown: () => (
     <div
       className="rounded-xl p-5 text-center"
@@ -2676,8 +2940,8 @@ const PROMPT_CATEGORIES = [
     Icon: Package,
     color: "var(--orange)",
     prompts: [
+      "Create sales invoice to Nykaa for ₹12.6L",
       "State-wise sales",
-      "HSN-wise sales",
       "Dead stock SKUs",
       "Money flow diagram",
     ],
@@ -2974,11 +3238,14 @@ interface ChatScreenProps {
    *  onQuestionConsumed so the parent can clear it. */
   initialQuestion?: string | null;
   onQuestionConsumed?: () => void;
+  /** Optional: chips like "Open in Entries" navigate cross-tab via this. */
+  onOpenTab?: (tabId: string) => void;
 }
 
 export function ChatScreen({
   initialQuestion,
   onQuestionConsumed,
+  onOpenTab,
 }: ChatScreenProps = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -3040,6 +3307,20 @@ export function ChatScreen({
   const handleSend = (raw?: string) => {
     const text = (raw ?? input).trim();
     if (!text) return;
+    // Cross-tab shortcut chips — intercept before classification so they
+    // don't get routed through the normal intent pipeline.
+    if (/^open in entries$/i.test(text)) {
+      onOpenTab?.("entries");
+      return;
+    }
+    if (/^open in day ?book$/i.test(text)) {
+      onOpenTab?.("daybook");
+      return;
+    }
+    if (/^open in bank recon$/i.test(text)) {
+      onOpenTab?.("bankrecon");
+      return;
+    }
     const intent = classifyIntent(text);
     const uId = nextId("u");
     const aId = nextId("a");

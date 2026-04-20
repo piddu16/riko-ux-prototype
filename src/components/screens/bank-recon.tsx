@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Building,
   UploadCloud,
@@ -11,6 +11,7 @@ import {
   Search,
   CheckCheck,
   Plus,
+  CheckCircle2,
 } from "lucide-react";
 import {
   BANK_ACCOUNTS,
@@ -55,6 +56,24 @@ export function BankReconScreen() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dragging, setDragging] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  /* Create matching entry → drafts a Receipt/Payment voucher in the
+     Entries queue and navigates. For the prototype we show a toast
+     and fire the cross-tab nav event; real impl would POST to backend. */
+  const handleCreateMatchingEntry = (description: string) => {
+    setToast(`Draft created · "${description.slice(0, 40)}" · routed to Accounts`);
+    // Navigate after a short pause so the toast lands first.
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "entries" }));
+    }, 900);
+  };
 
   const activeAccount = useMemo(
     () => BANK_ACCOUNTS.find((a) => a.id === activeAccountId) ?? BANK_ACCOUNTS[0],
@@ -426,7 +445,8 @@ export function BankReconScreen() {
                               {l.suggestion}
                             </span>
                             <button
-                              className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer transition-colors whitespace-nowrap flex-shrink-0"
+                              onClick={() => handleCreateMatchingEntry(l.description)}
+                              className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1"
                               style={{
                                 background: "color-mix(in srgb, var(--green) 15%, transparent)",
                                 color: "var(--green)",
@@ -440,8 +460,10 @@ export function BankReconScreen() {
                                 (e.currentTarget as HTMLElement).style.background = "color-mix(in srgb, var(--green) 15%, transparent)";
                                 (e.currentTarget as HTMLElement).style.color = "var(--green)";
                               }}
+                              title="Drafts a matching Receipt/Payment voucher in the Entries queue"
                             >
-                              Record in Tally
+                              <Plus size={10} />
+                              Create matching entry
                             </button>
                           </div>
                         ) : l.status === "mismatch" ? (
@@ -726,6 +748,26 @@ export function BankReconScreen() {
           </button>
         </motion.div>
       </div>
+
+      {/* Toast for "Create matching entry" confirmation */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-lg flex items-center gap-2"
+            style={{
+              background: "var(--green)",
+              color: "white",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
+            }}
+          >
+            <CheckCircle2 size={14} />
+            <span className="text-[13px] font-semibold">{toast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

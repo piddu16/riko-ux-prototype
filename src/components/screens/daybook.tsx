@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Search } from "lucide-react";
-import { DAYBOOK } from "@/lib/data";
+import { Search, Plus, Upload, ArrowRight, FileSpreadsheet } from "lucide-react";
+import { DAYBOOK, ENTRIES } from "@/lib/data";
 import { Pill } from "@/components/ui/pill";
+import { OcrUpload } from "@/components/ui/ocr-upload";
 
 /* ── Voucher type colours ── */
 const TYPE_COLORS: Record<string, string> = {
@@ -39,6 +40,12 @@ export function DaybookScreen() {
   const [activeRange, setActiveRange] = useState<string>("This Month");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeParty, setActiveParty] = useState<string>("All");
+  const [showUpload, setShowUpload] = useState(false);
+
+  /* Count of entries currently in draft/pending state — shows a link
+     at the top of Day Book so users can jump into the approval flow. */
+  const draftCount = ENTRIES.filter((e) => e.state === "draft").length;
+  const pendingCount = ENTRIES.filter((e) => e.state === "pending").length;
 
   /* Top-5 parties by transaction count */
   const topParties = useMemo(() => {
@@ -104,6 +111,11 @@ export function DaybookScreen() {
   const paymentTotal = voucherBreakdown.find((v) => v.type === "Payment")?.total ?? 0;
   const maxVoucherTotal = Math.max(...voucherBreakdown.map((v) => v.total), 1);
 
+  // After all hooks — safe to short-circuit to the OCR Upload view.
+  if (showUpload) {
+    return <OcrUpload onClose={() => setShowUpload(false)} />;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -112,10 +124,69 @@ export function DaybookScreen() {
       transition={{ duration: 0.4 }}
       className="px-4 py-4 max-w-4xl md:max-w-5xl mx-auto w-full"
     >
-      {/* Header */}
-      <h2 className="text-lg font-bold mb-4" style={{ color: "var(--text-1)" }}>
-        Day Book
-      </h2>
+      {/* Header with New entry + Upload actions */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-lg font-bold" style={{ color: "var(--text-1)" }}>
+            Day Book
+          </h2>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+            Posted vouchers · filter by party, type, or date. New entries
+            route through the{" "}
+            <span style={{ color: "var(--green)" }}>Entries</span> approval flow.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowUpload(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              color: "var(--text-2)",
+            }}
+          >
+            <Upload size={13} />
+            Upload bill
+          </button>
+          <button
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer transition-opacity hover:opacity-90"
+            style={{ background: "var(--green)", color: "white" }}
+          >
+            <Plus size={13} />
+            New entry
+          </button>
+        </div>
+      </div>
+
+      {/* Drafts/pending callout — links into Entries screen */}
+      {(draftCount > 0 || pendingCount > 0) && (
+        <a
+          href="#entries"
+          onClick={(e) => {
+            e.preventDefault();
+            // Cross-tab nav: fire a custom event page.tsx can listen to.
+            // Simpler: use window.location.hash as a signal. For prototype
+            // we dispatch a CustomEvent picked up by page.tsx listener.
+            window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "entries" }));
+          }}
+          className="flex items-center gap-2.5 px-3.5 py-2.5 mb-4 rounded-xl cursor-pointer transition-opacity hover:opacity-90"
+          style={{
+            background: "color-mix(in srgb, var(--yellow) 8%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
+            textDecoration: "none",
+          }}
+        >
+          <FileSpreadsheet size={14} style={{ color: "var(--yellow)", flexShrink: 0 }} />
+          <span className="text-[12px] flex-1" style={{ color: "var(--text-1)" }}>
+            <strong>{draftCount} drafts · {pendingCount} pending approval</strong>
+            <span style={{ color: "var(--text-3)" }}>
+              {" "}— these aren&apos;t in Day Book yet. Review to route them through.
+            </span>
+          </span>
+          <ArrowRight size={12} style={{ color: "var(--yellow)", flexShrink: 0 }} />
+        </a>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
