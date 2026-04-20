@@ -26,6 +26,10 @@ import {
   Download,
   Share2,
   CheckCircle2,
+  Paperclip,
+  FileText,
+  X,
+  AlertTriangle,
 } from "lucide-react";
 import {
   RECEIVABLES,
@@ -100,6 +104,13 @@ import {
   ENTRIES,
   ENTRY_TYPE_LABELS,
   ENTRY_STATE_META,
+  UPLOAD_KIND_META,
+  BATCH_UPLOAD_SAMPLES,
+  BANK_STATEMENT_UPLOAD,
+  CHAT_BILL_UPLOAD,
+  CHAT_INVOICE_UPLOAD,
+  classifyUpload,
+  type UploadKind,
 } from "@/lib/data";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -132,10 +143,29 @@ type Intent =
   | "state-wise"
   | "filing-delay"
   | "create-entry"
+  // File-upload intents — user attaches a file in the chat and Riko
+  // routes it to the right Tally voucher type. Not triggered by text;
+  // set directly by handleSendFile based on filename classification.
+  | "upload-bill"
+  | "upload-invoice"
+  | "upload-bank-recon"
+  | "upload-batch-sales"
+  | "upload-batch-purchase"
+  | "upload-batch-receipt"
+  | "upload-batch-expense"
+  | "upload-batch-inventory"
   | "unknown";
 
 type ChatMessage =
-  | { id: string; role: "user"; text: string; intent?: Intent }
+  | {
+      id: string;
+      role: "user";
+      text: string;
+      intent?: Intent;
+      /** Set when this user message represents a file attachment.
+       *  The text becomes the Riko-generated "Uploaded ..." summary. */
+      attachment?: { fileName: string; kind: UploadKind };
+    }
   | {
       id: string;
       role: "assistant";
@@ -144,7 +174,24 @@ type ChatMessage =
       /** How long Riko "thought" (fake but feels real — used to render
        *  the "Analyzed in X.Xs ▸" chip at the top of the response). */
       thinkingDurationMs?: number;
+      /** Mirrors the upstream user message's attachment so the
+       *  Exchange renderer + desktop result panel can read it. */
+      attachment?: { fileName: string; kind: UploadKind };
     };
+
+/** Map the detected UploadKind → which chat Intent should fire. */
+function intentForUploadKind(kind: UploadKind): Intent {
+  switch (kind) {
+    case "bill": return "upload-bill";
+    case "invoice": return "upload-invoice";
+    case "bank-statement": return "upload-bank-recon";
+    case "batch-sales": return "upload-batch-sales";
+    case "batch-purchase": return "upload-batch-purchase";
+    case "batch-receipt": return "upload-batch-receipt";
+    case "batch-expense": return "upload-batch-expense";
+    case "batch-inventory": return "upload-batch-inventory";
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Intent classifier — matches user text to an intent
@@ -276,7 +323,13 @@ function Chips({
   );
 }
 
-function UserBubble({ text }: { text: string }) {
+function UserBubble({
+  text,
+  attachment,
+}: {
+  text: string;
+  attachment?: { fileName: string; kind: UploadKind };
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -285,13 +338,27 @@ function UserBubble({ text }: { text: string }) {
       className="flex justify-end mb-3"
     >
       <div
-        className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-md text-sm"
+        className="max-w-[80%] rounded-2xl rounded-br-md text-sm overflow-hidden"
         style={{
           background: "color-mix(in srgb, var(--green) 15%, transparent)",
           color: "var(--text-1)",
         }}
       >
-        {text}
+        {attachment && (
+          <div
+            className="flex items-center gap-2 px-3 py-2"
+            style={{
+              background: "color-mix(in srgb, var(--green) 10%, transparent)",
+              borderBottom: "1px solid color-mix(in srgb, var(--green) 20%, transparent)",
+            }}
+          >
+            <FileText size={14} style={{ color: "var(--green)", flexShrink: 0 }} />
+            <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-2)" }}>
+              {attachment.fileName}
+            </p>
+          </div>
+        )}
+        <div className="px-4 py-2.5">{text}</div>
       </div>
     </motion.div>
   );
@@ -2014,6 +2081,523 @@ function ExchangeCreateEntry({ onFollowup }: { onFollowup: (q: string) => void }
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Upload exchanges — rendered when the user attaches a file
+   (PDF single-doc or CSV/Excel batch) and sends it through chat.
+   Each kind routes to a specific Tally voucher type via the
+   existing Entries approval workflow.
+   ═══════════════════════════════════════════════════════════════ */
+
+/** Shared helper: compact "drafted" pill used at the top of every
+ *  upload exchange card. */
+function UploadDraftedPill({ label }: { label: string }) {
+  return (
+    <span
+      className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+      style={{
+        background: "color-mix(in srgb, var(--green) 15%, transparent)",
+        color: "var(--green)",
+      }}
+    >
+      ✦ {label}
+    </span>
+  );
+}
+
+/** Shared row used inside the batch-upload card to preview the
+ *  first handful of rows Riko parsed from the file. */
+function BatchPreviewRow({
+  partyName,
+  particulars,
+  amount,
+  status,
+  note,
+}: {
+  partyName: string;
+  particulars: string;
+  amount: number;
+  status: "ok" | "warning" | "error";
+  note?: string;
+}) {
+  const color =
+    status === "ok" ? "var(--green)" : status === "warning" ? "var(--yellow)" : "var(--red)";
+  const Icon = status === "ok" ? CheckCircle2 : AlertTriangle;
+  return (
+    <div
+      className="flex items-start gap-2 px-2.5 py-1.5 rounded-md"
+      style={{ background: "var(--bg-primary)" }}
+    >
+      <Icon size={12} style={{ color, flexShrink: 0, marginTop: 2 }} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-2">
+          <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-1)" }}>
+            {partyName}
+          </p>
+          <p
+            className="text-[11px] tabular-nums"
+            style={{ color: amount < 0 ? "var(--red)" : "var(--text-2)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {amount === 0 ? "—" : `₹${Math.abs(amount).toLocaleString("en-IN")}`}
+          </p>
+        </div>
+        <p className="text-[10px] truncate" style={{ color: "var(--text-4)" }}>
+          {particulars}
+        </p>
+        {note && (
+          <p className="text-[10px] mt-0.5" style={{ color }}>
+            {note}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Single purchase bill PDF → drafted Purchase voucher. */
+function ExchangeUploadBill({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const b = CHAT_BILL_UPLOAD;
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{
+          background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
+          border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <UploadDraftedPill label="Drafted from bill" />
+          <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+            Purchase voucher
+          </span>
+          <span style={{ color: "var(--text-4)" }}>·</span>
+          <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            OCR {Math.round(b.confidence * 100)}% avg
+          </span>
+        </div>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              {b.vendorName}
+            </p>
+            <p className="text-[10px] font-mono" style={{ color: "var(--text-4)" }}>
+              {b.gstin} · {b.invoiceNumber} · {b.invoiceDate}
+            </p>
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+              Freight & logistics · CGST 9% + SGST 9% (intra-state)
+            </p>
+          </div>
+          <p
+            className="text-xl font-bold tabular-nums"
+            style={{ color: "var(--green)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            ₹{b.total.toLocaleString("en-IN")}
+          </p>
+        </div>
+        <div
+          className="mt-3 pt-3 grid grid-cols-2 gap-3"
+          style={{ borderTop: "1px solid color-mix(in srgb, var(--green) 18%, transparent)" }}
+        >
+          <div>
+            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+              Ledger cascade
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-2)" }}>
+              {b.ledgerImpact.length} accounts · GST register
+            </p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+              Routes to
+            </p>
+            <p className="text-[11px] mt-0.5 font-semibold" style={{ color: "var(--text-1)" }}>
+              Accounts team
+            </p>
+          </div>
+        </div>
+      </div>
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Read <strong>{b.fileName}</strong> and extracted vendor, GSTIN, invoice
+          number, and tax split at <strong>{Math.round(b.confidence * 100)}% confidence</strong>.
+          {b.lowConfidenceFields.length > 0 && (
+            <> Flagged <strong>{b.lowConfidenceFields.join(", ")}</strong> for review before posting.</>
+          )}{" "}
+          The draft is in your Entries queue — it routes to Accounts since ₹{(b.total / 1e3).toFixed(0)}K falls in the ₹10K – ₹1L band.
+        </p>
+      </Layer>
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
+      <Chips
+        items={["Open in Entries", "Upload another bill", "Edit the draft"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/** Single outward invoice PDF → drafted Sales voucher. */
+function ExchangeUploadInvoice({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const inv = CHAT_INVOICE_UPLOAD;
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{
+          background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
+          border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <UploadDraftedPill label="Drafted from invoice" />
+          <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+            Sales voucher
+          </span>
+          <span style={{ color: "var(--text-4)" }}>·</span>
+          <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            OCR {Math.round(inv.confidence * 100)}% avg
+          </span>
+        </div>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              {inv.buyerName}
+            </p>
+            <p className="text-[10px] font-mono" style={{ color: "var(--text-4)" }}>
+              {inv.gstin} · {inv.invoiceNumber} · {inv.invoiceDate}
+            </p>
+            <p className="text-[11px] mt-1" style={{ color: "var(--text-3)" }}>
+              Marketplace sale · IGST 18% (inter-state · buyer in 27 MH)
+            </p>
+          </div>
+          <p
+            className="text-xl font-bold tabular-nums"
+            style={{ color: "var(--green)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            ₹{(inv.total / 1e5).toFixed(1)}L
+          </p>
+        </div>
+        <div
+          className="mt-3 pt-3 grid grid-cols-2 gap-3"
+          style={{ borderTop: "1px solid color-mix(in srgb, var(--green) 18%, transparent)" }}
+        >
+          <div>
+            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+              Ledger cascade
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-2)" }}>
+              {inv.ledgerImpact.length} accounts · GST register
+            </p>
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+              Routes to
+            </p>
+            <p className="text-[11px] mt-0.5 font-semibold" style={{ color: "var(--text-1)" }}>
+              Accounts Head
+            </p>
+          </div>
+        </div>
+      </div>
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Read <strong>{inv.fileName}</strong> and matched the buyer against the
+          debtor master. Tax applied as IGST since the buyer is outside
+          Maharashtra. Value ₹{(inv.total / 1e5).toFixed(1)}L falls in the
+          ₹1L-₹10L band — routed to Accounts Head for approval.
+        </p>
+      </Layer>
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
+      <Chips
+        items={["Open in Entries", "Upload another invoice", "Edit the draft"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/** Bank statement PDF → matched receipts/payments + unmatched flagged. */
+function ExchangeUploadBankRecon({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const s = BANK_STATEMENT_UPLOAD;
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{
+          background: "color-mix(in srgb, var(--blue) 8%, var(--bg-surface))",
+          border: "1px solid color-mix(in srgb, var(--blue) 25%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <UploadDraftedPill label="Bank recon" />
+          <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+            {s.accountNumber}
+          </span>
+          <span style={{ color: "var(--text-4)" }}>·</span>
+          <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            {s.period}
+          </span>
+        </div>
+
+        {/* Summary row: matched vs unmatched */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div
+            className="rounded-lg p-2.5"
+            style={{ background: "color-mix(in srgb, var(--green) 12%, transparent)" }}
+          >
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: "var(--green)" }}>
+              Auto-matched
+            </p>
+            <p className="text-lg font-bold tabular-nums" style={{ color: "var(--green)" }}>
+              {s.matched}
+            </p>
+            <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+              of {s.totalLines} lines
+            </p>
+          </div>
+          <div
+            className="rounded-lg p-2.5"
+            style={{ background: "color-mix(in srgb, var(--yellow) 12%, transparent)" }}
+          >
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: "var(--yellow)" }}>
+              Unmatched
+            </p>
+            <p className="text-lg font-bold tabular-nums" style={{ color: "var(--yellow)" }}>
+              {s.unmatched}
+            </p>
+            <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+              need review
+            </p>
+          </div>
+          <div className="rounded-lg p-2.5" style={{ background: "var(--bg-primary)" }}>
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: "var(--text-4)" }}>
+              Net flow
+            </p>
+            <p
+              className="text-lg font-bold tabular-nums"
+              style={{
+                color: s.netFlow >= 0 ? "var(--green)" : "var(--red)",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {s.netFlow >= 0 ? "+" : ""}
+              ₹{(s.netFlow / 1e5).toFixed(1)}L
+            </p>
+            <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+              for the period
+            </p>
+          </div>
+        </div>
+
+        {/* Mini preview — first 4 unmatched lines */}
+        <p
+          className="text-[9px] uppercase tracking-wider font-medium mb-2"
+          style={{ color: "var(--text-4)" }}
+        >
+          Needs review
+        </p>
+        <div className="space-y-1">
+          {s.lines
+            .filter((l) => !l.match)
+            .slice(0, 4)
+            .map((l, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md"
+                style={{ background: "var(--bg-primary)" }}
+              >
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold truncate" style={{ color: "var(--text-1)" }}>
+                    {l.description}
+                  </p>
+                  <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                    {l.date} · {l.type}
+                  </p>
+                </div>
+                <p
+                  className="text-[11px] tabular-nums"
+                  style={{
+                    color: l.type === "credit" ? "var(--green)" : "var(--red)",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {l.type === "credit" ? "+" : "-"}₹{l.amount.toLocaleString("en-IN")}
+                </p>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Parsed {s.totalLines} lines from <strong>{s.fileName}</strong>. Auto-matched{" "}
+          <strong>{s.matched}</strong> against open receivables/payables and drafted
+          corresponding Receipt and Payment vouchers.{" "}
+          <strong>{s.unmatched} lines need review</strong> — mostly cash deposits and
+          unknown UPI credits. Open Bank Recon to resolve them; once matched, the
+          drafts move into the Entries queue for approval.
+        </p>
+      </Layer>
+
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
+
+      <Chips
+        items={["Open in Bank Recon", "Open in Entries", "Upload another statement"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/** Generic batch-upload exchange, parameterized by UploadKind. Used
+ *  for all 5 batch voucher types (sales/purchase/receipt/expense/inventory). */
+function ExchangeUploadBatch({
+  kind,
+  onFollowup,
+}: {
+  kind: UploadKind;
+  onFollowup: (q: string) => void;
+}) {
+  // Narrow to batch kinds — TypeScript guard
+  if (kind === "bill" || kind === "invoice" || kind === "bank-statement") {
+    return null;
+  }
+  const sample = BATCH_UPLOAD_SAMPLES[kind];
+  const meta = UPLOAD_KIND_META[kind];
+  const typeLabel = ENTRY_TYPE_LABELS[meta.voucherType];
+
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{
+          background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
+          border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <UploadDraftedPill label={`${sample.okCount + sample.warnCount} drafts`} />
+          <span className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>
+            {meta.label}
+          </span>
+          <span style={{ color: "var(--text-4)" }}>·</span>
+          <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+            → {typeLabel}
+          </span>
+        </div>
+
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
+          <div className="min-w-0">
+            <p className="text-sm font-bold truncate" style={{ color: "var(--text-1)" }}>
+              {sample.fileName}
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+              {sample.totalRows} rows · {sample.columns.length} columns detected
+            </p>
+          </div>
+          <p
+            className="text-xl font-bold tabular-nums"
+            style={{
+              color: sample.totalValue < 0 ? "var(--red)" : "var(--green)",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            ₹
+            {Math.abs(sample.totalValue) >= 1e7
+              ? `${(Math.abs(sample.totalValue) / 1e7).toFixed(2)}Cr`
+              : `${(Math.abs(sample.totalValue) / 1e5).toFixed(1)}L`}
+          </p>
+        </div>
+
+        {/* Processing summary — 3 chips */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div
+            className="rounded-lg p-2"
+            style={{ background: "color-mix(in srgb, var(--green) 12%, transparent)" }}
+          >
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: "var(--green)" }}>
+              Auto-drafted
+            </p>
+            <p className="text-base font-bold tabular-nums" style={{ color: "var(--green)" }}>
+              {sample.okCount}
+            </p>
+          </div>
+          <div
+            className="rounded-lg p-2"
+            style={{ background: "color-mix(in srgb, var(--yellow) 12%, transparent)" }}
+          >
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: "var(--yellow)" }}>
+              Needs review
+            </p>
+            <p className="text-base font-bold tabular-nums" style={{ color: "var(--yellow)" }}>
+              {sample.warnCount}
+            </p>
+          </div>
+          <div
+            className="rounded-lg p-2"
+            style={{ background: "color-mix(in srgb, var(--red) 12%, transparent)" }}
+          >
+            <p className="text-[9px] uppercase tracking-wider" style={{ color: "var(--red)" }}>
+              Skipped
+            </p>
+            <p className="text-base font-bold tabular-nums" style={{ color: "var(--red)" }}>
+              {sample.errorCount}
+            </p>
+          </div>
+        </div>
+
+        {/* Row previews — first 4 to stay compact */}
+        <p
+          className="text-[9px] uppercase tracking-wider font-medium mb-1.5"
+          style={{ color: "var(--text-4)" }}
+        >
+          First rows
+        </p>
+        <div className="space-y-1">
+          {sample.rows.slice(0, 4).map((r, i) => (
+            <BatchPreviewRow key={i} {...r} />
+          ))}
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Parsed <strong>{sample.totalRows} rows</strong> from{" "}
+          <strong>{sample.fileName}</strong> and mapped them to{" "}
+          <strong>{typeLabel.toLowerCase()}</strong> entries.{" "}
+          {sample.warnCount > 0 && (
+            <>
+              <strong>{sample.warnCount}</strong> need review (unclear HSN, missing
+              GSTIN, or amounts above threshold){" "}
+            </>
+          )}
+          {sample.errorCount > 0 && (
+            <>
+              and <strong>{sample.errorCount}</strong> were skipped (missing required fields){" "}
+            </>
+          )}
+          — open Entries to approve and post. Each row becomes an individual
+          voucher in Tally, not one bulk entry.
+        </p>
+      </Layer>
+
+      <div className="md:hidden">
+        <ExportBar />
+      </div>
+
+      <Chips
+        items={["Open in Entries", `Upload another ${meta.label.toLowerCase()}`, "Show column mapping"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
 /* ── Unknown fallback ── */
 function ExchangeUnknown({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
@@ -2089,6 +2673,24 @@ const EXCHANGE_RENDERERS: Record<
   "state-wise": ExchangeStateWise,
   "filing-delay": ExchangeFilingDelay,
   "create-entry": ExchangeCreateEntry,
+  "upload-bill": ExchangeUploadBill,
+  "upload-invoice": ExchangeUploadInvoice,
+  "upload-bank-recon": ExchangeUploadBankRecon,
+  "upload-batch-sales": ({ onFollowup }) => (
+    <ExchangeUploadBatch kind="batch-sales" onFollowup={onFollowup} />
+  ),
+  "upload-batch-purchase": ({ onFollowup }) => (
+    <ExchangeUploadBatch kind="batch-purchase" onFollowup={onFollowup} />
+  ),
+  "upload-batch-receipt": ({ onFollowup }) => (
+    <ExchangeUploadBatch kind="batch-receipt" onFollowup={onFollowup} />
+  ),
+  "upload-batch-expense": ({ onFollowup }) => (
+    <ExchangeUploadBatch kind="batch-expense" onFollowup={onFollowup} />
+  ),
+  "upload-batch-inventory": ({ onFollowup }) => (
+    <ExchangeUploadBatch kind="batch-inventory" onFollowup={onFollowup} />
+  ),
   unknown: ExchangeUnknown,
 };
 
@@ -2153,6 +2755,22 @@ const INTENT_REASONING: Record<Intent, string> = {
     "Pulled 24 months of GSTR-1 and GSTR-3B filing dates. Computed delay days vs each return's statutory due date.",
   "create-entry":
     "Parsed the voucher type, party, amount, and tax from your request. Matched the party against Tally ledger master. Routed to the correct approver based on the value threshold.",
+  "upload-bill":
+    "OCR'd the PDF and extracted vendor, GSTIN, invoice number, date, and line-item tax split. Matched the vendor against the creditor master and drafted a Purchase voucher with the correct expense ledger.",
+  "upload-invoice":
+    "OCR'd the outward invoice, matched the buyer against the debtor master, applied CGST+SGST or IGST based on the buyer's state, and drafted a Sales voucher with the full ledger cascade.",
+  "upload-bank-recon":
+    "Parsed all credit/debit lines from the bank statement. Matched each against open receipts + payments using UTR, amount, and date tolerance. Drafted Receipt/Payment vouchers for matched lines; flagged unmatched for review.",
+  "upload-batch-sales":
+    "Parsed the CSV rows and mapped columns to order_id, customer_name, HSN, qty, rate, and tax split. Created one Sales voucher per row. Flagged rows with missing HSN or unknown customers for review.",
+  "upload-batch-purchase":
+    "Parsed the vendor-bill sheet. Cross-checked each GSTIN against the GSTN lookup. Drafted one Purchase voucher per row, matching against the creditor master. Flagged rows with unregistered GSTINs.",
+  "upload-batch-receipt":
+    "Read the payment-gateway settlement file. Each settlement maps to a Receipt voucher against the relevant Debtor ledger, net of fees + tax on fees split separately per Section 194H.",
+  "upload-batch-expense":
+    "Parsed the expense sheet and grouped by category. Drafted one Payment voucher per line with the matched expense ledger. Flagged rows above ₹10K without bill references.",
+  "upload-batch-inventory":
+    "Read SKU-level adjustments. Each row becomes a Stock Journal — writeoffs debit Cost of Goods, transfers hit the destination godown, new SKUs require Item Master creation before posting.",
   unknown:
     "Couldn't confidently map your query to a known topic. Showing starter questions across cash, compliance, growth, and operations.",
 };
@@ -2173,6 +2791,14 @@ const INTENT_LABELS: Record<Intent, string> = {
   "state-wise": "State-wise sales",
   "filing-delay": "Filing delay calendar",
   "create-entry": "Drafted Tally voucher",
+  "upload-bill": "Purchase bill draft",
+  "upload-invoice": "Sales invoice draft",
+  "upload-bank-recon": "Bank statement reconciled",
+  "upload-batch-sales": "Sales batch drafted",
+  "upload-batch-purchase": "Purchase batch drafted",
+  "upload-batch-receipt": "Receipts batch drafted",
+  "upload-batch-expense": "Expense batch drafted",
+  "upload-batch-inventory": "Inventory batch drafted",
   "cash-flow": "Cash flow forecast",
   runway: "Runway",
   "expense-breakdown": "Expense breakdown",
@@ -2878,6 +3504,17 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       </div>
     );
   },
+  // ── Upload result renderers ────────────────────────────────────
+  // Desktop-only rich views. Each mirrors the left-side Exchange
+  // card but goes deeper (full ledger cascade, full row preview).
+  "upload-bill": () => <UploadBillResult />,
+  "upload-invoice": () => <UploadInvoiceResult />,
+  "upload-bank-recon": () => <UploadBankReconResult />,
+  "upload-batch-sales": () => <UploadBatchResult kind="batch-sales" />,
+  "upload-batch-purchase": () => <UploadBatchResult kind="batch-purchase" />,
+  "upload-batch-receipt": () => <UploadBatchResult kind="batch-receipt" />,
+  "upload-batch-expense": () => <UploadBatchResult kind="batch-expense" />,
+  "upload-batch-inventory": () => <UploadBatchResult kind="batch-inventory" />,
   unknown: () => (
     <div
       className="rounded-xl p-5 text-center"
@@ -2897,6 +3534,349 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     </div>
   ),
 };
+
+/* ═══════════════════════════════════════════════════════════════
+   Result components for upload intents — desktop right-panel views.
+   More detail than the left-panel Exchange cards (full ledger
+   cascade, full-file row table, column mapping).
+   ═══════════════════════════════════════════════════════════════ */
+
+function UploadResultHero({
+  icon,
+  filename,
+  subtitle,
+  headline,
+  headlineColor = "var(--green)",
+  accentColor = "var(--green)",
+}: {
+  icon: string;
+  filename: string;
+  subtitle: string;
+  headline: string;
+  headlineColor?: string;
+  accentColor?: string;
+}) {
+  return (
+    <div
+      className="rounded-xl p-5"
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderLeft: `4px solid ${accentColor}`,
+      }}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span style={{ fontSize: 20 }}>{icon}</span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold truncate" style={{ color: "var(--text-2)" }}>
+            {filename}
+          </p>
+          <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+            {subtitle}
+          </p>
+        </div>
+      </div>
+      <p
+        className="text-3xl font-bold mt-2 tabular-nums"
+        style={{ color: headlineColor, fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {headline}
+      </p>
+    </div>
+  );
+}
+
+function LedgerCascadeTable({
+  impacts,
+}: {
+  impacts: { ledger: string; debit?: number; credit?: number }[];
+}) {
+  return (
+    <div
+      className="rounded-xl p-4"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <p
+        className="text-[10px] uppercase tracking-wider font-bold mb-2"
+        style={{ color: "var(--text-4)" }}
+      >
+        Ledger cascade on post
+      </p>
+      <table className="w-full text-[11px]">
+        <tbody>
+          {impacts.map((l, i) => (
+            <tr
+              key={i}
+              style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}
+            >
+              <td className="py-1.5" style={{ color: "var(--text-1)" }}>
+                {l.ledger}
+              </td>
+              <td
+                className="py-1.5 text-right tabular-nums"
+                style={{
+                  color: l.debit ? "var(--text-2)" : "var(--text-4)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Dr {l.debit ? `₹${l.debit.toLocaleString("en-IN")}` : "—"}
+              </td>
+              <td
+                className="py-1.5 text-right tabular-nums"
+                style={{
+                  color: l.credit ? "var(--text-2)" : "var(--text-4)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Cr {l.credit ? `₹${l.credit.toLocaleString("en-IN")}` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function UploadBillResult() {
+  const b = CHAT_BILL_UPLOAD;
+  return (
+    <div className="space-y-3">
+      <UploadResultHero
+        icon="🧾"
+        filename={b.fileName}
+        subtitle={`${b.vendorName} · ${b.gstin} · ${b.invoiceDate}`}
+        headline={`₹${b.total.toLocaleString("en-IN")}`}
+      />
+      <LedgerCascadeTable impacts={b.ledgerImpact} />
+      <div
+        className="rounded-xl p-4"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p
+          className="text-[10px] uppercase tracking-wider font-bold mb-2"
+          style={{ color: "var(--text-4)" }}
+        >
+          OCR confidence
+        </p>
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <div
+              className="h-2 rounded-full overflow-hidden"
+              style={{ background: "var(--bg-hover)" }}
+            >
+              <div
+                style={{
+                  width: `${b.confidence * 100}%`,
+                  height: "100%",
+                  background: "var(--green)",
+                }}
+              />
+            </div>
+          </div>
+          <p
+            className="text-sm font-bold tabular-nums"
+            style={{ color: "var(--green)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {Math.round(b.confidence * 100)}%
+          </p>
+        </div>
+        {b.lowConfidenceFields.length > 0 && (
+          <p className="text-[11px] mt-2" style={{ color: "var(--yellow)" }}>
+            ⚠ Low confidence: {b.lowConfidenceFields.join(", ")}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UploadInvoiceResult() {
+  const inv = CHAT_INVOICE_UPLOAD;
+  return (
+    <div className="space-y-3">
+      <UploadResultHero
+        icon="📄"
+        filename={inv.fileName}
+        subtitle={`${inv.buyerName} · ${inv.gstin} · ${inv.invoiceDate}`}
+        headline={`₹${(inv.total / 1e5).toFixed(1)}L`}
+      />
+      <LedgerCascadeTable impacts={inv.ledgerImpact} />
+      <div
+        className="rounded-xl p-4"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p
+          className="text-[10px] uppercase tracking-wider font-bold mb-2"
+          style={{ color: "var(--text-4)" }}
+        >
+          Tax applied
+        </p>
+        <div className="grid grid-cols-2 gap-3 text-[11px]">
+          <div>
+            <p style={{ color: "var(--text-4)" }}>Taxable value</p>
+            <p
+              className="text-sm font-bold tabular-nums"
+              style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              ₹{inv.taxable.toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div>
+            <p style={{ color: "var(--text-4)" }}>IGST 18%</p>
+            <p
+              className="text-sm font-bold tabular-nums"
+              style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              ₹{inv.igst.toLocaleString("en-IN")}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UploadBankReconResult() {
+  const s = BANK_STATEMENT_UPLOAD;
+  return (
+    <div className="space-y-3">
+      <UploadResultHero
+        icon="🏦"
+        filename={s.fileName}
+        subtitle={`${s.accountNumber} · ${s.period}`}
+        headline={`${s.matched}/${s.totalLines} matched`}
+        headlineColor="var(--blue)"
+        accentColor="var(--blue)"
+      />
+
+      {/* Per-line table */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+          <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: "var(--text-4)" }}>
+            Transaction lines
+          </p>
+        </div>
+        <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+          {s.lines.map((l, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-3 px-4 py-2"
+              style={{ borderTop: i > 0 ? "1px solid var(--border)" : "none" }}
+            >
+              <div className="min-w-[76px]">
+                <p className="text-[11px] font-mono" style={{ color: "var(--text-3)" }}>
+                  {l.date.slice(5)}
+                </p>
+                <span
+                  className="text-[9px] uppercase tracking-wider font-bold"
+                  style={{ color: l.type === "credit" ? "var(--green)" : "var(--red)" }}
+                >
+                  {l.type}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text-1)" }}>
+                  {l.description}
+                </p>
+                <p
+                  className="text-[10px]"
+                  style={{ color: l.match ? "var(--green)" : "var(--yellow)" }}
+                >
+                  {l.match ?? "⚠ No auto-match — needs review"}
+                </p>
+              </div>
+              <p
+                className="text-[12px] tabular-nums font-semibold"
+                style={{
+                  color: l.type === "credit" ? "var(--green)" : "var(--red)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                {l.type === "credit" ? "+" : "-"}₹{l.amount.toLocaleString("en-IN")}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UploadBatchResult({ kind }: { kind: UploadKind }) {
+  if (kind === "bill" || kind === "invoice" || kind === "bank-statement") return null;
+  const sample = BATCH_UPLOAD_SAMPLES[kind];
+  const meta = UPLOAD_KIND_META[kind];
+  return (
+    <div className="space-y-3">
+      <UploadResultHero
+        icon={meta.icon}
+        filename={sample.fileName}
+        subtitle={`${sample.totalRows} rows · ${sample.columns.length} columns · → ${ENTRY_TYPE_LABELS[meta.voucherType]}`}
+        headline={
+          sample.totalValue < 0
+            ? `-₹${(Math.abs(sample.totalValue) / 1e5).toFixed(1)}L`
+            : sample.totalValue >= 1e7
+            ? `₹${(sample.totalValue / 1e7).toFixed(2)}Cr`
+            : `₹${(sample.totalValue / 1e5).toFixed(1)}L`
+        }
+      />
+
+      {/* Column mapping card */}
+      <div
+        className="rounded-xl p-4"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p
+          className="text-[10px] uppercase tracking-wider font-bold mb-2"
+          style={{ color: "var(--text-4)" }}
+        >
+          Column mapping
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {sample.columns.map((c) => (
+            <span
+              key={c}
+              className="text-[10px] font-mono px-2 py-1 rounded-md"
+              style={{
+                background: "var(--bg-hover)",
+                color: "var(--text-2)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Full row preview */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
+          <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: "var(--text-4)" }}>
+            First {sample.rows.length} of {sample.totalRows} rows
+          </p>
+          <div className="flex items-center gap-3 text-[10px]">
+            <span style={{ color: "var(--green)" }}>✓ {sample.okCount} ok</span>
+            <span style={{ color: "var(--yellow)" }}>⚠ {sample.warnCount} review</span>
+            <span style={{ color: "var(--red)" }}>✗ {sample.errorCount} skipped</span>
+          </div>
+        </div>
+        <div className="p-2 space-y-1">
+          {sample.rows.map((r, i) => (
+            <BatchPreviewRow key={i} {...r} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════
    Empty state — categorized prompts
@@ -2959,15 +3939,25 @@ function InputBar({
   value,
   onChange,
   onSend,
+  onSendFile,
   placeholder = "Ask Riko anything...",
 }: {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
+  /** Send a file (PDF / CSV / Excel) as an attachment. The caller
+   *  classifies the filename into an UploadKind and fires the
+   *  corresponding upload-* intent. */
+  onSendFile?: (fileName: string) => void;
   placeholder?: string;
 }) {
   // Track keyboard inset. On desktop this stays 0.
   const [kbInset, setKbInset] = useState(0);
+  // Pending attachment waiting for the user to hit send (or add a note).
+  const [attachment, setAttachment] = useState<{ fileName: string; kind: UploadKind } | null>(null);
+  // Drag-over visual state
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
@@ -2994,6 +3984,23 @@ function InputBar({
       ? { bottom: `${kbInset}px` }
       : undefined;
 
+  const pickFile = (f: File) => {
+    const name = f.name || "uploaded-file";
+    const kind = classifyUpload(name);
+    setAttachment({ fileName: name, kind });
+  };
+
+  const handleSendLocal = () => {
+    if (attachment && onSendFile) {
+      onSendFile(attachment.fileName);
+      setAttachment(null);
+      return;
+    }
+    onSend();
+  };
+
+  const canSend = !!attachment || value.trim().length > 0;
+
   return (
     <div
       className="sticky bottom-[calc(60px+env(safe-area-inset-bottom,0px))] md:bottom-0 px-4 py-3"
@@ -3002,14 +4009,106 @@ function InputBar({
         borderTop: "1px solid var(--border)",
         ...bottomStyle,
       }}
+      onDragOver={(e) => {
+        if (!onSendFile) return;
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        if (!onSendFile) return;
+        e.preventDefault();
+        setDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) pickFile(file);
+      }}
     >
+      {/* Pending attachment chip — shows filename + detected kind */}
+      {attachment && (
+        <div
+          className="mb-2 flex items-center gap-2 rounded-lg px-3 py-2"
+          style={{
+            background: "color-mix(in srgb, var(--green) 10%, var(--bg-surface))",
+            border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
+          }}
+        >
+          <span style={{ fontSize: 16 }}>{UPLOAD_KIND_META[attachment.kind].icon}</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-semibold truncate" style={{ color: "var(--text-1)" }}>
+              {attachment.fileName}
+            </p>
+            <p className="text-[10px]" style={{ color: "var(--text-3)" }}>
+              Detected as <strong>{UPLOAD_KIND_META[attachment.kind].label}</strong> ·{" "}
+              Riko will draft entries and route to approval
+            </p>
+          </div>
+          <button
+            onClick={() => setAttachment(null)}
+            className="rounded-md cursor-pointer p-1 transition-colors hover:opacity-70"
+            aria-label="Remove attachment"
+            style={{ color: "var(--text-3)" }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Drag-over overlay hint */}
+      {dragOver && (
+        <div
+          className="mb-2 flex items-center justify-center rounded-lg py-3 border-2 border-dashed"
+          style={{
+            background: "color-mix(in srgb, var(--green) 8%, transparent)",
+            borderColor: "var(--green)",
+            color: "var(--green)",
+          }}
+        >
+          <Paperclip size={14} className="mr-2" />
+          <span className="text-[12px] font-semibold">Drop to attach — Riko will draft the entries</span>
+        </div>
+      )}
+
       <div
-        className="flex items-center gap-2 rounded-xl px-3 py-2"
+        className="flex items-center gap-2 rounded-xl px-2 py-1.5"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
         }}
       >
+        {/* Attach button (only shown if onSendFile is wired in) */}
+        {onSendFile && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept=".pdf,.csv,.xls,.xlsx"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) pickFile(file);
+                // Reset so picking the same file twice still fires
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-lg cursor-pointer transition-colors flex items-center justify-center flex-shrink-0"
+              style={{
+                width: 36,
+                height: 36,
+                color: attachment ? "var(--green)" : "var(--text-3)",
+                background: attachment
+                  ? "color-mix(in srgb, var(--green) 12%, transparent)"
+                  : "transparent",
+              }}
+              aria-label="Attach file"
+              title="Attach PDF, CSV or Excel — Riko drafts Tally entries"
+            >
+              <Paperclip size={16} />
+            </button>
+          </>
+        )}
+
         <input
           type="text"
           value={value}
@@ -3017,20 +4116,20 @@ function InputBar({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              onSend();
+              handleSendLocal();
             }
           }}
-          placeholder={placeholder}
+          placeholder={attachment ? "Add a note (optional)..." : placeholder}
           aria-label="Ask Riko a question"
           className="flex-1 bg-transparent text-sm min-w-0 py-2"
           style={{ color: "var(--text-1)" }}
         />
         <button
-          onClick={onSend}
-          disabled={!value.trim()}
+          onClick={handleSendLocal}
+          disabled={!canSend}
           className="rounded-lg cursor-pointer transition-opacity disabled:opacity-40 flex items-center justify-center"
           style={{
-            background: value.trim() ? "var(--green)" : "var(--bg-hover)",
+            background: canSend ? "var(--green)" : "var(--bg-hover)",
             width: 40,
             height: 40,
           }}
@@ -3038,7 +4137,7 @@ function InputBar({
         >
           <Send
             size={16}
-            color={value.trim() ? "white" : "var(--text-4)"}
+            color={canSend ? "white" : "var(--text-4)"}
           />
         </button>
       </div>
@@ -3277,6 +4376,16 @@ export function ChatScreen({
    *  resolve fast. Tune these as the feel evolves. */
   const delayFor = (intent: Intent): number => {
     switch (intent) {
+      // File uploads feel like OCR is actually running.
+      case "upload-bill":
+      case "upload-invoice":
+      case "upload-bank-recon":
+      case "upload-batch-sales":
+      case "upload-batch-purchase":
+      case "upload-batch-receipt":
+      case "upload-batch-expense":
+      case "upload-batch-inventory":
+        return 1800;
       case "gst-recon":
       case "cash-flow":
       case "cohort-retention":
@@ -3321,6 +4430,32 @@ export function ChatScreen({
       onOpenTab?.("bankrecon");
       return;
     }
+    // "Upload another bill/invoice/statement" chips — trigger the
+    // hidden file input by synthesizing a click. Users typing this
+    // as plain text also lands here. No intent fires; the attachment
+    // flow takes over once a file is picked.
+    if (/^upload another/i.test(text)) {
+      setInput("");
+      // The InputBar owns the <input type="file" /> ref; since we
+      // can't dispatch into it from here, fall back to surfacing a
+      // helper hint via a synthetic user message.
+      setMessages((prev) => [
+        ...prev,
+        { id: nextId("u"), role: "user", text },
+      ]);
+      window.setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: nextId("a"),
+            role: "assistant",
+            intent: "unknown",
+            thinkingDurationMs: 400,
+          },
+        ]);
+      }, 400);
+      return;
+    }
     const intent = classifyIntent(text);
     const uId = nextId("u");
     const aId = nextId("a");
@@ -3347,6 +4482,51 @@ export function ChatScreen({
           role: "assistant",
           intent,
           thinkingDurationMs: elapsed,
+        },
+      ]);
+    }, delay);
+  };
+
+  /** File-attachment path. Called by InputBar when the user picks a
+   *  PDF / CSV / Excel file and hits send. We classify the filename,
+   *  drop a "Uploaded X" user bubble, then after the OCR delay drop
+   *  the matching upload-* assistant card. */
+  const handleSendFile = (fileName: string) => {
+    const kind = classifyUpload(fileName);
+    const intent = intentForUploadKind(kind);
+    const uId = nextId("u");
+    const aId = nextId("a");
+    const delay = delayFor(intent);
+    const meta = UPLOAD_KIND_META[kind];
+    const userText = input.trim()
+      ? `${input.trim()} · Attached ${fileName}`
+      : `Uploaded ${fileName} · ${meta.label}`;
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: uId,
+        role: "user",
+        text: userText,
+        intent,
+        attachment: { fileName, kind },
+      },
+    ]);
+    setInput("");
+    const startedAt = performance.now();
+    setThinkingStartedAt(Date.now());
+
+    window.setTimeout(() => {
+      const elapsed = Math.round(performance.now() - startedAt);
+      setThinkingStartedAt(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aId,
+          role: "assistant",
+          intent,
+          thinkingDurationMs: elapsed,
+          attachment: { fileName, kind },
         },
       ]);
     }, delay);
@@ -3473,10 +4653,30 @@ export function ChatScreen({
             >
               Or type your own question below — Riko understands plain English.
             </p>
+
+            {/* Upload hint — tie the new attach button to the empty state
+                so users discover it without scrolling through prompts. */}
+            <div
+              className="mt-4 flex items-center justify-center gap-2 text-[11px] flex-wrap px-2"
+              style={{ color: "var(--text-3)" }}
+            >
+              <Paperclip size={12} style={{ color: "var(--green)" }} />
+              <span>
+                Or attach a file —{" "}
+                <strong>PDF bills, bank statements</strong>, or{" "}
+                <strong>CSV/Excel batches</strong> of invoices, receipts, expenses,
+                inventory → Riko drafts the Tally entries.
+              </span>
+            </div>
           </div>
         </div>
 
-        <InputBar value={input} onChange={setInput} onSend={() => handleSend()} />
+        <InputBar
+          value={input}
+          onChange={setInput}
+          onSend={() => handleSend()}
+          onSendFile={handleSendFile}
+        />
       </motion.div>
       </MotionConfig>
     );
@@ -3505,7 +4705,7 @@ export function ChatScreen({
         >
           {messages.map((m) => {
             if (m.role === "user") {
-              return <UserBubble key={m.id} text={m.text} />;
+              return <UserBubble key={m.id} text={m.text} attachment={m.attachment} />;
             }
             const Renderer = EXCHANGE_RENDERERS[m.intent];
             return (
@@ -3522,7 +4722,12 @@ export function ChatScreen({
             <ThinkingLive startedAt={thinkingStartedAt} />
           )}
         </div>
-        <InputBar value={input} onChange={setInput} onSend={() => handleSend()} />
+        <InputBar
+          value={input}
+          onChange={setInput}
+          onSend={() => handleSend()}
+          onSendFile={handleSendFile}
+        />
       </div>
 
       {/* Right — Result panel (desktop only).

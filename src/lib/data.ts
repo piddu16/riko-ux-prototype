@@ -1460,3 +1460,312 @@ export const OCR_SAMPLE = {
   ],
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   Chat upload samples — drives the "attach file in chat" flow.
+   Single PDFs → route to specific Tally voucher types.
+   Batch CSV/Excel → route to multiple entries via Entries queue.
+   These are DEMO samples: filename-pattern → pre-computed result.
+   ═══════════════════════════════════════════════════════════════ */
+
+/** Kind of upload Riko recognized from the filename. Drives the
+ *  Exchange card that renders in the chat + the routing to the
+ *  right Tally voucher. */
+export type UploadKind =
+  | "bill" // single PDF invoice/bill → Purchase voucher draft
+  | "invoice" // single PDF outward invoice → Sales voucher draft
+  | "bank-statement" // PDF bank statement → Receipt/Payment + Bank Recon matches
+  | "batch-sales" // CSV/Excel of multiple sales rows
+  | "batch-purchase" // CSV/Excel of multiple purchase rows
+  | "batch-receipt" // CSV/Excel of collection receipts
+  | "batch-expense" // CSV/Excel of expense vouchers
+  | "batch-inventory"; // CSV/Excel of stock-journal rows
+
+export interface UploadKindMeta {
+  /** Short label shown on the pill (e.g. "Purchase bill"). */
+  label: string;
+  /** Tally voucher this upload type becomes. */
+  voucherType: EntryType;
+  /** Emoji icon for the card header. */
+  icon: string;
+  /** One-liner Riko shows describing what it'll do. */
+  description: string;
+  /** Filename hints that match this kind. Keep lowercased. */
+  hints: string[];
+}
+
+export const UPLOAD_KIND_META: Record<UploadKind, UploadKindMeta> = {
+  bill: {
+    label: "Purchase bill",
+    voucherType: "purchase",
+    icon: "🧾",
+    description: "Extract vendor, GSTIN, line items, and tax → draft a Purchase voucher.",
+    hints: ["bill", "invoice-in", "purchase", "vendor", "shiprocket", "amazon", "google"],
+  },
+  invoice: {
+    label: "Outward invoice",
+    voucherType: "sales",
+    icon: "📄",
+    description: "Extract buyer, HSN codes, and tax → draft a Sales voucher.",
+    hints: ["sales", "invoice-out", "outward", "tax-invoice"],
+  },
+  "bank-statement": {
+    label: "Bank statement",
+    voucherType: "bank-recon",
+    icon: "🏦",
+    description: "Match debits → Payment vouchers, credits → Receipt vouchers, flag unmatched for review.",
+    hints: ["statement", "hdfc", "icici", "axis", "sbi", "passbook", "bank-stmt"],
+  },
+  "batch-sales": {
+    label: "Sales batch",
+    voucherType: "sales",
+    icon: "📊",
+    description: "Every row becomes a Sales voucher. Party-master matched + HSN-coded.",
+    hints: ["sales-batch", "invoices", "orders", "website", "shopify", "d2c"],
+  },
+  "batch-purchase": {
+    label: "Purchase batch",
+    voucherType: "purchase",
+    icon: "📥",
+    description: "Every row becomes a Purchase voucher. Flagged if GSTIN fails GSTN lookup.",
+    hints: ["purchases", "purchase-batch", "vendor-bills"],
+  },
+  "batch-receipt": {
+    label: "Receipts batch",
+    voucherType: "receipt",
+    icon: "💰",
+    description: "Every row becomes a Receipt voucher against the matching Debtor.",
+    hints: ["receipts", "collections", "payments-in", "razorpay", "paytm", "stripe"],
+  },
+  "batch-expense": {
+    label: "Expense batch",
+    voucherType: "payment",
+    icon: "💸",
+    description: "Every row becomes a Payment voucher under the matched expense ledger.",
+    hints: ["expense", "expenses", "petty-cash", "reimbursement"],
+  },
+  "batch-inventory": {
+    label: "Inventory update",
+    voucherType: "stock-journal",
+    icon: "📦",
+    description: "Every row becomes a Stock Journal — opening/closing adjustments, transfers, writeoffs.",
+    hints: ["inventory", "stock", "sku", "warehouse", "transfer", "wms"],
+  },
+};
+
+/** Heuristic: given a filename, guess the upload kind. If nothing
+ *  matches, fall back to "bill" for PDFs and "batch-sales" for
+ *  CSV/Excel (the most common cases). */
+export function classifyUpload(fileName: string): UploadKind {
+  const name = fileName.toLowerCase();
+  const isPdf = name.endsWith(".pdf");
+  const isBatch = /\.(csv|xls|xlsx)$/.test(name);
+
+  if (isPdf) {
+    if (UPLOAD_KIND_META["bank-statement"].hints.some((h) => name.includes(h)))
+      return "bank-statement";
+    if (UPLOAD_KIND_META.invoice.hints.some((h) => name.includes(h)))
+      return "invoice";
+    return "bill";
+  }
+  if (isBatch) {
+    if (UPLOAD_KIND_META["batch-inventory"].hints.some((h) => name.includes(h)))
+      return "batch-inventory";
+    if (UPLOAD_KIND_META["batch-expense"].hints.some((h) => name.includes(h)))
+      return "batch-expense";
+    if (UPLOAD_KIND_META["batch-receipt"].hints.some((h) => name.includes(h)))
+      return "batch-receipt";
+    if (UPLOAD_KIND_META["batch-purchase"].hints.some((h) => name.includes(h)))
+      return "batch-purchase";
+    return "batch-sales";
+  }
+  // Unknown extension — default to bill, let user confirm.
+  return "bill";
+}
+
+/* ── Bank statement upload sample — 14 lines, 9 matched, 5 flagged ── */
+export const BANK_STATEMENT_UPLOAD = {
+  fileName: "HDFC-Stmt-Mar2026.pdf",
+  accountNumber: "HDFC-Current-****6782",
+  period: "1 Mar – 31 Mar 2026",
+  totalLines: 14,
+  matched: 9,
+  unmatched: 5,
+  openingBalance: 184_500,
+  closingBalance: 560_320,
+  netFlow: 560_320 - 184_500,
+  lines: [
+    { date: "2026-03-02", description: "NEFT-Nykaa E-Retail-NEFT/034822", amount: 125_000, type: "credit" as const, match: "Receipt · Nykaa Feb settlement", confidence: 0.98 },
+    { date: "2026-03-03", description: "UPI-RZR-Razorpay PGW", amount: 46_250, type: "credit" as const, match: "Receipt · Website D2C batch", confidence: 0.96 },
+    { date: "2026-03-05", description: "IMPS-PAYTM-One97 Settle", amount: 89_000, type: "credit" as const, match: "Receipt · Paytm daily settlement", confidence: 0.94 },
+    { date: "2026-03-07", description: "RTGS-Amazon-AMZN IN Pay", amount: 182_400, type: "credit" as const, match: "Receipt · Amazon payout batch 12", confidence: 0.97 },
+    { date: "2026-03-08", description: "NEFT-Shiprocket-SHIPROCKET", amount: 32_100, type: "debit" as const, match: "Payment · against bill SR-2301", confidence: 0.95 },
+    { date: "2026-03-10", description: "UPI-FRESHDESK-Freshworks", amount: 14_850, type: "debit" as const, match: null, confidence: 0.0 },
+    { date: "2026-03-12", description: "NEFT-Google India-ADS", amount: 163_988, type: "debit" as const, match: "Payment · Google Ads Mar", confidence: 0.99 },
+    { date: "2026-03-14", description: "UPI-RZR-Razorpay PGW", amount: 92_400, type: "credit" as const, match: "Receipt · Website D2C batch", confidence: 0.94 },
+    { date: "2026-03-16", description: "Cash DEP-Branch 4422", amount: 50_000, type: "credit" as const, match: null, confidence: 0.0 },
+    { date: "2026-03-18", description: "IMPS-MUMBAI PACKAGING", amount: 58_400, type: "debit" as const, match: "Payment · MPL-3301 invoice", confidence: 0.93 },
+    { date: "2026-03-22", description: "UPI-UNKNOWN-UPI/932211", amount: 8_200, type: "debit" as const, match: null, confidence: 0.0 },
+    { date: "2026-03-25", description: "NEFT-Nykaa E-Retail-NEFT/042918", amount: 142_880, type: "credit" as const, match: "Receipt · Nykaa Mar pt 1", confidence: 0.97 },
+    { date: "2026-03-28", description: "Chq-Cleared 002314", amount: 36_500, type: "debit" as const, match: null, confidence: 0.0 },
+    { date: "2026-03-30", description: "Bank Charges-QTR", amount: 1_240, type: "debit" as const, match: null, confidence: 0.0 },
+  ],
+};
+
+/* ── Batch upload samples — show what "42 rows → 42 vouchers" looks like ── */
+export interface BatchUploadRow {
+  partyName: string;
+  particulars: string;
+  amount: number;
+  status: "ok" | "warning" | "error"; // ok = auto-drafted, warning = needs review, error = skipped
+  note?: string; // why warning/error
+}
+
+export interface BatchUploadSample {
+  kind: UploadKind;
+  fileName: string;
+  totalRows: number;
+  okCount: number; // auto-drafted
+  warnCount: number; // drafted but needs review
+  errorCount: number; // skipped
+  totalValue: number;
+  columns: string[]; // what we detected in the file
+  rows: BatchUploadRow[]; // preview of first ~6 rows
+}
+
+export const BATCH_UPLOAD_SAMPLES: Record<Exclude<UploadKind, "bill" | "invoice" | "bank-statement">, BatchUploadSample> = {
+  "batch-sales": {
+    kind: "batch-sales",
+    fileName: "Website-Orders-Mar-2026.csv",
+    totalRows: 184,
+    okCount: 176,
+    warnCount: 6,
+    errorCount: 2,
+    totalValue: 18_46_300,
+    columns: ["order_id", "customer_name", "customer_pan", "state", "hsn", "qty", "rate", "cgst", "sgst", "igst", "total"],
+    rows: [
+      { partyName: "Priya Shetty", particulars: "ORD-9821 · Face Wash 100ml ×2", amount: 712, status: "ok" },
+      { partyName: "Rahul Sharma", particulars: "ORD-9822 · Serum 30ml ×1, Sunscreen ×1", amount: 1_340, status: "ok" },
+      { partyName: "Anjali Menon", particulars: "ORD-9823 · Hair Oil 200ml ×3", amount: 1_428, status: "ok" },
+      { partyName: "Sandeep K.", particulars: "ORD-9824 · gift-hamper", amount: 2_890, status: "warning", note: "HSN missing for hamper — defaulted to 33049990" },
+      { partyName: "Meera Jain", particulars: "ORD-9825 · Face Wash ×5", amount: 1_780, status: "ok" },
+      { partyName: "—", particulars: "ORD-9826 · invalid customer", amount: 980, status: "error", note: "No customer_name in row 84" },
+    ],
+  },
+  "batch-purchase": {
+    kind: "batch-purchase",
+    fileName: "Vendor-Bills-April.xlsx",
+    totalRows: 34,
+    okCount: 29,
+    warnCount: 4,
+    errorCount: 1,
+    totalValue: 8_92_450,
+    columns: ["vendor", "gstin", "invoice_no", "date", "hsn_or_sac", "taxable", "cgst", "sgst", "igst", "total"],
+    rows: [
+      { partyName: "Mumbai Packaging Ltd", particulars: "INV-3301 · secondary packaging", amount: 58_400, status: "ok" },
+      { partyName: "Shiprocket Logistics", particulars: "SR-2412 · Apr freight pt 1", amount: 18_200, status: "ok" },
+      { partyName: "GOOGLE INDIA PVT LTD", particulars: "G-4499 · Ads Apr", amount: 81_720, status: "ok" },
+      { partyName: "Raw Supplier Co", particulars: "RSC-22 · essential oils", amount: 43_100, status: "warning", note: "GSTIN failed GSTN lookup — verify before posting" },
+      { partyName: "Unknown Vendor", particulars: "—", amount: 12_800, status: "error", note: "Vendor not in master + no GSTIN" },
+      { partyName: "Freshworks India", particulars: "FD-88112 · CRM April", amount: 14_850, status: "ok" },
+    ],
+  },
+  "batch-receipt": {
+    kind: "batch-receipt",
+    fileName: "Razorpay-Settlements-Apr.csv",
+    totalRows: 62,
+    okCount: 60,
+    warnCount: 2,
+    errorCount: 0,
+    totalValue: 14_86_200,
+    columns: ["settlement_id", "utr", "date", "amount", "fees", "tax_on_fees", "net"],
+    rows: [
+      { partyName: "Razorpay Settlement", particulars: "STL-9012 · 5 Apr · net of fees", amount: 92_400, status: "ok" },
+      { partyName: "Razorpay Settlement", particulars: "STL-9023 · 6 Apr", amount: 46_250, status: "ok" },
+      { partyName: "Razorpay Settlement", particulars: "STL-9034 · 7 Apr", amount: 1_18_900, status: "ok" },
+      { partyName: "Razorpay Settlement", particulars: "STL-9045 · 8 Apr", amount: 84_200, status: "warning", note: "Fees above expected 2% — verify MDR" },
+      { partyName: "Razorpay Settlement", particulars: "STL-9056 · 9 Apr", amount: 67_110, status: "ok" },
+      { partyName: "Razorpay Settlement", particulars: "STL-9067 · 10 Apr", amount: 1_14_500, status: "ok" },
+    ],
+  },
+  "batch-expense": {
+    kind: "batch-expense",
+    fileName: "Petty-Cash-March.xlsx",
+    totalRows: 48,
+    okCount: 42,
+    warnCount: 5,
+    errorCount: 1,
+    totalValue: 1_24_820,
+    columns: ["date", "description", "category", "amount", "paid_by", "bill_ref"],
+    rows: [
+      { partyName: "Cab expenses", particulars: "Ola/Uber · client meetings × 8", amount: 8_420, status: "ok" },
+      { partyName: "Tea & coffee", particulars: "Office pantry weekly", amount: 3_100, status: "ok" },
+      { partyName: "Courier", particulars: "Outbound samples · Blue Dart", amount: 6_280, status: "ok" },
+      { partyName: "Meal · team offsite", particulars: "Lunch · Tribhuvan", amount: 12_400, status: "warning", note: "Above ₹10K — needs bill attached" },
+      { partyName: "Misc printing", particulars: "Carton labels · 1200 pcs", amount: 4_200, status: "ok" },
+      { partyName: "—", particulars: "Uncategorized", amount: 2_800, status: "error", note: "Category blank on row 33" },
+    ],
+  },
+  "batch-inventory": {
+    kind: "batch-inventory",
+    fileName: "Warehouse-Closing-Apr.csv",
+    totalRows: 211,
+    okCount: 203,
+    warnCount: 7,
+    errorCount: 1,
+    totalValue: 18_32_100, // valuation delta, not gross value
+    columns: ["sku", "sku_name", "godown", "opening_qty", "closing_qty", "adjustment", "reason", "rate"],
+    rows: [
+      { partyName: "Riko Face Wash 100ml", particulars: "SKU-FW-001 · Bhiwandi WH · -14 units", amount: -3_990, status: "ok", note: "Write-off · damaged" },
+      { partyName: "Riko Serum 30ml", particulars: "SKU-SR-002 · Bhiwandi → Chennai · 40 units", amount: 0, status: "ok", note: "Inter-godown transfer" },
+      { partyName: "Riko Hair Oil 200ml", particulars: "SKU-HO-003 · Chennai WH · +60 units", amount: 28_560, status: "ok", note: "Stock receipt from production" },
+      { partyName: "Riko Sunscreen 60ml", particulars: "SKU-SS-004 · Bhiwandi · -8 units", amount: -5_120, status: "warning", note: "Expiry writeoff — needs Accounts Head sign-off" },
+      { partyName: "Riko Gift Hamper", particulars: "SKU-GH-010 · New SKU", amount: 0, status: "warning", note: "No opening qty — create SKU master first" },
+      { partyName: "—", particulars: "—", amount: 0, status: "error", note: "Row 177 has no SKU code" },
+    ],
+  },
+};
+
+/** Single-PDF bill extraction sample (reuses OCR_SAMPLE shape but keeps a
+ *  chat-specific filename + vendor so demo doesn't feel repetitive).
+ *  Drives ExchangeUploadBill in the chat. */
+export const CHAT_BILL_UPLOAD = {
+  fileName: "Shiprocket-SR-2412.pdf",
+  vendorName: "Shiprocket Logistics",
+  gstin: "07AAGCS5867P1Z9",
+  invoiceNumber: "SR-2412",
+  invoiceDate: "2026-04-18",
+  total: 18_200,
+  cgst: 1_388,
+  sgst: 1_388,
+  taxable: 15_424,
+  voucherType: "purchase" as EntryType,
+  ledgerImpact: [
+    { ledger: "Freight & Logistics", debit: 15_424 },
+    { ledger: "Input CGST 9%", debit: 1_388 },
+    { ledger: "Input SGST 9%", debit: 1_388 },
+    { ledger: "Shiprocket Logistics (Creditor)", credit: 18_200 },
+  ],
+  confidence: 0.94,
+  lowConfidenceFields: ["HSN/SAC code"],
+};
+
+/** Single outward invoice sample. */
+export const CHAT_INVOICE_UPLOAD = {
+  fileName: "Invoice-Nykaa-Apr-2026.pdf",
+  buyerName: "Nykaa E-Retail Pvt Ltd",
+  gstin: "27AAACN6153K1Z5",
+  invoiceNumber: "RSK/2026-27/042",
+  invoiceDate: "2026-04-19",
+  total: 3_42_100,
+  igst: 52_185,
+  taxable: 2_89_915,
+  voucherType: "sales" as EntryType,
+  ledgerImpact: [
+    { ledger: "Nykaa E-Retail (Debtors)", debit: 3_42_100 },
+    { ledger: "Sales — Marketplace", credit: 2_89_915 },
+    { ledger: "Output IGST 18%", credit: 52_185 },
+  ],
+  confidence: 0.97,
+  lowConfidenceFields: [],
+};
+
