@@ -1769,3 +1769,491 @@ export const CHAT_INVOICE_UPLOAD = {
   lowConfidenceFields: [],
 };
 
+/* ═══════════════════════════════════════════════════════════════
+   Payment Reminders — drives the AR/AP Outstanding reminder UX
+   (per Payment Reminder PRD v2.0). Mock data only; real send
+   path goes through MSG91 + Supabase in the production stack.
+   ═══════════════════════════════════════════════════════════════ */
+
+/** Source of a party's contact info. "tally" = synced from Tally
+ *  master, "manual" = entered by the user (via side-panel or bulk
+ *  import). "none" = we don't have a number yet. */
+export type ContactSource = "tally" | "manual" | "none";
+
+export interface PartyContact {
+  /** Matches a RECEIVABLES.name — used as the join key. */
+  partyName: string;
+  phone?: string;
+  email?: string;
+  contactPerson?: string;
+  source: ContactSource;
+  /** If the party replied STOP to a WhatsApp reminder, we flag
+   *  them and disable future automated sends. */
+  optedOut?: boolean;
+}
+
+/** The 4-tier tone ladder (PRD §3.2 — the existing 3-tier system
+ *  enhanced with a Final tier for 180d+ dues). */
+export type ReminderTone = "gentle" | "standard" | "firm" | "final";
+export type ReminderChannel = "whatsapp" | "email" | "sms";
+
+export interface ReminderTemplate {
+  tone: ReminderTone;
+  label: string;
+  daysBucket: string; // Human label: "7 days", "8-30 days"…
+  channel: ReminderChannel;
+  /** The raw template. Replace `{party_name}`, `{invoice_no}`,
+   *  `{net_amount}`, `{due_date}`, `{days_overdue}`, `{company_name}`,
+   *  `{bill_count}`, `{total_net_amount}`, `{oldest_invoice_no}`,
+   *  `{oldest_date}` when rendering preview. */
+  body: string;
+}
+
+/** All 12 canonical templates (3 tones × 3 channels + 3 extra for
+ *  the new Final tier). Channels: WA, Email, SMS. Body uses
+ *  PRD-approved wording with the fixes applied (FY suffix stripped,
+ *  invoice number included, no "Despite our earlier communications"). */
+export const REMINDER_TEMPLATES: ReminderTemplate[] = [
+  {
+    tone: "gentle", label: "Gentle", daysBucket: "≤ 7 days", channel: "whatsapp",
+    body: "Dear {party_name}, a gentle reminder that Invoice #{invoice_no} for {net_amount} was due on {due_date}. Kindly arrange payment at your convenience. — {company_name}",
+  },
+  {
+    tone: "standard", label: "Standard", daysBucket: "8 – 30 days", channel: "whatsapp",
+    body: "Dear {party_name}, Invoice #{invoice_no} for {net_amount} remains unpaid since {due_date} ({days_overdue} days). We request you to clear this at the earliest. — {company_name}",
+  },
+  {
+    tone: "firm", label: "Firm", daysBucket: "31 – 180 days", channel: "whatsapp",
+    body: "Dear {party_name}, this is a follow-up for {net_amount} outstanding since {due_date}. Please contact us urgently to resolve this. — {company_name}",
+  },
+  {
+    tone: "final", label: "Final", daysBucket: "180+ days", channel: "whatsapp",
+    body: "Dear {party_name}, final reminder: {net_amount} has been outstanding since {due_date}. Please clear this urgently or contact us to discuss a payment arrangement. — {company_name}",
+  },
+  {
+    tone: "gentle", label: "Gentle · Email", daysBucket: "≤ 7 days", channel: "email",
+    body: "Subject: Payment reminder — Invoice #{invoice_no}\n\nDear {party_name},\n\nThis is a gentle reminder that Invoice #{invoice_no} for {net_amount} was due on {due_date}. We'd appreciate your help in clearing this at your earliest convenience.\n\nPlease let us know if you need a fresh copy of the invoice.\n\nRegards,\n{company_name}",
+  },
+  {
+    tone: "standard", label: "Standard · Email", daysBucket: "8 – 30 days", channel: "email",
+    body: "Subject: Outstanding — Invoice #{invoice_no} ({days_overdue} days overdue)\n\nDear {party_name},\n\nInvoice #{invoice_no} for {net_amount} has been unpaid since {due_date} — {days_overdue} days past due. Please arrange payment at the earliest and share the UTR for reconciliation.\n\nRegards,\n{company_name}",
+  },
+  {
+    tone: "firm", label: "Firm · Email", daysBucket: "31 – 180 days", channel: "email",
+    body: "Subject: Urgent — {net_amount} outstanding\n\nDear {party_name},\n\n{net_amount} remains outstanding since {due_date}. We've extended our usual payment window and need to resolve this now. Please share an update or payment confirmation by return mail.\n\nRegards,\n{company_name}",
+  },
+  {
+    tone: "final", label: "Final · Email", daysBucket: "180+ days", channel: "email",
+    body: "Subject: Final notice — {net_amount} overdue since {due_date}\n\nDear {party_name},\n\nThis is a final notice. {net_amount} has been outstanding for over 180 days from {due_date}. We need either payment or a formal payment arrangement within 7 days to avoid escalation.\n\nRegards,\n{company_name}",
+  },
+  {
+    tone: "gentle", label: "Gentle · SMS", daysBucket: "≤ 7 days", channel: "sms",
+    body: "{company_name}: Invoice #{invoice_no} for {net_amount} due {due_date}. Kindly arrange payment.",
+  },
+  {
+    tone: "standard", label: "Standard · SMS", daysBucket: "8 – 30 days", channel: "sms",
+    body: "{company_name}: {net_amount} outstanding since {due_date} ({days_overdue}d). Please clear at earliest.",
+  },
+  {
+    tone: "firm", label: "Firm · SMS", daysBucket: "31 – 180 days", channel: "sms",
+    body: "{company_name}: Urgent — {net_amount} outstanding since {due_date}. Please contact us.",
+  },
+  {
+    tone: "final", label: "Final · SMS", daysBucket: "180+ days", channel: "sms",
+    body: "{company_name}: FINAL — {net_amount} overdue since {due_date}. Clear or contact us within 7 days.",
+  },
+];
+
+/** Multi-bill variant used when a party has more than one unpaid
+ *  invoice. Surfaced by the preview modal when bill_count > 1. */
+export const REMINDER_MULTI_BILL_SUFFIX =
+  "You have {bill_count} unpaid invoices totalling {total_net_amount}. Oldest: #{oldest_invoice_no} from {oldest_date}.";
+
+/** Recommend a tone based on days overdue (the ladder itself). */
+export function recommendTone(daysOverdue: number): ReminderTone {
+  if (daysOverdue <= 7) return "gentle";
+  if (daysOverdue <= 30) return "standard";
+  if (daysOverdue <= 180) return "firm";
+  return "final";
+}
+
+/** Render a template's body with the given variables replaced. Used
+ *  by the Preview modal so the user sees the actual message that'll
+ *  go out. */
+export function renderTemplate(
+  body: string,
+  vars: Record<string, string | number>,
+): string {
+  return body.replace(/\{(\w+)\}/g, (_, key) => {
+    const v = vars[key];
+    return v === undefined ? `{${key}}` : String(v);
+  });
+}
+
+/** Clean up a company name for reminder templates — strips the
+ *  financial-year suffix like "Bandra Soap Pvt Ltd(2020-2024)".
+ *  (PRD §3.1) */
+export function cleanCompanyName(raw: string): string {
+  return raw.replace(/\s*\(\d{4}-\d{4}\)\s*$/, "").trim();
+}
+
+/** Per-party reminder configuration. Mirrors the
+ *  reminder_settings table in the PRD. */
+export interface ReminderSettings {
+  partyName: string;
+  /** Master on/off switch. Locked to false if the party has no phone. */
+  enabled: boolean;
+  /** How often the cron loop fires for this party (in days). */
+  frequencyDays: 3 | 5 | 7 | 14 | 30;
+  channels: ReminderChannel[];
+  /** "auto" lets the tone ladder pick based on overdue days. */
+  tone: "auto" | ReminderTone;
+  /** If set, cron skips this party until this date. */
+  pauseUntil?: string;
+  /** Hard cap on automated sends before flagging for manual. */
+  maxReminders: number;
+  /** Count of sends so far (used against maxReminders). */
+  sendsSoFar: number;
+  /** Next scheduled reminder date (ISO). */
+  nextReminderAt?: string;
+  /** Last payment date — used by the stop-on-payment rule. */
+  lastPaymentAt?: string;
+}
+
+export type ReminderStatus =
+  | "sent" // delivered to MSG91
+  | "delivered" // WhatsApp double-tick
+  | "read" // WhatsApp blue-tick
+  | "replied" // customer responded
+  | "failed" // MSG91 error
+  | "opted-out"; // customer replied STOP
+
+export interface ReminderHistoryItem {
+  id: string;
+  partyName: string;
+  sentAt: string; // ISO
+  channel: ReminderChannel;
+  tone: ReminderTone;
+  status: ReminderStatus;
+  /** First 80 chars of the message body for the timeline. */
+  messagePreview: string;
+  /** Days the bill was overdue at send time — for sorting. */
+  daysOverdueAtSend: number;
+  /** The bills this reminder covered. */
+  billsCovered: number;
+  netAmountAtSend: number;
+}
+
+/* ── Party contacts — backfilled for the 10 RECEIVABLES parties ── */
+export const PARTY_CONTACTS: PartyContact[] = [
+  {
+    partyName: "Nykaa E-Retail Pvt Ltd",
+    phone: "+91 98200 44112",
+    email: "ar-mumbai@nykaa.com",
+    contactPerson: "Sakshi Rao",
+    source: "tally",
+  },
+  {
+    partyName: "Website Debtors",
+    // Aggregated ledger — no single phone. Owner flagged manual.
+    source: "none",
+  },
+  {
+    partyName: "LLC Olimpiya",
+    phone: "+7 495 123 45 67",
+    email: "acct@olimpiya.ru",
+    contactPerson: "Dmitri Olimpov",
+    source: "manual",
+  },
+  {
+    partyName: "One97 Communications (Paytm)",
+    phone: "+91 99870 55102",
+    email: "vendor-payments@paytm.com",
+    contactPerson: "Rahul Kohli",
+    source: "tally",
+  },
+  {
+    partyName: "Prodsol Biotech Pvt Ltd",
+    phone: "+91 98765 33221",
+    email: "accounts@prodsol.in",
+    contactPerson: "Meena Shah",
+    source: "tally",
+    optedOut: true, // replied STOP
+  },
+  {
+    partyName: "Nykaa E-Retail (2)",
+    phone: "+91 98200 44112",
+    email: "ar-mumbai@nykaa.com",
+    contactPerson: "Sakshi Rao",
+    source: "tally",
+  },
+  {
+    partyName: "Scale Global Debtors",
+    // Known party but missed during Tally sync.
+    source: "none",
+  },
+  {
+    partyName: "Buy More (Counfreedise)",
+    phone: "+91 87890 11220",
+    source: "manual",
+  },
+  {
+    partyName: "NYKAA Mumbai 2",
+    phone: "+91 98200 44112",
+    source: "tally",
+  },
+  {
+    partyName: "Bigfoot/Shiprocket",
+    phone: "+91 90042 00111",
+    email: "ar@shiprocket.com",
+    contactPerson: "Varun Bhalla",
+    source: "tally",
+  },
+];
+
+/** Helper to fetch a contact for a party (falls back to none). */
+export function getPartyContact(partyName: string): PartyContact {
+  return (
+    PARTY_CONTACTS.find((c) => c.partyName === partyName) ?? {
+      partyName,
+      source: "none" as ContactSource,
+    }
+  );
+}
+
+/* ── Per-party reminder settings — demo seeds ── */
+export const REMINDER_SETTINGS: ReminderSettings[] = [
+  {
+    partyName: "Nykaa E-Retail Pvt Ltd",
+    enabled: true,
+    frequencyDays: 7,
+    channels: ["whatsapp", "email"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 4,
+    nextReminderAt: "2026-04-27",
+    lastPaymentAt: "2026-02-18",
+  },
+  {
+    partyName: "One97 Communications (Paytm)",
+    enabled: true,
+    frequencyDays: 14,
+    channels: ["whatsapp"],
+    tone: "firm",
+    maxReminders: 5,
+    sendsSoFar: 3,
+    nextReminderAt: "2026-05-04",
+    pauseUntil: "2026-05-01", // paused while relationship manager contacts
+  },
+  {
+    partyName: "LLC Olimpiya",
+    enabled: false, // 180+ days — flagged for manual action
+    frequencyDays: 7,
+    channels: ["email"],
+    tone: "final",
+    maxReminders: 3,
+    sendsSoFar: 0,
+  },
+  {
+    partyName: "Bigfoot/Shiprocket",
+    enabled: true,
+    frequencyDays: 7,
+    channels: ["whatsapp", "email"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 2,
+    nextReminderAt: "2026-04-25",
+  },
+  {
+    partyName: "Prodsol Biotech Pvt Ltd",
+    enabled: false, // opted out — respect STOP reply
+    frequencyDays: 7,
+    channels: ["whatsapp"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 2,
+  },
+  {
+    partyName: "Buy More (Counfreedise)",
+    enabled: true,
+    frequencyDays: 14,
+    channels: ["whatsapp"],
+    tone: "standard",
+    maxReminders: 4,
+    sendsSoFar: 1,
+    nextReminderAt: "2026-04-28",
+  },
+  {
+    partyName: "Nykaa E-Retail (2)",
+    enabled: true,
+    frequencyDays: 7,
+    channels: ["whatsapp"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 2,
+    nextReminderAt: "2026-04-26",
+  },
+  {
+    partyName: "NYKAA Mumbai 2",
+    enabled: true,
+    frequencyDays: 7,
+    channels: ["whatsapp"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 1,
+    nextReminderAt: "2026-04-27",
+  },
+];
+
+export function getReminderSettings(partyName: string): ReminderSettings | undefined {
+  return REMINDER_SETTINGS.find((r) => r.partyName === partyName);
+}
+
+/* ── Reminder history — who got reminded when, with which channel ── */
+export const REMINDER_HISTORY: ReminderHistoryItem[] = [
+  { id: "rh-1", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-04-13T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "read", messagePreview: "Dear Nykaa, this is a follow-up for ₹12.6L outstanding since…", daysOverdueAtSend: 2189, billsCovered: 298, netAmountAtSend: 1261337 },
+  { id: "rh-2", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-04-06T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "delivered", messagePreview: "Dear Nykaa, this is a follow-up for ₹12.6L outstanding since…", daysOverdueAtSend: 2182, billsCovered: 298, netAmountAtSend: 1261337 },
+  { id: "rh-3", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-03-30T10:02:00+05:30", channel: "email", tone: "firm", status: "replied", messagePreview: "Subject: Urgent — ₹12.6L outstanding. Dear Nykaa, …", daysOverdueAtSend: 2175, billsCovered: 298, netAmountAtSend: 1261337 },
+  { id: "rh-4", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-03-23T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "read", messagePreview: "Dear Nykaa, Invoice #NYK-2301 for ₹12.6L remains unpaid since…", daysOverdueAtSend: 2168, billsCovered: 298, netAmountAtSend: 1261337 },
+  { id: "rh-5", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-03-16T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "delivered", messagePreview: "Dear Nykaa, Invoice #NYK-2301 for ₹12.6L remains unpaid since…", daysOverdueAtSend: 2161, billsCovered: 298, netAmountAtSend: 1261337 },
+
+  { id: "rh-6", partyName: "One97 Communications (Paytm)", sentAt: "2026-04-20T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "delivered", messagePreview: "Dear One97 Communications, this is a follow-up for ₹3.55L outstanding…", daysOverdueAtSend: 2132, billsCovered: 180, netAmountAtSend: 355000 },
+  { id: "rh-7", partyName: "One97 Communications (Paytm)", sentAt: "2026-04-06T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "sent", messagePreview: "Dear One97 Communications, this is a follow-up for ₹3.55L outstanding…", daysOverdueAtSend: 2118, billsCovered: 180, netAmountAtSend: 355000 },
+  { id: "rh-8", partyName: "One97 Communications (Paytm)", sentAt: "2026-03-23T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "read", messagePreview: "Dear One97 Communications, this is a follow-up for ₹3.55L outstanding…", daysOverdueAtSend: 2104, billsCovered: 180, netAmountAtSend: 355000 },
+
+  { id: "rh-9", partyName: "Bigfoot/Shiprocket", sentAt: "2026-04-18T10:02:00+05:30", channel: "email", tone: "final", status: "delivered", messagePreview: "Subject: Final notice — ₹1.78L overdue since…", daysOverdueAtSend: 2166, billsCovered: 173, netAmountAtSend: 177730 },
+  { id: "rh-10", partyName: "Bigfoot/Shiprocket", sentAt: "2026-04-11T10:02:00+05:30", channel: "whatsapp", tone: "final", status: "read", messagePreview: "Dear Bigfoot, final reminder: ₹1.78L has been outstanding since…", daysOverdueAtSend: 2159, billsCovered: 173, netAmountAtSend: 177730 },
+
+  { id: "rh-11", partyName: "Nykaa E-Retail (2)", sentAt: "2026-04-19T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "sent", messagePreview: "Dear Nykaa, this is a follow-up for ₹3.06L outstanding since…", daysOverdueAtSend: 2132, billsCovered: 60, netAmountAtSend: 306667 },
+  { id: "rh-12", partyName: "NYKAA Mumbai 2", sentAt: "2026-04-20T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "delivered", messagePreview: "Dear NYKAA Mumbai 2, this is a follow-up for ₹2.93L outstanding since…", daysOverdueAtSend: 2132, billsCovered: 35, netAmountAtSend: 292810 },
+
+  { id: "rh-13", partyName: "Prodsol Biotech Pvt Ltd", sentAt: "2026-03-01T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "opted-out", messagePreview: "Dear Prodsol, Invoice #PSB-2201 for ₹2.90L remains unpaid since…", daysOverdueAtSend: 1575, billsCovered: 17, netAmountAtSend: 289756 },
+
+  { id: "rh-14", partyName: "Buy More (Counfreedise)", sentAt: "2026-04-14T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "read", messagePreview: "Dear Buy More, this is a follow-up for ₹2.58L outstanding since…", daysOverdueAtSend: 954, billsCovered: 63, netAmountAtSend: 257865 },
+];
+
+/** Fetch the last N history items for a party, newest first. */
+export function getPartyReminderHistory(
+  partyName: string,
+  limit?: number,
+): ReminderHistoryItem[] {
+  const hits = REMINDER_HISTORY.filter((h) => h.partyName === partyName).sort(
+    (a, b) => b.sentAt.localeCompare(a.sentAt),
+  );
+  return limit ? hits.slice(0, limit) : hits;
+}
+
+/** Summary: when was this party last reminded? Used by the list
+ *  "Last Reminded" column. Returns "Never" when no history. */
+export function lastRemindedLabel(partyName: string): string {
+  const last = getPartyReminderHistory(partyName, 1)[0];
+  if (!last) return "Never";
+  const sentAt = new Date(last.sentAt).getTime();
+  const today = new Date("2026-04-20T23:59:59+05:30").getTime(); // align with demo "today"
+  const diffMs = today - sentAt;
+  const days = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  if (days === 0) return "Today";
+  if (days === 1) return "1d ago";
+  if (days < 7) return `${days}d ago`;
+  if (days < 14) return "1w ago";
+  if (days < 28) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+/** 5-tier aging color per the PRD (Green current, Amber 1-30d,
+ *  Orange 31-90d, Red 91-180d, Deep-Red 180d+). Centralised so
+ *  the list, chip, and card all agree. */
+export function agingColor5(days: number): {
+  bg: string;
+  fg: string;
+  label: string;
+} {
+  if (days <= 0)
+    return { bg: "color-mix(in srgb, var(--green) 15%, transparent)", fg: "var(--green)", label: "Current" };
+  if (days <= 30)
+    return { bg: "color-mix(in srgb, var(--yellow) 18%, transparent)", fg: "var(--yellow)", label: "1-30d" };
+  if (days <= 90)
+    return { bg: "color-mix(in srgb, var(--orange) 20%, transparent)", fg: "var(--orange)", label: "31-90d" };
+  if (days <= 180)
+    return { bg: "color-mix(in srgb, var(--red) 22%, transparent)", fg: "var(--red)", label: "91-180d" };
+  return { bg: "color-mix(in srgb, #9F1239 28%, transparent)", fg: "#BE123C", label: "180d+" };
+}
+
+/** Filter chips for the Outstanding list — these are the exact
+ *  buckets called out in the PRD §Priority 2. */
+export type ReminderListFilter =
+  | "all"
+  | "never-reminded"
+  | "overdue-30"
+  | "no-contact"
+  | "reminded-this-week";
+
+export const REMINDER_LIST_FILTERS: Array<{
+  id: ReminderListFilter;
+  label: string;
+}> = [
+  { id: "all", label: "All" },
+  { id: "never-reminded", label: "Never reminded" },
+  { id: "overdue-30", label: "Overdue 30d+" },
+  { id: "no-contact", label: "No contact" },
+  { id: "reminded-this-week", label: "Reminded this week" },
+];
+
+/* ── Bulk Contact Import — sample rows for the 4-step modal ── */
+
+export interface BulkImportRow {
+  partyName: string;
+  existingPhone?: string;
+  existingEmail?: string;
+  newPhone?: string;
+  newEmail?: string;
+  newContactPerson?: string;
+  /** Resolution status after match preview. */
+  status: "matched" | "will-update" | "name-mismatch" | "skipped";
+  note?: string;
+}
+
+export const BULK_IMPORT_SAMPLE: BulkImportRow[] = [
+  { partyName: "Nykaa E-Retail Pvt Ltd", existingPhone: "+91 98200 44112", existingEmail: "ar-mumbai@nykaa.com", newPhone: "+91 98200 44112", newEmail: "ar-mumbai@nykaa.com", newContactPerson: "Sakshi Rao", status: "matched" },
+  { partyName: "Website Debtors", newPhone: "", newEmail: "", status: "skipped", note: "No phone/email in row" },
+  { partyName: "LLC Olimpiya", existingPhone: "+7 495 123 45 67", newPhone: "+7 495 123 45 80", newEmail: "finance@olimpiya.ru", newContactPerson: "Anna Volkova", status: "will-update", note: "Phone + contact person changed" },
+  { partyName: "One97 Communications (Paytm)", existingPhone: "+91 99870 55102", newPhone: "+91 99870 55102", newEmail: "vendor-payments@paytm.com", status: "matched" },
+  { partyName: "Prodsol Biotech Pvt Ltd", existingPhone: "+91 98765 33221", newPhone: "+91 98765 33221", newEmail: "accounts@prodsol.in", status: "matched" },
+  { partyName: "Nykaa E-Retail (2)", existingPhone: "+91 98200 44112", newPhone: "+91 98200 44112", newEmail: "ar-mumbai@nykaa.com", status: "matched" },
+  { partyName: "Scale Global Debtors", newPhone: "+91 88220 44556", newEmail: "accounts@scaleglobal.in", newContactPerson: "Kiran Patel", status: "will-update", note: "First-time contact added" },
+  { partyName: "Buy More (Counfreedise)", existingPhone: "+91 87890 11220", newPhone: "+91 87890 11220", newEmail: "ar@counfreedise.com", status: "will-update", note: "Email added" },
+  { partyName: "NYKAA Mumbai 2", existingPhone: "+91 98200 44112", newPhone: "+91 98200 44112", status: "matched" },
+  { partyName: "BIGFOOT SHIPROCKET", existingPhone: "+91 90042 00111", newPhone: "+91 90042 00111", newEmail: "ar@shiprocket.com", status: "name-mismatch", note: "Closest: Bigfoot/Shiprocket (91% match)" },
+  { partyName: "Sales & Marketing Agencies", newPhone: "+91 99112 23344", status: "skipped", note: "Party not in Riko receivables master" },
+];
+
+/* ── Global reminder automation rules (Settings → Reminders) ── */
+export interface ReminderAutomationRules {
+  /** Stop reminders when a receipt voucher lands for the party. */
+  stopOnPaymentReceived: boolean;
+  /** Honor WhatsApp STOP replies by auto-disabling. */
+  stopOnOptOut: boolean;
+  /** Batch cron: daily max sends across the whole portfolio. */
+  dailyBatchLimit: number;
+  /** Parties overdue > this number of days are flagged for manual
+   *  outreach (no automated sends). */
+  maxOverdueThresholdDays: number;
+  /** Hard cap on total sends before we stop automated reminders
+   *  for a party. */
+  maxRemindersPerParty: number;
+  /** Cron schedule (IST) — 10:00 AM daily per PRD. */
+  cronTimeIst: string;
+  /** WABA template approval status (held in MSG91 dashboard). */
+  wabaApproved: boolean;
+}
+
+export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
+  stopOnPaymentReceived: true,
+  stopOnOptOut: true,
+  dailyBatchLimit: 5,
+  maxOverdueThresholdDays: 180,
+  maxRemindersPerParty: 5,
+  cronTimeIst: "10:00",
+  wabaApproved: true,
+};
+
