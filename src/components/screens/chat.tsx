@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/chat-charts";
 import { ChatGstRecon } from "@/components/ui/chat-gst-recon";
 import { Gauge } from "@/components/ui/gauge";
+import { DeadStockTreemap } from "@/components/ui/dead-stock-treemap";
 
 /* ═══════════════════════════════════════════════════════════════
    Intents — what a message can be about
@@ -1412,7 +1413,14 @@ const INTENT_LABELS: Record<Intent, string> = {
   unknown: "Suggestions",
 };
 
-const RESULT_RENDERERS: Record<Intent, () => JSX.Element> = {
+/** Context each Result renderer receives. Currently just an onAsk
+ *  callback so renderers can dispatch chat queries from interactive
+ *  chart elements (e.g. click a treemap tile → ask about it). */
+interface ResultCtx {
+  onAsk: (q: string) => void;
+}
+
+const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
   "current-ratio": () => (
     <ChatDonut
       title="Current Assets composition"
@@ -1717,29 +1725,10 @@ const RESULT_RENDERERS: Record<Intent, () => JSX.Element> = {
       </div>
     );
   },
-  "inventory-dead": () => (
-    <div className="space-y-3">
-      <ChatDonut
-        title="Dead stock by category"
-        data={DEAD_STOCK_SUMMARY.categoryBreakdown.map((c, i) => ({
-          label: c.category,
-          value: c.value,
-          color: ["var(--red)", "var(--orange)", "var(--yellow)"][i],
-        }))}
-        centerValue={`₹${(DEAD_STOCK_SUMMARY.totalValue / 1e5).toFixed(1)}L`}
-        centerLabel="Locked"
-        size={220}
-      />
-      <ChatBarChart
-        title="Top 5 dead SKUs"
-        data={DEAD_STOCK.slice(0, 5).map((s) => ({
-          label: s.name,
-          value: s.value,
-          color: "var(--red)",
-          caption: `${s.qty} units · last sold ${s.lastSold}`,
-        }))}
-      />
-    </div>
+  // Dead stock: ECharts treemap on desktop Result panel. Clicks dispatch
+  // a liquidation question into Chat via the context's onAsk.
+  "inventory-dead": ({ onAsk }) => (
+    <DeadStockTreemap height={480} onAsk={onAsk} />
   ),
   returns: () => (
     <ChatBarChart
@@ -1934,10 +1923,12 @@ function InputBar({
 function ResultPanel({
   currentIntent,
   hasMessages,
+  onAsk,
   onNewChat,
 }: {
   currentIntent: Intent | null;
   hasMessages: boolean;
+  onAsk: (q: string) => void;
   onNewChat: () => void;
 }) {
   const intent = currentIntent;
@@ -2019,7 +2010,7 @@ function ResultPanel({
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {Renderer ? (
           <div>
-            <Renderer />
+            <Renderer onAsk={onAsk} />
           </div>
         ) : (
           // Empty state — no active result
@@ -2291,6 +2282,7 @@ export function ChatScreen({
         <ResultPanel
           currentIntent={currentIntent}
           hasMessages={messages.length > 0}
+          onAsk={handleSend}
           onNewChat={handleNewChat}
         />
       </div>
