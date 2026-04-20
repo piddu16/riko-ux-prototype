@@ -14,9 +14,12 @@ import {
   Receipt,
   Building,
   Settings,
+  FileSpreadsheet,
 } from "lucide-react";
 import { ThemeToggle } from "../theme-toggle";
 import { useRbac } from "@/lib/rbac-context";
+import { ENTRIES } from "@/lib/data";
+import { canApproveAmount, canEntryAction } from "@/lib/rbac";
 
 type NavItem = { id: string; label: string; icon: LucideIcon };
 
@@ -31,6 +34,7 @@ const navGroups: NavItem[][] = [
   ],
   // Operations
   [
+    { id: "entries", label: "Entries", icon: FileSpreadsheet },
     { id: "outstanding", label: "Outstanding", icon: ArrowDownToLine },
     { id: "inventory", label: "Inventory", icon: Package },
     { id: "daybook", label: "Day Book", icon: BookOpen },
@@ -72,6 +76,15 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const visibleGroups = navGroups
     .map((g) => g.filter((n) => canSee(n.id)))
     .filter((g) => g.length > 0);
+
+  /* Count of entries pending my approval — drives the red Entries badge. */
+  const pendingApprovalCount = ENTRIES.filter(
+    (e) =>
+      e.state === "pending" &&
+      canApproveAmount(role, e.amount) &&
+      canEntryAction(role, e.type, "approve") &&
+      e.createdByRole !== role,
+  ).length;
 
   return (
     <aside
@@ -126,10 +139,25 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                       style={{ background: "var(--green)" }}
                     />
                   )}
-                  <Icon
-                    size={20}
-                    style={{ color: active ? "var(--green)" : "var(--text-3)" }}
-                  />
+                  <div className="relative">
+                    <Icon
+                      size={20}
+                      style={{ color: active ? "var(--green)" : "var(--text-3)" }}
+                    />
+                    {id === "entries" && pendingApprovalCount > 0 && (
+                      <span
+                        className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold"
+                        style={{
+                          background: "var(--red)",
+                          color: "white",
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}
+                        aria-label={`${pendingApprovalCount} entries pending your approval`}
+                      >
+                        {pendingApprovalCount}
+                      </span>
+                    )}
+                  </div>
                   <span
                     className="text-[10px] mt-1 leading-none font-medium"
                     style={{ color: active ? "var(--green)" : "var(--text-4)" }}

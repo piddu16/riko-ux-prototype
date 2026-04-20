@@ -947,3 +947,516 @@ export const FILING_STATS = {
   maxStreakMonths: 18, // longest on-time streak in window
 };
 
+/* ============================================================
+   TALLY WRITE-BACK (Phase 1 UX) — entries, approval workflow,
+   and OCR extraction. Everything here is mock data for the demo;
+   backend + real Tally XML posting is Phase 2.
+   ============================================================ */
+
+export type EntryType =
+  | "sales"
+  | "purchase"
+  | "receipt"
+  | "payment"
+  | "contra"
+  | "journal"
+  | "credit-note"
+  | "debit-note"
+  | "stock-journal"
+  | "bank-recon";
+
+export type EntryState =
+  | "draft"
+  | "pending" // awaiting approval
+  | "approved" // approved, awaiting post
+  | "posted" // successfully in Tally
+  | "rejected";
+
+export type EntrySource =
+  | "chat"
+  | "daybook"
+  | "ocr"
+  | "bank-recon"
+  | "bulk";
+
+export interface EntryHistoryItem {
+  at: string; // ISO timestamp
+  actor: string;
+  actorRole: string;
+  action: string; // "Created via chat" | "Submitted for approval" | "Approved" | ...
+  note?: string;
+}
+
+export interface LedgerImpact {
+  ledger: string;
+  debit?: number;
+  credit?: number;
+}
+
+export interface EntryItem {
+  name: string;
+  hsn?: string;
+  qty: number;
+  unit?: string;
+  rate: number;
+  amount: number;
+}
+
+export interface TaxComponents {
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
+  cess?: number;
+}
+
+export interface Entry {
+  id: string;
+  type: EntryType;
+  state: EntryState;
+  amount: number; // Total invoice value incl. tax
+  partyName: string;
+  partyGstin?: string;
+  particulars: string;
+  createdBy: string;
+  createdByRole: string;
+  createdAt: string;
+  source: EntrySource;
+  date: string; // Voucher date (ISO)
+  ledgerImpact: LedgerImpact[];
+  items?: EntryItem[];
+  taxComponents?: TaxComponents;
+
+  // Lifecycle
+  voucherNumber?: string; // assigned on post
+  postedAt?: string;
+  postedBy?: string;
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+
+  // Approval routing
+  requiredApprover: "any" | "accounts" | "accounts-head" | "admin";
+  history: EntryHistoryItem[];
+
+  // OCR metadata (only if source=ocr)
+  ocr?: {
+    fileName: string;
+    confidence: Record<string, number>; // per-field 0-1
+    extractedAt: string;
+  };
+}
+
+export const ENTRIES: Entry[] = [
+  /* ── PENDING APPROVAL (approvers' queue) ─────────────────── */
+  {
+    id: "e101",
+    type: "sales",
+    state: "pending",
+    amount: 1261337,
+    partyName: "Nykaa E-Retail Pvt Ltd",
+    partyGstin: "27AAACN6153K1Z5",
+    particulars: "March settlement invoice",
+    createdBy: "Yogesh Patel",
+    createdByRole: "admin",
+    createdAt: "2026-04-20T14:30:00+05:30",
+    source: "chat",
+    date: "2026-04-20",
+    ledgerImpact: [
+      { ledger: "Nykaa E-Retail (Debtors)", debit: 1261337 },
+      { ledger: "Sales — Marketplace", credit: 1069777 },
+      { ledger: "Output IGST 18%", credit: 191560 },
+    ],
+    items: [
+      { name: "Riko Face Wash 100ml", hsn: "34022090", qty: 420, rate: 285, amount: 119700 },
+      { name: "Riko Niacinamide Serum 30ml", hsn: "33049990", qty: 380, rate: 495, amount: 188100 },
+      { name: "Riko SPF 50 Sunscreen 60ml", hsn: "33049990", qty: 260, rate: 640, amount: 166400 },
+      { name: "Riko Hair Oil 200ml", hsn: "33059011", qty: 1250, rate: 476, amount: 595577 },
+    ],
+    taxComponents: { igst: 191560 },
+    requiredApprover: "accounts-head",
+    history: [
+      { at: "2026-04-20T14:29:00+05:30", actor: "Yogesh Patel", actorRole: "admin", action: "Drafted via chat", note: "From: 'Create sales invoice to Nykaa for 12.6L'" },
+      { at: "2026-04-20T14:30:00+05:30", actor: "Yogesh Patel", actorRole: "admin", action: "Submitted for approval" },
+    ],
+  },
+  {
+    id: "e102",
+    type: "purchase",
+    state: "pending",
+    amount: 32100,
+    partyName: "Shiprocket Logistics",
+    partyGstin: "07AAGCS5867P1Z9",
+    particulars: "Freight charges · Mar 2026 · last-mile delivery",
+    createdBy: "Kavya Iyer",
+    createdByRole: "junior-accounts",
+    createdAt: "2026-04-20T12:15:00+05:30",
+    source: "ocr",
+    date: "2026-03-31",
+    ledgerImpact: [
+      { ledger: "Freight & Logistics", debit: 27203 },
+      { ledger: "Input CGST 9%", debit: 2448.5 },
+      { ledger: "Input SGST 9%", debit: 2448.5 },
+      { ledger: "Shiprocket Logistics (Creditor)", credit: 32100 },
+    ],
+    taxComponents: { cgst: 2448.5, sgst: 2448.5 },
+    requiredApprover: "accounts",
+    history: [
+      { at: "2026-04-20T12:10:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Uploaded bill · Shiprocket-SR-2301.pdf" },
+      { at: "2026-04-20T12:12:00+05:30", actor: "Riko OCR", actorRole: "system", action: "Extracted 11 fields · 94% avg confidence" },
+      { at: "2026-04-20T12:15:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Submitted for approval" },
+    ],
+    ocr: {
+      fileName: "Shiprocket-SR-2301.pdf",
+      confidence: {
+        vendorName: 0.99, gstin: 0.99, invoiceNo: 0.98, date: 0.95,
+        total: 0.99, cgst: 0.91, sgst: 0.91, lineItems: 0.87,
+      },
+      extractedAt: "2026-04-20T12:12:00+05:30",
+    },
+  },
+  {
+    id: "e103",
+    type: "purchase",
+    state: "pending",
+    amount: 228186,
+    partyName: "Amazon - Creations",
+    partyGstin: "29AAHCA9099B1Z4",
+    particulars: "Marketplace commission & fulfilment fees · Mar 2026",
+    createdBy: "Kavya Iyer",
+    createdByRole: "junior-accounts",
+    createdAt: "2026-04-20T10:20:00+05:30",
+    source: "ocr",
+    date: "2026-03-28",
+    ledgerImpact: [
+      { ledger: "Channel Commission - Amazon", debit: 193378 },
+      { ledger: "Input IGST 18%", debit: 34808 },
+      { ledger: "Amazon - Creations (Creditor)", credit: 228186 },
+    ],
+    taxComponents: { igst: 34808 },
+    requiredApprover: "accounts-head",
+    history: [
+      { at: "2026-04-20T10:18:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Uploaded bill · AMZ-9921.pdf" },
+      { at: "2026-04-20T10:19:00+05:30", actor: "Riko OCR", actorRole: "system", action: "Extracted 14 fields · 96% avg confidence" },
+      { at: "2026-04-20T10:20:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Submitted for approval" },
+    ],
+    ocr: {
+      fileName: "AMZ-9921.pdf",
+      confidence: { vendorName: 0.99, gstin: 0.99, invoiceNo: 0.99, date: 0.98, total: 0.99, igst: 0.97, lineItems: 0.92 },
+      extractedAt: "2026-04-20T10:19:00+05:30",
+    },
+  },
+  {
+    id: "e104",
+    type: "payment",
+    state: "pending",
+    amount: 45000,
+    partyName: "Shiprocket Logistics",
+    partyGstin: "07AAGCS5867P1Z9",
+    particulars: "Advance for April freight",
+    createdBy: "Kavya Iyer",
+    createdByRole: "junior-accounts",
+    createdAt: "2026-04-19T17:00:00+05:30",
+    source: "daybook",
+    date: "2026-04-19",
+    ledgerImpact: [
+      { ledger: "Shiprocket Logistics (Creditor)", debit: 45000 },
+      { ledger: "HDFC Bank - Current A/c", credit: 45000 },
+    ],
+    requiredApprover: "accounts",
+    history: [
+      { at: "2026-04-19T16:58:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Drafted from Day Book" },
+      { at: "2026-04-19T17:00:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Submitted for approval" },
+    ],
+  },
+  {
+    id: "e105",
+    type: "receipt",
+    state: "pending",
+    amount: 89000,
+    partyName: "Paytm Settlement (One97 Communications)",
+    partyGstin: "07AAACT2727Q1ZV",
+    particulars: "Daily settlement · 17 Apr 2026",
+    createdBy: "Anjali Desai",
+    createdByRole: "field-sales",
+    createdAt: "2026-04-18T19:45:00+05:30",
+    source: "bank-recon",
+    date: "2026-04-17",
+    ledgerImpact: [
+      { ledger: "HDFC Bank - Current A/c", debit: 89000 },
+      { ledger: "Paytm Settlement (Debtors)", credit: 89000 },
+    ],
+    requiredApprover: "any",
+    history: [
+      { at: "2026-04-18T19:42:00+05:30", actor: "Anjali Desai", actorRole: "field-sales", action: "Drafted from Bank Recon · matched unmatched bank credit" },
+      { at: "2026-04-18T19:45:00+05:30", actor: "Anjali Desai", actorRole: "field-sales", action: "Submitted for approval" },
+    ],
+  },
+
+  /* ── DRAFTS (creator still editing) ──────────────────────── */
+  {
+    id: "e110",
+    type: "purchase",
+    state: "draft",
+    amount: 58400,
+    partyName: "Mumbai Packaging Ltd",
+    partyGstin: "27AAACM5555P1Z2",
+    particulars: "Secondary packaging bulk order · April",
+    createdBy: "Kavya Iyer",
+    createdByRole: "junior-accounts",
+    createdAt: "2026-04-20T15:30:00+05:30",
+    source: "ocr",
+    date: "2026-04-18",
+    ledgerImpact: [
+      { ledger: "Packaging Materials", debit: 49492 },
+      { ledger: "Input CGST 9%", debit: 4454 },
+      { ledger: "Input SGST 9%", debit: 4454 },
+      { ledger: "Mumbai Packaging Ltd (Creditor)", credit: 58400 },
+    ],
+    taxComponents: { cgst: 4454, sgst: 4454 },
+    requiredApprover: "accounts",
+    history: [
+      { at: "2026-04-20T15:25:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Uploaded bill · MPL-3301.pdf" },
+      { at: "2026-04-20T15:28:00+05:30", actor: "Riko OCR", actorRole: "system", action: "Extracted 12 fields · 89% avg confidence · 2 fields need review" },
+    ],
+    ocr: {
+      fileName: "MPL-3301.pdf",
+      confidence: { vendorName: 0.98, gstin: 0.97, invoiceNo: 0.92, date: 0.78, total: 0.99, cgst: 0.85, sgst: 0.85, lineItems: 0.72 },
+      extractedAt: "2026-04-20T15:28:00+05:30",
+    },
+  },
+  {
+    id: "e111",
+    type: "sales",
+    state: "draft",
+    amount: 342100,
+    partyName: "Website D2C (rikoskin.com)",
+    particulars: "Website orders · 19 Apr batch",
+    createdBy: "Rahul Mehta",
+    createdByRole: "sales",
+    createdAt: "2026-04-20T11:00:00+05:30",
+    source: "daybook",
+    date: "2026-04-19",
+    ledgerImpact: [
+      { ledger: "Website Debtors (Razorpay)", debit: 342100 },
+      { ledger: "Sales — D2C", credit: 290000 },
+      { ledger: "Output CGST 9%", credit: 26100 },
+      { ledger: "Output SGST 9%", credit: 26100 },
+    ],
+    taxComponents: { cgst: 26100, sgst: 26100 },
+    requiredApprover: "accounts",
+    history: [
+      { at: "2026-04-20T11:00:00+05:30", actor: "Rahul Mehta", actorRole: "sales", action: "Drafted from Day Book" },
+    ],
+  },
+
+  /* ── POSTED (successfully in Tally) ───────────────────────── */
+  {
+    id: "e120",
+    type: "sales",
+    state: "posted",
+    amount: 198500,
+    partyName: "Nykaa Marketplace",
+    partyGstin: "27AADCN7487G1ZF",
+    particulars: "Nykaa marketplace · Mar settlement",
+    createdBy: "Priya Sharma",
+    createdByRole: "manager",
+    createdAt: "2026-04-18T09:30:00+05:30",
+    source: "chat",
+    date: "2026-04-17",
+    ledgerImpact: [
+      { ledger: "Nykaa Marketplace (Debtors)", debit: 198500 },
+      { ledger: "Sales — Marketplace", credit: 168220 },
+      { ledger: "Output IGST 18%", credit: 30280 },
+    ],
+    taxComponents: { igst: 30280 },
+    voucherNumber: "VCH/2026-27/0142",
+    postedAt: "2026-04-18T10:15:00+05:30",
+    postedBy: "Priya Sharma",
+    requiredApprover: "accounts",
+    history: [
+      { at: "2026-04-18T09:25:00+05:30", actor: "Priya Sharma", actorRole: "manager", action: "Drafted via chat" },
+      { at: "2026-04-18T09:30:00+05:30", actor: "Priya Sharma", actorRole: "manager", action: "Posted directly (manager auth · sales voucher)" },
+      { at: "2026-04-18T10:15:00+05:30", actor: "Riko → Tally", actorRole: "system", action: "Voucher accepted by Tally · VCH/2026-27/0142" },
+    ],
+  },
+  {
+    id: "e121",
+    type: "receipt",
+    state: "posted",
+    amount: 125000,
+    partyName: "Nykaa E-Retail Pvt Ltd",
+    partyGstin: "27AAACN6153K1Z5",
+    particulars: "Part payment · against Feb 2026 invoices",
+    createdBy: "Nikhil Kumar",
+    createdByRole: "accounts",
+    createdAt: "2026-04-17T14:20:00+05:30",
+    source: "bank-recon",
+    date: "2026-04-17",
+    ledgerImpact: [
+      { ledger: "HDFC Bank - Current A/c", debit: 125000 },
+      { ledger: "Nykaa E-Retail (Debtors)", credit: 125000 },
+    ],
+    voucherNumber: "VCH/2026-27/0138",
+    postedAt: "2026-04-17T14:45:00+05:30",
+    postedBy: "Sunil Shah",
+    requiredApprover: "accounts",
+    history: [
+      { at: "2026-04-17T14:15:00+05:30", actor: "Nikhil Kumar", actorRole: "accounts", action: "Drafted from Bank Recon" },
+      { at: "2026-04-17T14:20:00+05:30", actor: "Nikhil Kumar", actorRole: "accounts", action: "Submitted for approval" },
+      { at: "2026-04-17T14:32:00+05:30", actor: "Sunil Shah", actorRole: "accounts-head", action: "Approved" },
+      { at: "2026-04-17T14:40:00+05:30", actor: "Sunil Shah", actorRole: "accounts-head", action: "Posted to Tally" },
+      { at: "2026-04-17T14:45:00+05:30", actor: "Riko → Tally", actorRole: "system", action: "Voucher accepted · VCH/2026-27/0138" },
+    ],
+  },
+  {
+    id: "e122",
+    type: "purchase",
+    state: "posted",
+    amount: 163988,
+    partyName: "GOOGLE INDIA PVT LTD",
+    partyGstin: "29AACCG0527D1Z8",
+    particulars: "Google Ads · Mar 2026",
+    createdBy: "Kavya Iyer",
+    createdByRole: "junior-accounts",
+    createdAt: "2026-04-16T11:00:00+05:30",
+    source: "ocr",
+    date: "2026-03-30",
+    ledgerImpact: [
+      { ledger: "Advertising Expenses", debit: 139 * 1000 },
+      { ledger: "Input IGST 18%", debit: 25000 },
+      { ledger: "GOOGLE INDIA PVT LTD (Creditor)", credit: 163988 },
+    ],
+    taxComponents: { igst: 25000 },
+    voucherNumber: "VCH/2026-27/0131",
+    postedAt: "2026-04-16T12:30:00+05:30",
+    postedBy: "Nikhil Kumar",
+    requiredApprover: "accounts-head",
+    history: [
+      { at: "2026-04-16T10:50:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Uploaded bill · Google-G-4412.pdf" },
+      { at: "2026-04-16T10:55:00+05:30", actor: "Riko OCR", actorRole: "system", action: "Extracted 10 fields · 98% avg confidence" },
+      { at: "2026-04-16T11:00:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Submitted for approval" },
+      { at: "2026-04-16T12:15:00+05:30", actor: "Sunil Shah", actorRole: "accounts-head", action: "Approved" },
+      { at: "2026-04-16T12:25:00+05:30", actor: "Nikhil Kumar", actorRole: "accounts", action: "Posted to Tally" },
+      { at: "2026-04-16T12:30:00+05:30", actor: "Riko → Tally", actorRole: "system", action: "Voucher accepted · VCH/2026-27/0131" },
+    ],
+  },
+  {
+    id: "e123",
+    type: "journal",
+    state: "posted",
+    amount: 3400,
+    partyName: "—",
+    particulars: "Depreciation entry · Q4 FY25-26 · straight-line",
+    createdBy: "Sunil Shah",
+    createdByRole: "accounts-head",
+    createdAt: "2026-03-31T18:00:00+05:30",
+    source: "chat",
+    date: "2026-03-31",
+    ledgerImpact: [
+      { ledger: "Depreciation", debit: 3400 },
+      { ledger: "Accumulated Depreciation - Office Eqmt", credit: 3400 },
+    ],
+    voucherNumber: "VCH/2025-26/0398",
+    postedAt: "2026-03-31T18:05:00+05:30",
+    postedBy: "Sunil Shah",
+    requiredApprover: "admin",
+    history: [
+      { at: "2026-03-31T17:55:00+05:30", actor: "Sunil Shah", actorRole: "accounts-head", action: "Drafted via chat" },
+      { at: "2026-03-31T18:00:00+05:30", actor: "Sunil Shah", actorRole: "accounts-head", action: "Posted directly (override · year-end close)" },
+      { at: "2026-03-31T18:05:00+05:30", actor: "Riko → Tally", actorRole: "system", action: "Voucher accepted · VCH/2025-26/0398" },
+    ],
+  },
+
+  /* ── REJECTED ─────────────────────────────────────────────── */
+  {
+    id: "e130",
+    type: "purchase",
+    state: "rejected",
+    amount: 128600,
+    partyName: "Unknown Vendor",
+    particulars: "Unverified invoice · no matching PO",
+    createdBy: "Kavya Iyer",
+    createdByRole: "junior-accounts",
+    createdAt: "2026-04-15T14:00:00+05:30",
+    source: "ocr",
+    date: "2026-04-10",
+    ledgerImpact: [
+      { ledger: "Expenses - Uncategorized", debit: 109000 },
+      { ledger: "Input GST (pending classification)", debit: 19600 },
+      { ledger: "Unknown Vendor (Creditor)", credit: 128600 },
+    ],
+    requiredApprover: "accounts-head",
+    rejectionReason:
+      "Vendor not in master · GSTIN failed GSTN lookup · no PO reference on invoice. Please verify source + re-upload with a clear vendor name.",
+    rejectedBy: "Sunil Shah",
+    rejectedAt: "2026-04-15T15:30:00+05:30",
+    history: [
+      { at: "2026-04-15T13:55:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Uploaded bill · unknown-1.pdf" },
+      { at: "2026-04-15T13:58:00+05:30", actor: "Riko OCR", actorRole: "system", action: "Extracted 8 fields · 54% avg confidence" },
+      { at: "2026-04-15T14:00:00+05:30", actor: "Kavya Iyer", actorRole: "junior-accounts", action: "Submitted for approval" },
+      { at: "2026-04-15T15:30:00+05:30", actor: "Sunil Shah", actorRole: "accounts-head", action: "Rejected", note: "Vendor not in master · GSTIN lookup failed · no PO reference" },
+    ],
+  },
+];
+
+/** Lookup: human-readable label + color per entry state. */
+export const ENTRY_STATE_META: Record<EntryState, {
+  label: string;
+  color: string;
+  bgColor: string;
+}> = {
+  draft: { label: "Draft", color: "var(--text-3)", bgColor: "var(--bg-hover)" },
+  pending: { label: "Pending approval", color: "var(--yellow)", bgColor: "color-mix(in srgb, var(--yellow) 12%, transparent)" },
+  approved: { label: "Approved · awaiting post", color: "var(--blue)", bgColor: "color-mix(in srgb, var(--blue) 12%, transparent)" },
+  posted: { label: "Posted to Tally", color: "var(--green)", bgColor: "color-mix(in srgb, var(--green) 12%, transparent)" },
+  rejected: { label: "Rejected", color: "var(--red)", bgColor: "color-mix(in srgb, var(--red) 12%, transparent)" },
+};
+
+/** Human-readable label per entry type. */
+export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
+  sales: "Sales voucher",
+  purchase: "Purchase voucher",
+  receipt: "Receipt voucher",
+  payment: "Payment voucher",
+  contra: "Contra voucher",
+  journal: "Journal voucher",
+  "credit-note": "Credit note",
+  "debit-note": "Debit note",
+  "stock-journal": "Stock journal",
+  "bank-recon": "Bank recon entry",
+};
+
+/** Human-readable label per entry source. */
+export const ENTRY_SOURCE_LABELS: Record<EntrySource, string> = {
+  chat: "Chat",
+  daybook: "Day Book",
+  ocr: "OCR upload",
+  "bank-recon": "Bank recon",
+  bulk: "Bulk import",
+};
+
+/** Sample OCR extraction for the Upload & OCR screen demo (before the
+ *  user clicks "Save as Draft" this represents the AI's extraction in
+ *  progress). Fields with confidence < 0.85 get yellow "Verify" highlight. */
+export const OCR_SAMPLE = {
+  fileName: "Patel-Traders-Invoice-2301.pdf",
+  pageCount: 1,
+  extractedAt: "just now",
+  fields: {
+    vendorName: { value: "Patel Raw Materials Ltd", confidence: 0.98 },
+    gstin: { value: "27AACCP4432N1Z9", confidence: 0.99 },
+    invoiceNumber: { value: "PTL-2301", confidence: 0.95 },
+    invoiceDate: { value: "2026-04-15", confidence: 0.88 },
+    subtotal: { value: 98500, confidence: 0.99 },
+    cgst: { value: 8865, confidence: 0.94 },
+    sgst: { value: 8865, confidence: 0.94 },
+    total: { value: 116230, confidence: 0.99 },
+    category: { value: "Raw Materials", confidence: 0.76 },
+    paymentDueDate: { value: "2026-05-30", confidence: 0.72 },
+  },
+  lineItems: [
+    { description: "Shea butter (food grade)", hsn: "15159091", qty: 50, unit: "kg", rate: 1450, amount: 72500, confidence: 0.91 },
+    { description: "Essential oil blend — Lavender", hsn: "33012990", qty: 12, unit: "ltr", rate: 2166, amount: 25992, confidence: 0.86 },
+  ],
+};
+

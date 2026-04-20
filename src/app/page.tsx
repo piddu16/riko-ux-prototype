@@ -16,6 +16,7 @@ import { GstScreen as Gst } from "@/components/screens/gst";
 import { TdsScreen as Tds } from "@/components/screens/tds";
 import { BankReconScreen as BankRecon } from "@/components/screens/bank-recon";
 import { SettingsScreen as Settings } from "@/components/screens/settings";
+import { EntriesScreen as Entries } from "@/components/screens/entries";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { RoleSwitcher } from "@/components/role-switcher";
@@ -135,6 +136,7 @@ export default function Home() {
           {tab === "tds" && <Tds />}
           {tab === "bankrecon" && <BankRecon />}
           {tab === "outstanding" && <Outstandings />}
+          {tab === "entries" && <Entries />}
           {tab === "daybook" && <DayBook />}
           {tab === "sales" && <Sales />}
           {tab === "inventory" && <Inventory />}
