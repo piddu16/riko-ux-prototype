@@ -142,18 +142,193 @@ export const DAYBOOK = [
   { date: "28 Apr 2025", invoice: 23, type: "Receipt", name: "Paytm Settlement", amount: 89000 },
 ];
 
-export const INVENTORY = [
-  { name: "100 Gm Riko Jar", sku: "SKU-001", qty: 12042, value: 892100, reorder: 85, status: "ok" },
-  { name: "100 Gm Riko Jar Cap", sku: "SKU-002", qty: 0, value: 0, reorder: 0, status: "out" },
-  { name: "100 Gm Riko Jar - SF", sku: "SKU-003", qty: 4168, value: 0, reorder: 0, status: "ok" },
-  { name: "100 GM BROWN GLASS JAR WITH CAP & LID CHINA", sku: "SKU-004", qty: 0, value: 0, reorder: 0, status: "out" },
-  { name: "100 GM CHINA SURAH K TOAN PASTE TUBE", sku: "SKU-005", qty: 0, value: 0, reorder: 0, status: "out" },
-  { name: "150 Gm Riko Jar New Tube", sku: "SKU-006", qty: 8520, value: 1245000, reorder: 92, status: "ok" },
-  { name: "Niacinamide Serum 30ml", sku: "SKU-007", qty: 3200, value: 480000, reorder: 78, status: "low" },
-  { name: "Vitamin C Face Wash 100ml", sku: "SKU-008", qty: 5600, value: 672000, reorder: 88, status: "ok" },
-  { name: "Retinol Night Cream 50g", sku: "SKU-009", qty: 1200, value: 360000, reorder: 45, status: "low" },
-  { name: "Sunscreen SPF50 60ml", sku: "SKU-010", qty: 7800, value: 936000, reorder: 95, status: "ok" },
+/** Godown (warehouse) registry. Inventory SKUs live in one godown at a time;
+ *  transfers go through Stock Journal entries. Mirrors Tally's godown master. */
+export interface Godown {
+  id: string;
+  name: string;
+  city: string;
+  lastCountedDate: string; // ISO — last time a physical count happened
+  lastReconciledAt?: string; // ISO — last time we produced Stock Journals
+}
+
+export const GODOWNS: Godown[] = [
+  { id: "bhiwandi", name: "Bhiwandi WH",  city: "Mumbai",  lastCountedDate: "2026-02-18" }, // 62 days ago — stale, drives the banner
+  { id: "chennai",  name: "Chennai WH",   city: "Chennai", lastCountedDate: "2026-04-03", lastReconciledAt: "2026-04-03T16:00:00+05:30" }, // 18 days ago — fresh
 ];
+
+export interface InventoryItem {
+  name: string;
+  sku: string;
+  qty: number;          // Book qty from Tally (canonical)
+  value: number;        // Book value from Tally (method-applied)
+  reorder: number;      // Reorder % (0-100 UI scale)
+  status: "ok" | "low" | "out";
+  godownId: string;     // Which godown holds this SKU
+  // Physical-count snapshot (only present after last reconciliation)
+  physicalQty?: number;
+  physicalCountDate?: string; // ISO
+  varianceQty?: number;
+  variancePct?: number;       // 0.05 = 5%
+  // FIFO cost layers — populated for select SKUs so the cost-layer drawer
+  // (optional P1) can show how book value was built up purchase-by-purchase.
+  costLayers?: Array<{ purchaseDate: string; qty: number; rate: number }>;
+  wacRate?: number; // Weighted-avg rate — for WAC-configured companies
+}
+
+export const INVENTORY: InventoryItem[] = [
+  { name: "100 Gm Riko Jar", sku: "SKU-001", qty: 12042, value: 892100, reorder: 85, status: "ok", godownId: "bhiwandi",
+    physicalQty: 12020, physicalCountDate: "2026-02-18", varianceQty: -22, variancePct: -0.0018,
+    costLayers: [
+      { purchaseDate: "2025-11-12", qty: 4000, rate: 72 },
+      { purchaseDate: "2026-01-08", qty: 5000, rate: 75 },
+      { purchaseDate: "2026-03-04", qty: 3042, rate: 78 },
+    ],
+  },
+  { name: "100 Gm Riko Jar Cap", sku: "SKU-002", qty: 0, value: 0, reorder: 0, status: "out", godownId: "bhiwandi" },
+  { name: "100 Gm Riko Jar - SF", sku: "SKU-003", qty: 4168, value: 0, reorder: 0, status: "ok", godownId: "bhiwandi" },
+  { name: "100 GM BROWN GLASS JAR WITH CAP & LID CHINA", sku: "SKU-004", qty: 0, value: 0, reorder: 0, status: "out", godownId: "bhiwandi" },
+  { name: "100 GM CHINA SURAH K TOAN PASTE TUBE", sku: "SKU-005", qty: 0, value: 0, reorder: 0, status: "out", godownId: "chennai" },
+  { name: "150 Gm Riko Jar New Tube", sku: "SKU-006", qty: 8520, value: 1245000, reorder: 92, status: "ok", godownId: "chennai",
+    physicalQty: 8520, physicalCountDate: "2026-04-03", varianceQty: 0, variancePct: 0,
+    costLayers: [
+      { purchaseDate: "2025-12-20", qty: 3000, rate: 142 },
+      { purchaseDate: "2026-02-15", qty: 3500, rate: 146 },
+      { purchaseDate: "2026-03-22", qty: 2020, rate: 150 },
+    ],
+  },
+  { name: "Niacinamide Serum 30ml", sku: "SKU-007", qty: 3200, value: 480000, reorder: 78, status: "low", godownId: "chennai",
+    physicalQty: 3180, physicalCountDate: "2026-04-03", varianceQty: -20, variancePct: -0.00625,
+    costLayers: [
+      { purchaseDate: "2026-01-20", qty: 1500, rate: 148 },
+      { purchaseDate: "2026-03-10", qty: 1700, rate: 152 },
+    ],
+  },
+  { name: "Vitamin C Face Wash 100ml", sku: "SKU-008", qty: 5600, value: 672000, reorder: 88, status: "ok", godownId: "bhiwandi",
+    physicalQty: 5500, physicalCountDate: "2026-02-18", varianceQty: -100, variancePct: -0.0179,
+  },
+  { name: "Retinol Night Cream 50g", sku: "SKU-009", qty: 1200, value: 360000, reorder: 45, status: "low", godownId: "bhiwandi" },
+  { name: "Sunscreen SPF50 60ml", sku: "SKU-010", qty: 7800, value: 936000, reorder: 95, status: "ok", godownId: "chennai",
+    physicalQty: 7800, physicalCountDate: "2026-04-03", varianceQty: 0, variancePct: 0,
+  },
+];
+
+/** Tally's configured valuation method, surfaced read-only in the UI.
+ *  The user picks this inside Tally at FY boundary; Riko just displays it. */
+export const TALLY_VALUATION = {
+  method: "FIFO" as "FIFO" | "WAC" | "LIFO" | "Standard",
+  recalculatedAt: "2026-04-05T10:00:00+05:30",
+  source: "tally" as const,
+  // Short educational line shown in the FIFO chip tooltip.
+  description:
+    "First-In-First-Out: oldest stock is consumed first. Your Tally is configured for FIFO — change it inside Tally at FY boundary.",
+};
+
+/** Month-end stock snapshots. Drives the snapshot strip and locks
+ *  closed months so users can't accidentally edit them. */
+export interface StockSnapshot {
+  month: string;          // "Mar 2026"
+  monthIso: string;       // "2026-03"
+  openingValue: number;
+  closingValue: number;
+  cogs: number;
+  method: "FIFO" | "WAC" | "LIFO" | "Standard";
+  status: "locked" | "open";
+  reconciledAt?: string;  // ISO — last physical count for this month
+}
+
+export const STOCK_SNAPSHOTS: StockSnapshot[] = [
+  { month: "Jan 2026", monthIso: "2026-01", openingValue: 6_85_000, closingValue: 7_20_000, cogs: 8_40_000, method: "FIFO", status: "locked", reconciledAt: "2026-02-03" },
+  { month: "Feb 2026", monthIso: "2026-02", openingValue: 7_20_000, closingValue: 7_42_000, cogs: 9_12_000, method: "FIFO", status: "locked", reconciledAt: "2026-03-02" },
+  { month: "Mar 2026", monthIso: "2026-03", openingValue: 7_42_000, closingValue: 76_90_000, cogs: 12_48_000, method: "FIFO", status: "locked", reconciledAt: "2026-04-03" },
+  { month: "Apr 2026", monthIso: "2026-04", openingValue: 76_90_000, closingValue: 77_15_000, cogs: 2_80_000, method: "FIFO", status: "open" }, // current month, no recon yet
+];
+
+/** Variance routing thresholds. 5% is the boundary between "minor"
+ *  (rolls into one bulk Stock Journal → Accounts) and "major"
+ *  (one Stock Journal per SKU → Accounts Head). */
+export const VARIANCE_THRESHOLDS = {
+  /** Anything within this fraction is considered a "match" (green). */
+  match: 0.02,   // ±2%
+  /** Anything within this fraction is "minor" and bulk-routed. */
+  minor: 0.05,   // ±5%
+  /** Beyond this is "major" and per-SKU routed to Accounts Head. */
+  // >minor is major, implicit
+} as const;
+
+/** Physical-count upload sample. Drives the 4-step reconciliation
+ *  modal's Step 3 variance preview. Uses the existing BatchUploadRow
+ *  shape but with inventory-specific fields layered on. */
+export interface PhysicalCountRow {
+  sku: string;
+  skuName: string;
+  godownId: string;
+  bookQty: number;     // From Tally
+  physicalQty: number; // From user's uploaded sheet
+  uom: string;         // Unit of measure
+  adjustmentValue: number; // (physicalQty - bookQty) * rate (signed)
+  status: "matched" | "minor" | "major" | "new-sku" | "uom-warn";
+  reason: "Damaged" | "Pilferage" | "Count error" | "Expiry" | "Inter-godown transit" | "Other" | "New SKU" | "—";
+  note?: string;
+}
+
+export const PHYSICAL_COUNT_SAMPLE: {
+  fileName: string;
+  godownId: string;
+  month: string;
+  totalRows: number;
+  rows: PhysicalCountRow[];
+} = {
+  fileName: "physical-count-bhiwandi-apr-2026.csv",
+  godownId: "bhiwandi",
+  month: "Apr 2026",
+  totalRows: 14,
+  rows: [
+    // ── Matched (±2%) ── 7 rows
+    { sku: "SKU-001", skuName: "100 Gm Riko Jar",                       godownId: "bhiwandi", bookQty: 12042, physicalQty: 12030, uom: "pcs", adjustmentValue:   -936, status: "matched", reason: "—" },
+    { sku: "SKU-003", skuName: "100 Gm Riko Jar - SF",                   godownId: "bhiwandi", bookQty:  4168, physicalQty:  4168, uom: "pcs", adjustmentValue:      0, status: "matched", reason: "—" },
+    { sku: "SKU-008", skuName: "Vitamin C Face Wash 100ml",              godownId: "bhiwandi", bookQty:  5600, physicalQty:  5612, uom: "pcs", adjustmentValue:  +1440, status: "matched", reason: "—", note: "Auto-match · within tolerance" },
+    { sku: "SKU-011", skuName: "Peppermint Lip Balm 15g",                godownId: "bhiwandi", bookQty:  2400, physicalQty:  2395, uom: "pcs", adjustmentValue:   -475, status: "matched", reason: "—" },
+    { sku: "SKU-012", skuName: "Aloe Hand Wash 250ml",                   godownId: "bhiwandi", bookQty:  1850, physicalQty:  1848, uom: "pcs", adjustmentValue:   -170, status: "matched", reason: "—" },
+    { sku: "SKU-013", skuName: "Coconut Body Butter 100g",               godownId: "bhiwandi", bookQty:  1200, physicalQty:  1200, uom: "pcs", adjustmentValue:      0, status: "matched", reason: "—" },
+    { sku: "SKU-014", skuName: "Charcoal Face Mask 80g",                 godownId: "bhiwandi", bookQty:   900, physicalQty:   895, uom: "pcs", adjustmentValue:   -475, status: "matched", reason: "—" },
+
+    // ── Minor variance (2-5%) ── 3 rows — ALL roll into one bulk Stock Journal
+    { sku: "SKU-015", skuName: "Tea Tree Shampoo 200ml",                 godownId: "bhiwandi", bookQty:  3400, physicalQty:  3290, uom: "pcs", adjustmentValue:  -12_100, status: "minor",   reason: "Count error",     note: "3.2% short — likely miscount on last receipt" },
+    { sku: "SKU-016", skuName: "Rose Water Toner 150ml",                 godownId: "bhiwandi", bookQty:   800, physicalQty:   765, uom: "pcs", adjustmentValue:   -4_200, status: "minor",   reason: "Damaged",         note: "4.4% short — broken bottles at receipt dock" },
+    { sku: "SKU-017", skuName: "Lavender Conditioner 200ml",             godownId: "bhiwandi", bookQty:  1600, physicalQty:  1542, uom: "pcs", adjustmentValue:   -9_280, status: "minor",   reason: "Count error",     note: "3.6% short" },
+
+    // ── Major variance (>5%) ── 3 rows — each becomes its own Stock Journal (Accounts Head approval)
+    { sku: "SKU-018", skuName: "Ubtan Face Pack 100g",                   godownId: "bhiwandi", bookQty:   600, physicalQty:   420, uom: "pcs", adjustmentValue: -1_48_500, status: "major",   reason: "Pilferage",       note: "30% short · significant loss · requires Accounts Head review" },
+    { sku: "SKU-019", skuName: "Saffron Eye Cream 20g",                  godownId: "bhiwandi", bookQty:   180, physicalQty:   132, uom: "pcs", adjustmentValue:   -38_400, status: "major",   reason: "Expiry",          note: "27% short · batch expiry writeoff" },
+    { sku: "SKU-020", skuName: "Gold Facial Kit 5pc",                    godownId: "bhiwandi", bookQty:   240, physicalQty:   198, uom: "pcs", adjustmentValue:   -1_18_800, status: "major",   reason: "Inter-godown transit", note: "17% variance · 42 units in transit to Chennai WH" },
+
+    // ── New SKU (not in master) ── 1 row — flagged as error, needs SKU master creation first
+    { sku: "SKU-NEW-01", skuName: "Multani Mitti Clay 200g (unreg)",     godownId: "bhiwandi", bookQty:     0, physicalQty:   320, uom: "pcs", adjustmentValue:    0, status: "new-sku", reason: "New SKU", note: "Not in SKU master — create via Entries queue" },
+  ],
+};
+
+/** Helpers for status counts (used by Step 3 summary chips). */
+export function countPhysicalStatuses() {
+  const rows = PHYSICAL_COUNT_SAMPLE.rows;
+  return {
+    matched: rows.filter((r) => r.status === "matched").length,
+    minor:   rows.filter((r) => r.status === "minor").length,
+    major:   rows.filter((r) => r.status === "major").length,
+    newSku:  rows.filter((r) => r.status === "new-sku").length,
+    uomWarn: rows.filter((r) => r.status === "uom-warn").length,
+    majorNetAdjustment: rows.filter((r) => r.status === "major").reduce((s, r) => s + Math.abs(r.adjustmentValue), 0),
+    minorNetAdjustment: rows.filter((r) => r.status === "minor").reduce((s, r) => s + Math.abs(r.adjustmentValue), 0),
+  };
+}
+
+/** "Days since last physical count" for a godown. Used by tab status
+ *  dot colors and the stale-count banner. Reference point: 21 Apr 2026. */
+export function daysSinceCount(godown: Godown): number {
+  const today = new Date("2026-04-21");
+  const last = new Date(godown.lastCountedDate);
+  return Math.floor((today.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+}
 
 export const HEALTH_SCORES = [
   { label: "Profitability", score: 85, color: "var(--green)" },
@@ -649,6 +824,7 @@ export function computeComplianceCalendar(): ComplianceDeadline[] {
     { date: "2026-04-28", filing: "FY25 closing review", section: "CA workflow",          severity: "soon",     clientNames: ["Sri Balaji Exports", "Reliance Retail - Bandra", "Sai Enterprises", "Joshi Pharma Traders"] },
     { date: "2026-04-30", filing: "TDS Payment (Mar)",   section: "CBDT Rule 30 · special March deadline", severity: "soon", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
     { date: "2026-04-30", filing: "Bank reconciliation", section: "Month-end",            severity: "soon",     clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
+    { date: "2026-04-30", filing: "Physical stock count", section: "Month-end · closing stock", severity: "soon", clientNames: ["Bandra Soap Pvt Ltd", "Nexus Electronics Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
     { date: "2026-05-07", filing: "TDS Payment (Apr)",   section: "CBDT Rule 30 · monthly",severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
     { date: "2026-05-11", filing: "GSTR-1 (Apr)",        section: "CBIC Rule 59 · file by 11th", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Bhatia Exports", "Kothari Traders", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Om Infra Builders"] },
     { date: "2026-05-14", filing: "GSTR-2B ITC match",   section: "2B drops — recon window 14-19", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },

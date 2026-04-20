@@ -376,15 +376,23 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
               const pct = Math.abs(w.value) / R.rev * 100;
               const barW = Math.max(2, (Math.abs(w.value) / wfMax) * 100);
               const isNeg = w.value < 0;
+              // COGS tooltip ties to Inventory module — closing stock derives
+              // from FIFO valuation in Tally, verified by the last physical
+              // count. This is the audit trail that anchors P&L integrity.
+              const isCogs = w.label.includes("COGS");
+              const tooltip = isCogs
+                ? "Opening ₹7.42L + Purchases − Closing ₹76.90L · FIFO (from Tally) · last verified via physical count 3 Apr 2026"
+                : undefined;
 
               return (
                 <div
                   key={i}
+                  title={tooltip}
                   className={`flex items-center gap-2 py-1.5 px-1 ${
                     w.bold
                       ? "border-b"
                       : ""
-                  }`}
+                  } ${isCogs ? "cursor-help" : ""}`}
                   style={{
                     borderColor: w.bold ? "var(--border)" : undefined,
                   }}
@@ -396,6 +404,11 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
                     style={{ color: w.bold ? "var(--text-1)" : "var(--text-3)" }}
                   >
                     {w.label}
+                    {isCogs && (
+                      <span className="ml-1 text-[9px]" style={{ color: "var(--blue)" }} aria-hidden>
+                        ℹ
+                      </span>
+                    )}
                   </span>
 
                   <div
