@@ -12,7 +12,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { motion, MotionConfig } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
   Send,
   ChevronRight,
@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Download,
   Share2,
+  CheckCircle2,
 } from "lucide-react";
 import {
   RECEIVABLES,
@@ -57,8 +58,34 @@ import {
 } from "@/components/ui/chat-charts";
 import { ChatGstRecon } from "@/components/ui/chat-gst-recon";
 import { Gauge } from "@/components/ui/gauge";
-import { DeadStockTreemap } from "@/components/ui/dead-stock-treemap";
+import dynamic from "next/dynamic";
 import { ChartRenderer, type DataShape } from "@/components/ui/chart-switcher";
+
+// DeadStockTreemap is ECharts-powered; defer its load so asking anything
+// other than "dead stock" doesn't pay the ECharts cost.
+const DeadStockTreemap = dynamic(
+  () =>
+    import("@/components/ui/dead-stock-treemap").then(
+      (m) => m.DeadStockTreemap
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="rounded-xl animate-pulse"
+        style={{
+          height: 480,
+          background: "color-mix(in srgb, var(--bg-hover) 50%, transparent)",
+        }}
+      />
+    ),
+  }
+);
+import {
+  downloadChartAsPng,
+  shareToWhatsApp,
+  slugify,
+} from "@/components/ui/chart-export";
 import { COHORT_RETENTION } from "@/lib/data";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1551,20 +1578,23 @@ interface ResultCtx {
 }
 
 const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
-  "current-ratio": () => (
-    <ChatDonut
-      title="Current Assets composition"
-      data={[
+  // Current ratio: migrated to ChartRenderer — switches between
+  // donut / bar / treemap for the 4 components of current assets.
+  "current-ratio": () => {
+    const shape: DataShape = {
+      kind: "composition",
+      title: "Current Assets composition",
+      subtitle: `Total CA ₹${fL(K.ca)}L · CR ${K.cr.toFixed(2)}`,
+      total: K.ca,
+      parts: [
         { label: "Inventory", value: R.stkC, color: "var(--purple)" },
         { label: "Debtors", value: R.debtors, color: "var(--blue)" },
         { label: "Cash", value: R.cash, color: "var(--green)" },
         { label: "Other CA", value: 1410000, color: "var(--text-4)" },
-      ]}
-      centerValue={`${fL(K.ca)}L`}
-      centerLabel="Total CA"
-      size={220}
-    />
-  ),
+      ],
+    };
+    return <ChartRenderer shape={shape} defaultType="donut" />;
+  },
   receivables: () => {
     const total = RECEIVABLES.reduce((s, r) => s + r.amount, 0);
     const b030 = 170000;
@@ -1595,17 +1625,24 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       </div>
     );
   },
-  payables: () => (
-    <ChatBarChart
-      title="Top vendors you owe"
-      data={PAYABLES.slice(0, 8).map((p) => ({
+  // Payables: migrated to ChartRenderer — switch bar / donut / treemap.
+  // MSME vendors get orange color (45-day compliance); others red.
+  payables: () => {
+    const total = PAYABLES.reduce((s, p) => s + p.amount, 0);
+    const msmeTotal = PAYABLES.filter((p) => p.msme).reduce((s, p) => s + p.amount, 0);
+    const shape: DataShape = {
+      kind: "categorical",
+      title: "Top vendors you owe",
+      subtitle: `₹${(total / 1e7).toFixed(2)}Cr payable · ₹${(msmeTotal / 1e5).toFixed(1)}L to MSMEs`,
+      entries: PAYABLES.slice(0, 8).map((p) => ({
         label: p.name,
         value: p.amount,
         color: p.msme ? "var(--orange)" : "var(--red)",
         caption: `${p.days}d aged${p.msme ? " · MSME (45d rule)" : ""} · ${p.category}`,
-      }))}
-    />
-  ),
+      })),
+    };
+    return <ChartRenderer shape={shape} defaultType="bar" />;
+  },
   mis: () => (
     <div
       className="rounded-xl overflow-hidden"
@@ -1932,10 +1969,14 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
   "inventory-dead": ({ onAsk }) => (
     <DeadStockTreemap height={480} onAsk={onAsk} />
   ),
-  returns: () => (
-    <ChatBarChart
-      title="Return rate by channel"
-      data={RETURNS_BY_CHANNEL.map((c) => ({
+  // Returns: migrated to ChartRenderer — switch bar / donut / treemap.
+  // Color by rate: red >20%, orange >10%, yellow otherwise.
+  returns: () => {
+    const shape: DataShape = {
+      kind: "categorical",
+      title: "Returns by channel",
+      subtitle: `₹${(RETURNS_SUMMARY.totalReturns / 1e7).toFixed(2)}Cr returned · ${RETURNS_SUMMARY.returnRate.toFixed(1)}% of gross sales`,
+      entries: RETURNS_BY_CHANNEL.map((c) => ({
         label: c.channel,
         value: c.returns,
         color:
@@ -1945,9 +1986,10 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
             ? "var(--orange)"
             : "var(--yellow)",
         caption: `${c.rate.toFixed(1)}% rate · top reason: ${c.topReason}`,
-      }))}
-    />
-  ),
+      })),
+    };
+    return <ChartRenderer shape={shape} defaultType="bar" />;
+  },
   unknown: () => (
     <div
       className="rounded-xl p-5 text-center"
@@ -2137,8 +2179,34 @@ function ResultPanel({
   const Renderer = intent ? RESULT_RENDERERS[intent] : null;
   const label = intent ? INTENT_LABELS[intent] : "Result";
 
+  // Ref to the scrollable content area — passed to exporters so they
+  // can find the chart's canvas or svg and rasterize it.
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  // Tiny inline toast for export feedback (no toast library dep).
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2400);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const handleDownload = async () => {
+    if (!intent) return;
+    const filename = `riko-${slugify(label)}-${new Date().toISOString().slice(0, 10)}.png`;
+    const ok = await downloadChartAsPng(contentRef.current, filename);
+    setToast(ok ? `Downloaded ${filename}` : "Export unavailable for this view");
+  };
+
+  const handleShare = () => {
+    if (!intent) return;
+    shareToWhatsApp(
+      `Sharing from Riko · ${label}\n\nBandra Soap Pvt Ltd · FY 2024-25\nOpen Riko to see the live chart.`
+    );
+    setToast("Opening WhatsApp to share");
+  };
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden relative">
       {/* Header bar */}
       <div
         className="sticky top-0 z-10 flex items-center justify-between px-5 py-3"
@@ -2170,18 +2238,20 @@ function ResultPanel({
           {intent && (
             <>
               <button
+                onClick={handleDownload}
                 className="p-1.5 rounded-md cursor-pointer transition-opacity hover:opacity-70"
                 style={{ color: "var(--text-3)" }}
-                title="Download (demo)"
-                aria-label="Download result"
+                title="Download as PNG"
+                aria-label="Download result as PNG"
               >
                 <Download size={14} />
               </button>
               <button
+                onClick={handleShare}
                 className="p-1.5 rounded-md cursor-pointer transition-opacity hover:opacity-70"
                 style={{ color: "var(--text-3)" }}
-                title="Share (demo)"
-                aria-label="Share result"
+                title="Share via WhatsApp"
+                aria-label="Share result via WhatsApp"
               >
                 <Share2 size={14} />
               </button>
@@ -2209,7 +2279,7 @@ function ResultPanel({
       {/* Main content — scrollable. No suggested-follow-up chips here;
          follow-ups live in the chat on the left as <Chips>, avoiding
          duplication across panels. */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+      <div ref={contentRef} className="flex-1 overflow-y-auto px-5 py-4">
         {Renderer ? (
           <div>
             <Renderer onAsk={onAsk} />
@@ -2246,6 +2316,27 @@ function ResultPanel({
           </div>
         )}
       </div>
+
+      {/* Inline toast for export feedback */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.2 }}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-3 py-2 rounded-lg text-[12px] font-medium flex items-center gap-2"
+            style={{
+              background: "var(--green)",
+              color: "white",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
+            }}
+          >
+            <CheckCircle2 size={14} />
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

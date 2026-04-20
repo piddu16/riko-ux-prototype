@@ -23,6 +23,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import {
   ChevronDown,
   BarChart3,
@@ -42,11 +43,46 @@ import {
   type LinePoint,
   type DonutSlice,
 } from "./chat-charts";
-import { CompositionTreemap } from "./composition-treemap";
-import { CohortHeatmap } from "./chart-matrix";
-import { MoneyFlowSankey, type SankeyNode, type SankeyLink } from "./chart-sankey";
-import { CustomerScatter, type ScatterPoint } from "./chart-scatter";
-import { HealthRadar, type RadarAxis } from "./chart-radar";
+// Types are safe to import statically — they're erased at build time.
+// The runtime components themselves are loaded lazily via next/dynamic
+// below so ECharts (~130KB gz) doesn't bloat the initial chat bundle.
+import type { SankeyNode, SankeyLink } from "./chart-sankey";
+import type { ScatterPoint } from "./chart-scatter";
+import type { RadarAxis } from "./chart-radar";
+
+/* ── Lazy loaders for ECharts-powered charts ────────────────────
+   Each becomes its own chunk, fetched only when the user first
+   selects that chart type. Fallback = a lightweight placeholder. */
+const ChartFallback = () => (
+  <div
+    className="rounded-lg animate-pulse"
+    style={{
+      height: 320,
+      background: "color-mix(in srgb, var(--bg-hover) 50%, transparent)",
+    }}
+  />
+);
+
+const CompositionTreemap = dynamic(
+  () => import("./composition-treemap").then((m) => m.CompositionTreemap),
+  { ssr: false, loading: ChartFallback }
+);
+const CohortHeatmap = dynamic(
+  () => import("./chart-matrix").then((m) => m.CohortHeatmap),
+  { ssr: false, loading: ChartFallback }
+);
+const MoneyFlowSankey = dynamic(
+  () => import("./chart-sankey").then((m) => m.MoneyFlowSankey),
+  { ssr: false, loading: ChartFallback }
+);
+const CustomerScatter = dynamic(
+  () => import("./chart-scatter").then((m) => m.CustomerScatter),
+  { ssr: false, loading: ChartFallback }
+);
+const HealthRadar = dynamic(
+  () => import("./chart-radar").then((m) => m.HealthRadar),
+  { ssr: false, loading: ChartFallback }
+);
 
 /* ═══════════════════════════════════════════════════════════════
    DataShape — the structure of the data, independent of how we
