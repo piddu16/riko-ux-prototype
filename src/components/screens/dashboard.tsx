@@ -8,6 +8,7 @@ import { Gauge } from "@/components/ui/gauge";
 import { HealthScore } from "@/components/ui/health-score";
 import { ActionQueue } from "@/components/ui/action-queue";
 import { RunwayTimeline } from "@/components/ui/runway-timeline";
+import { CausalChain } from "@/components/ui/causal-chain";
 import {
   R,
   K,
@@ -49,7 +50,12 @@ function barHeight(value: number, max: number, maxPx: number) {
 /* ------------------------------------------------------------------ */
 /*  Dashboard screen                                                  */
 /* ------------------------------------------------------------------ */
-export default function DashboardScreen() {
+interface DashboardScreenProps {
+  /** Optional: dispatch a question into Chat. Wired from page.tsx. */
+  onAskRiko?: (question: string) => void;
+}
+
+export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}) {
   /* Show/hide the CFO-level detail sections (waterfall, expense comp, channel
      mix, CCC, BS snapshot). Collapsed by default to keep the founder view
      scannable on first load. */
@@ -220,6 +226,15 @@ export default function DashboardScreen() {
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className="overflow-hidden flex flex-col gap-5"
             >
+
+        {/* -------------------------------------------------------- */}
+        {/*  3a. Causal Chain — DAG of P&L flow                       */}
+        {/*  (signature differentiator: visual root-cause that ties   */}
+        {/*  back into Chat via node clicks)                          */}
+        {/* -------------------------------------------------------- */}
+        <motion.div {...sectionAnim}>
+          <CausalChain onAsk={onAskRiko} />
+        </motion.div>
 
         {/* -------------------------------------------------------- */}
         {/*  3b. Expense Composition (desktop only)                  */}

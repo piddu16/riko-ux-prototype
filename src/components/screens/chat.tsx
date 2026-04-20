@@ -23,6 +23,8 @@ import {
   Package,
   Sparkles,
   RotateCcw,
+  Download,
+  Share2,
 } from "lucide-react";
 import {
   RECEIVABLES,
@@ -295,18 +297,20 @@ function ExchangeCurrentRatio({ onFollowup }: { onFollowup: (q: string) => void 
         </div>
       </div>
 
-      {/* Composition donut */}
-      <ChatDonut
-        title="Current Assets composition"
-        data={[
-          { label: "Inventory", value: R.stkC, color: "var(--purple)" },
-          { label: "Debtors", value: R.debtors, color: "var(--blue)" },
-          { label: "Cash", value: R.cash, color: "var(--green)" },
-          { label: "Other CA", value: 1410000, color: "var(--text-4)" },
-        ]}
-        centerValue={`${fL(ca)}L`}
-        centerLabel="Total CA"
-      />
+      {/* Composition donut — inline on mobile, moves to Result panel on desktop */}
+      <div className="md:hidden">
+        <ChatDonut
+          title="Current Assets composition"
+          data={[
+            { label: "Inventory", value: R.stkC, color: "var(--purple)" },
+            { label: "Debtors", value: R.debtors, color: "var(--blue)" },
+            { label: "Cash", value: R.cash, color: "var(--green)" },
+            { label: "Other CA", value: 1410000, color: "var(--text-4)" },
+          ]}
+          centerValue={`${fL(ca)}L`}
+          centerLabel="Total CA"
+        />
+      </div>
 
       <Layer color="var(--blue)" icon="📐" title="Calculation">
         <div className="space-y-1">
@@ -408,16 +412,18 @@ function ExchangeReceivables({ onFollowup }: { onFollowup: (q: string) => void }
         </div>
       </div>
 
-      <ChatStackedBar
-        title="Aging buckets"
-        subtitle={`₹${(total / 1e7).toFixed(2)}Cr receivable across 4 buckets`}
-        segments={[
-          { label: "0-30d", value: bucket0_30, color: "var(--green)" },
-          { label: "30-90d", value: bucket30_90, color: "var(--blue)" },
-          { label: "90-365d", value: bucket90_365, color: "var(--yellow)" },
-          { label: "365+d", value: bucket365, color: "var(--red)" },
-        ]}
-      />
+      <div className="md:hidden">
+        <ChatStackedBar
+          title="Aging buckets"
+          subtitle={`₹${(total / 1e7).toFixed(2)}Cr receivable across 4 buckets`}
+          segments={[
+            { label: "0-30d", value: bucket0_30, color: "var(--green)" },
+            { label: "30-90d", value: bucket30_90, color: "var(--blue)" },
+            { label: "90-365d", value: bucket90_365, color: "var(--yellow)" },
+            { label: "365+d", value: bucket365, color: "var(--red)" },
+          ]}
+        />
+      </div>
 
       <Layer color="var(--green)" icon="💡" title="Recommended action">
         <p>
@@ -596,15 +602,17 @@ function ExchangeRevenueTrend({ onFollowup }: { onFollowup: (q: string) => void 
         </div>
       </div>
 
-      <ChatLineChart
-        title="Monthly revenue"
-        data={MONTHS.map((m, i) => ({ x: m, y: R.ms[i] }))}
-        color="var(--green)"
-        highlight={{
-          index: maxIdx,
-          label: `${MONTHS[maxIdx]} ₹${fL(R.ms[maxIdx])}L`,
-        }}
-      />
+      <div className="md:hidden">
+        <ChatLineChart
+          title="Monthly revenue"
+          data={MONTHS.map((m, i) => ({ x: m, y: R.ms[i] }))}
+          color="var(--green)"
+          highlight={{
+            index: maxIdx,
+            label: `${MONTHS[maxIdx]} ₹${fL(R.ms[maxIdx])}L`,
+          }}
+        />
+      </div>
 
       <Layer color="var(--yellow)" icon="💡" title="Riko's take">
         <p>
@@ -651,7 +659,9 @@ function ExchangeCashFlow({ onFollowup }: { onFollowup: (q: string) => void }) {
         </div>
       </div>
 
-      <ChatForecastChart title="Inflow vs outflow · running balance" weeks={CASH_FORECAST_WEEKS} />
+      <div className="md:hidden">
+        <ChatForecastChart title="Inflow vs outflow · running balance" weeks={CASH_FORECAST_WEEKS} />
+      </div>
 
       <div
         className="rounded-xl p-4 my-2"
@@ -782,30 +792,32 @@ function ExchangeExpenses({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </div>
 
-      <ChatDonut
-        title="Expense composition"
-        data={[
-          { label: "Marketing", value: R.mkt, color: "var(--red)" },
-          { label: "Employees", value: R.emp, color: "var(--blue)" },
-          { label: "CAC", value: R.cac, color: "var(--orange)" },
-          { label: "COGS", value: R.cogs, color: "var(--purple)" },
-          { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
-          { label: "Overheads", value: R.ovh + R.orc, color: "var(--text-4)" },
-        ]}
-        centerValue={`₹${(totalExp / 1e7).toFixed(1)}Cr`}
-        centerLabel="Total"
-      />
+      <div className="md:hidden space-y-2">
+        <ChatDonut
+          title="Expense composition"
+          data={[
+            { label: "Marketing", value: R.mkt, color: "var(--red)" },
+            { label: "Employees", value: R.emp, color: "var(--blue)" },
+            { label: "CAC", value: R.cac, color: "var(--orange)" },
+            { label: "COGS", value: R.cogs, color: "var(--purple)" },
+            { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
+            { label: "Overheads", value: R.ovh + R.orc, color: "var(--text-4)" },
+          ]}
+          centerValue={`₹${(totalExp / 1e7).toFixed(1)}Cr`}
+          centerLabel="Total"
+        />
 
-      <ChatBarChart
-        title="Top expense categories"
-        data={[
-          { label: "Marketing", value: R.mkt, color: "var(--red)" },
-          { label: "Employees", value: R.emp, color: "var(--blue)" },
-          { label: "CAC", value: R.cac, color: "var(--orange)" },
-          { label: "COGS", value: R.cogs, color: "var(--purple)" },
-          { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
-        ]}
-      />
+        <ChatBarChart
+          title="Top expense categories"
+          data={[
+            { label: "Marketing", value: R.mkt, color: "var(--red)" },
+            { label: "Employees", value: R.emp, color: "var(--blue)" },
+            { label: "CAC", value: R.cac, color: "var(--orange)" },
+            { label: "COGS", value: R.cogs, color: "var(--purple)" },
+            { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
+          ]}
+        />
+      </div>
 
       <Layer color="var(--yellow)" icon="💡" title="Riko's take">
         <p>
@@ -840,7 +852,9 @@ function ExchangeWaterfall({ onFollowup }: { onFollowup: (q: string) => void }) 
           Revenue → EBITDA: how each cost eats into profit
         </p>
       </div>
-      <ChatWaterfall data={WATERFALL} />
+      <div className="md:hidden">
+        <ChatWaterfall data={WATERFALL} />
+      </div>
       <Layer color="var(--red)" icon="💡" title="Why you're losing money">
         <p>
           Gross profit is healthy (82.5%) but operating costs are{" "}
@@ -875,7 +889,9 @@ function ExchangeGstRecon({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </div>
 
-      <ChatGstRecon period={RECONCILIATION.period} />
+      <div className="md:hidden">
+        <ChatGstRecon period={RECONCILIATION.period} />
+      </div>
 
       <Chips
         items={[
@@ -985,19 +1001,21 @@ function ExchangeTopCustomers({ onFollowup }: { onFollowup: (q: string) => void 
         </p>
       </div>
 
-      <ChatBarChart
-        data={top.map((c) => ({
-          label: c.name,
-          value: c.revenue,
-          color:
-            c.channel === "Marketplace"
-              ? "var(--blue)"
-              : c.channel === "D2C"
-              ? "var(--green)"
-              : "var(--purple)",
-          caption: `${c.orders} orders · LTV ₹${(c.ltv / 1e5).toFixed(1)}L · ${c.channel}`,
-        }))}
-      />
+      <div className="md:hidden">
+        <ChatBarChart
+          data={top.map((c) => ({
+            label: c.name,
+            value: c.revenue,
+            color:
+              c.channel === "Marketplace"
+                ? "var(--blue)"
+                : c.channel === "D2C"
+                ? "var(--green)"
+                : "var(--purple)",
+            caption: `${c.orders} orders · LTV ₹${(c.ltv / 1e5).toFixed(1)}L · ${c.channel}`,
+          }))}
+        />
+      </div>
 
       <Layer color="var(--green)" icon="💡" title="Riko's take">
         <p>
@@ -1105,26 +1123,28 @@ function ExchangeDeadStock({ onFollowup }: { onFollowup: (q: string) => void }) 
         </p>
       </div>
 
-      <ChatDonut
-        title="By category"
-        data={DEAD_STOCK_SUMMARY.categoryBreakdown.map((c, i) => ({
-          label: c.category,
-          value: c.value,
-          color: ["var(--red)", "var(--orange)", "var(--yellow)"][i],
-        }))}
-        centerValue={`₹${(DEAD_STOCK_SUMMARY.totalValue / 1e5).toFixed(1)}L`}
-        centerLabel="Locked"
-      />
+      <div className="md:hidden space-y-2">
+        <ChatDonut
+          title="By category"
+          data={DEAD_STOCK_SUMMARY.categoryBreakdown.map((c, i) => ({
+            label: c.category,
+            value: c.value,
+            color: ["var(--red)", "var(--orange)", "var(--yellow)"][i],
+          }))}
+          centerValue={`₹${(DEAD_STOCK_SUMMARY.totalValue / 1e5).toFixed(1)}L`}
+          centerLabel="Locked"
+        />
 
-      <ChatBarChart
-        title="Top 5 dead SKUs"
-        data={DEAD_STOCK.slice(0, 5).map((s) => ({
-          label: s.name,
-          value: s.value,
-          color: "var(--red)",
-          caption: `${s.qty} units · last sold ${s.lastSold}`,
-        }))}
-      />
+        <ChatBarChart
+          title="Top 5 dead SKUs"
+          data={DEAD_STOCK.slice(0, 5).map((s) => ({
+            label: s.name,
+            value: s.value,
+            color: "var(--red)",
+            caption: `${s.qty} units · last sold ${s.lastSold}`,
+          }))}
+        />
+      </div>
 
       <Layer color="var(--green)" icon="💡" title="Cash recovery play">
         <p>
@@ -1168,20 +1188,22 @@ function ExchangeReturns({ onFollowup }: { onFollowup: (q: string) => void }) {
         </p>
       </div>
 
-      <ChatBarChart
-        title="Return rate by channel"
-        data={RETURNS_BY_CHANNEL.map((c) => ({
-          label: c.channel,
-          value: c.returns,
-          color:
-            c.rate > 20
-              ? "var(--red)"
-              : c.rate > 10
-              ? "var(--orange)"
-              : "var(--yellow)",
-          caption: `${c.rate.toFixed(1)}% rate · top reason: ${c.topReason}`,
-        }))}
-      />
+      <div className="md:hidden">
+        <ChatBarChart
+          title="Return rate by channel"
+          data={RETURNS_BY_CHANNEL.map((c) => ({
+            label: c.channel,
+            value: c.returns,
+            color:
+              c.rate > 20
+                ? "var(--red)"
+                : c.rate > 10
+                ? "var(--orange)"
+                : "var(--yellow)",
+            caption: `${c.rate.toFixed(1)}% rate · top reason: ${c.topReason}`,
+          }))}
+        />
+      </div>
 
       <Layer color="var(--red)" icon="💡" title="Amazon is the problem">
         <p>
@@ -1266,6 +1288,396 @@ const EXCHANGE_RENDERERS: Record<
   "inventory-dead": ExchangeDeadStock,
   returns: ExchangeReturns,
   unknown: ExchangeUnknown,
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Result renderers — standalone chart/widget for the desktop
+   Result panel. The same chart is hidden inline in the chat
+   (via md:hidden wrappers inside each Exchange) and instead
+   rendered full-width here by intent.
+   ═══════════════════════════════════════════════════════════════ */
+const INTENT_LABELS: Record<Intent, string> = {
+  "current-ratio": "Current ratio",
+  receivables: "Receivables",
+  payables: "Payables",
+  mis: "MIS report",
+  "revenue-trend": "Revenue trend",
+  "cash-flow": "Cash flow forecast",
+  runway: "Runway",
+  "expense-breakdown": "Expense breakdown",
+  waterfall: "P&L waterfall",
+  "gst-recon": "GST 2B reconciliation",
+  "gst-health": "GST health",
+  "top-customers": "Top customers",
+  "health-score": "Business health",
+  "inventory-dead": "Dead stock",
+  returns: "Returns",
+  unknown: "Suggestions",
+};
+
+const RESULT_RENDERERS: Record<Intent, () => JSX.Element> = {
+  "current-ratio": () => (
+    <ChatDonut
+      title="Current Assets composition"
+      data={[
+        { label: "Inventory", value: R.stkC, color: "var(--purple)" },
+        { label: "Debtors", value: R.debtors, color: "var(--blue)" },
+        { label: "Cash", value: R.cash, color: "var(--green)" },
+        { label: "Other CA", value: 1410000, color: "var(--text-4)" },
+      ]}
+      centerValue={`${fL(K.ca)}L`}
+      centerLabel="Total CA"
+      size={220}
+    />
+  ),
+  receivables: () => {
+    const total = RECEIVABLES.reduce((s, r) => s + r.amount, 0);
+    const b030 = 170000;
+    const b3090 = 340000;
+    const b90365 = 510000;
+    const b365 = total - b030 - b3090 - b90365;
+    return (
+      <div className="space-y-3">
+        <ChatStackedBar
+          title="Aging buckets"
+          subtitle={`₹${(total / 1e7).toFixed(2)}Cr receivable across 4 buckets`}
+          segments={[
+            { label: "0-30d", value: b030, color: "var(--green)" },
+            { label: "30-90d", value: b3090, color: "var(--blue)" },
+            { label: "90-365d", value: b90365, color: "var(--yellow)" },
+            { label: "365+d", value: b365, color: "var(--red)" },
+          ]}
+        />
+        <ChatBarChart
+          title="Top 5 overdue parties"
+          data={RECEIVABLES.slice(0, 5).map((r) => ({
+            label: r.name,
+            value: r.amount,
+            color: r.days > 365 ? "var(--red)" : "var(--yellow)",
+            caption: `${r.days} days overdue · ${r.bills} bills`,
+          }))}
+        />
+      </div>
+    );
+  },
+  payables: () => (
+    <ChatBarChart
+      title="Top vendors you owe"
+      data={PAYABLES.slice(0, 8).map((p) => ({
+        label: p.name,
+        value: p.amount,
+        color: p.msme ? "var(--orange)" : "var(--red)",
+        caption: `${p.days}d aged${p.msme ? " · MSME (45d rule)" : ""} · ${p.category}`,
+      }))}
+    />
+  ),
+  mis: () => (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ background: "#fff", border: "1px solid var(--border)" }}
+    >
+      <div className="p-6" style={{ color: "#0F172A" }}>
+        <p className="text-[10px] uppercase tracking-widest font-bold mb-1" style={{ color: "#64748B" }}>
+          Management Information System
+        </p>
+        <p className="text-xl font-bold">Monthly MIS Report</p>
+        <p className="text-xs mt-0.5" style={{ color: "#64748B" }}>
+          Bandra Soap Pvt Ltd · March 2026
+        </p>
+        <hr className="my-4" style={{ borderColor: "#E2E8F0" }} />
+        <p className="text-sm font-bold mb-3" style={{ color: "#0F172A" }}>P&amp;L Summary</p>
+        <table className="w-full text-xs mb-4">
+          <tbody>
+            {[
+              { label: "Revenue", value: `₹${(R.rev / 1e7).toFixed(2)} Cr`, bold: true },
+              { label: "COGS", value: `₹${(R.cogs / 1e7).toFixed(2)} Cr` },
+              { label: `Gross Profit (${K.gm.toFixed(0)}%)`, value: `₹${(R.gp / 1e7).toFixed(2)} Cr`, bold: true, color: "#16A34A" },
+              { label: "OpEx", value: `₹${(R.indExp / 1e7).toFixed(2)} Cr` },
+              { label: "EBITDA", value: `-₹${(Math.abs(R.ebitda) / 1e7).toFixed(2)} Cr`, bold: true, color: "#DC2626" },
+              { label: "Net Loss", value: `-₹${(Math.abs(R.netPL) / 1e7).toFixed(2)} Cr`, bold: true, color: "#DC2626" },
+            ].map((r) => (
+              <tr key={r.label} style={{ borderTop: "1px solid #F1F5F9" }}>
+                <td
+                  className="py-1.5"
+                  style={{ color: r.color || (r.bold ? "#0F172A" : "#475569"), fontWeight: r.bold ? 600 : 400 }}
+                >
+                  {r.label}
+                </td>
+                <td
+                  className="py-1.5 text-right tabular-nums"
+                  style={{
+                    color: r.color || "#0F172A",
+                    fontWeight: r.bold ? 700 : 500,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {r.value}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ),
+  "revenue-trend": () => {
+    const maxIdx = R.ms.reduce((m, v, i) => (v > R.ms[m] ? i : m), 0);
+    return (
+      <ChatLineChart
+        title="Monthly revenue · FY 2024-25"
+        data={MONTHS.map((m, i) => ({ x: m, y: R.ms[i] }))}
+        color="var(--green)"
+        height={220}
+        highlight={{ index: maxIdx, label: `${MONTHS[maxIdx]} ₹${fL(R.ms[maxIdx])}L` }}
+      />
+    );
+  },
+  "cash-flow": () => (
+    <ChatForecastChart
+      title="Inflow vs outflow · running balance · next 6 weeks"
+      weeks={CASH_FORECAST_WEEKS}
+    />
+  ),
+  runway: () => {
+    const months = R.cash / K.burn;
+    const days = Math.round(months * 30);
+    return (
+      <div
+        className="rounded-xl p-5"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex flex-col items-center mb-4">
+          <Gauge
+            value={Math.min(days, 180)}
+            min={0}
+            max={180}
+            thresholds={{ red: 30, yellow: 90 }}
+            size={200}
+            label="days of runway"
+          />
+          <p
+            className="text-3xl font-bold mt-2"
+            style={{
+              color: days < 30 ? "var(--red)" : "var(--yellow)",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            {days} days
+          </p>
+          <p className="text-xs" style={{ color: "var(--text-3)" }}>
+            at current burn of ₹{fL(K.burn)}L/month
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <ChatKpi label="Cash on hand" value={`₹${fL(R.cash)}L`} />
+          <ChatKpi
+            label="Monthly burn"
+            value={`₹${fL(K.burn)}L`}
+            deltaColor="var(--red)"
+          />
+        </div>
+      </div>
+    );
+  },
+  "expense-breakdown": () => {
+    const totalExp =
+      R.mkt + R.emp + R.cac + R.ful + R.orc + R.ovh + R.interest + R.cogs;
+    return (
+      <div className="space-y-3">
+        <ChatDonut
+          title="Expense composition"
+          data={[
+            { label: "Marketing", value: R.mkt, color: "var(--red)" },
+            { label: "Employees", value: R.emp, color: "var(--blue)" },
+            { label: "CAC", value: R.cac, color: "var(--orange)" },
+            { label: "COGS", value: R.cogs, color: "var(--purple)" },
+            { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
+            { label: "Overheads", value: R.ovh + R.orc, color: "var(--text-4)" },
+          ]}
+          centerValue={`₹${(totalExp / 1e7).toFixed(1)}Cr`}
+          centerLabel="Total"
+          size={220}
+        />
+        <ChatBarChart
+          title="Top expense categories"
+          data={[
+            { label: "Marketing", value: R.mkt, color: "var(--red)" },
+            { label: "Employees", value: R.emp, color: "var(--blue)" },
+            { label: "CAC", value: R.cac, color: "var(--orange)" },
+            { label: "COGS", value: R.cogs, color: "var(--purple)" },
+            { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
+          ]}
+        />
+      </div>
+    );
+  },
+  waterfall: () => (
+    <ChatWaterfall data={WATERFALL} title="P&L waterfall · Revenue to EBITDA" />
+  ),
+  "gst-recon": () => <ChatGstRecon period={RECONCILIATION.period} />,
+  "gst-health": () => (
+    <div
+      className="rounded-xl p-5"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex flex-col items-center mb-4">
+        <Gauge
+          value={GST_HEALTH.score}
+          min={0}
+          max={100}
+          thresholds={{ red: 50, yellow: 75 }}
+          size={180}
+          label="GST Health"
+        />
+      </div>
+      <div className="space-y-2">
+        {[
+          { label: "Filing streak", value: `${GST_HEALTH.filingStreak} months`, color: "var(--green)" },
+          { label: "Avg days early", value: `${GST_HEALTH.avgDaysBeforeDue} days`, color: "var(--text-1)" },
+          { label: "ITC match rate", value: `${GST_HEALTH.itcMatchRate}%`, color: "var(--blue)" },
+          { label: "Excess ITC unclaimed", value: `₹${(GST_HEALTH.excessItcUnclaimed / 1e5).toFixed(1)}L`, color: "var(--yellow)" },
+        ].map((m) => (
+          <div
+            key={m.label}
+            className="flex items-center justify-between px-3 py-2 rounded-lg"
+            style={{ background: "var(--bg-hover)" }}
+          >
+            <span className="text-xs" style={{ color: "var(--text-3)" }}>
+              {m.label}
+            </span>
+            <span
+              className="text-sm font-bold tabular-nums"
+              style={{ color: m.color, fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              {m.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+  "top-customers": () => (
+    <ChatBarChart
+      title="Top customers by revenue"
+      data={TOP_CUSTOMERS.slice(0, 10).map((c) => ({
+        label: c.name,
+        value: c.revenue,
+        color:
+          c.channel === "Marketplace"
+            ? "var(--blue)"
+            : c.channel === "D2C"
+            ? "var(--green)"
+            : "var(--purple)",
+        caption: `${c.orders} orders · LTV ₹${(c.ltv / 1e5).toFixed(1)}L · ${c.channel}`,
+      }))}
+    />
+  ),
+  "health-score": () => {
+    const avg =
+      HEALTH_SCORES.reduce((s, h) => s + h.score, 0) / HEALTH_SCORES.length;
+    return (
+      <div
+        className="rounded-xl p-5"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex flex-col items-center mb-4">
+          <Gauge
+            value={avg}
+            min={0}
+            max={100}
+            thresholds={{ red: 40, yellow: 70 }}
+            size={180}
+            label="Overall health"
+          />
+        </div>
+        <div className="space-y-3">
+          {HEALTH_SCORES.map((h) => (
+            <div key={h.label}>
+              <div className="flex justify-between text-xs mb-1">
+                <span style={{ color: "var(--text-2)" }}>{h.label}</span>
+                <span
+                  className="tabular-nums font-bold"
+                  style={{ color: h.color, fontFamily: "'Space Grotesk', sans-serif" }}
+                >
+                  {h.score}
+                </span>
+              </div>
+              <div
+                className="h-2 rounded-full overflow-hidden"
+                style={{ background: "var(--bg-hover)" }}
+              >
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${h.score}%` }}
+                  transition={{ duration: 0.6 }}
+                  className="h-full rounded-full"
+                  style={{ background: h.color }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  },
+  "inventory-dead": () => (
+    <div className="space-y-3">
+      <ChatDonut
+        title="Dead stock by category"
+        data={DEAD_STOCK_SUMMARY.categoryBreakdown.map((c, i) => ({
+          label: c.category,
+          value: c.value,
+          color: ["var(--red)", "var(--orange)", "var(--yellow)"][i],
+        }))}
+        centerValue={`₹${(DEAD_STOCK_SUMMARY.totalValue / 1e5).toFixed(1)}L`}
+        centerLabel="Locked"
+        size={220}
+      />
+      <ChatBarChart
+        title="Top 5 dead SKUs"
+        data={DEAD_STOCK.slice(0, 5).map((s) => ({
+          label: s.name,
+          value: s.value,
+          color: "var(--red)",
+          caption: `${s.qty} units · last sold ${s.lastSold}`,
+        }))}
+      />
+    </div>
+  ),
+  returns: () => (
+    <ChatBarChart
+      title="Return rate by channel"
+      data={RETURNS_BY_CHANNEL.map((c) => ({
+        label: c.channel,
+        value: c.returns,
+        color:
+          c.rate > 20
+            ? "var(--red)"
+            : c.rate > 10
+            ? "var(--orange)"
+            : "var(--yellow)",
+        caption: `${c.rate.toFixed(1)}% rate · top reason: ${c.topReason}`,
+      }))}
+    />
+  ),
+  unknown: () => (
+    <div
+      className="rounded-xl p-5 text-center"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <Sparkles
+        size={20}
+        className="mx-auto mb-2"
+        style={{ color: "var(--green)" }}
+      />
+      <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+        Ask Riko a question to see the result here
+      </p>
+      <p className="text-xs mt-1" style={{ color: "var(--text-3)" }}>
+        Try the categorized prompts on the left.
+      </p>
+    </div>
+  ),
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1417,19 +1829,27 @@ function InputBar({
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Insights panel (desktop) — recent topics + related prompts
+   Result panel (desktop) — renders the active assistant message's
+   chart/widget full-width, with demo-quality action icons in the
+   header (edit/download/share are decorative). When conversation
+   is empty, shows an onboarding state with category prompts.
    ═══════════════════════════════════════════════════════════════ */
-function InsightsPanel({
-  recentTopics,
+function ResultPanel({
   currentIntent,
+  hasMessages,
   onPick,
   onNewChat,
 }: {
-  recentTopics: { intent: Intent; text: string }[];
   currentIntent: Intent | null;
+  hasMessages: boolean;
   onPick: (q: string) => void;
   onNewChat: () => void;
 }) {
+  const intent = currentIntent;
+  const Renderer = intent ? RESULT_RENDERERS[intent] : null;
+  const label = intent ? INTENT_LABELS[intent] : "Result";
+
+  // Related follow-up questions by intent (same mapping as before)
   const related = useMemo(() => {
     const map: Partial<Record<Intent, string[]>> = {
       "gst-recon": [
@@ -1481,128 +1901,147 @@ function InsightsPanel({
       mis: ["Send to CA", "Schedule monthly", "Board deck version"],
       unknown: [],
     };
-    if (!currentIntent) return [];
-    return map[currentIntent] ?? [];
-  }, [currentIntent]);
+    if (!intent) return [];
+    return map[intent] ?? [];
+  }, [intent]);
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header bar */}
       <div
-        className="sticky top-0 z-10 px-5 pt-4 pb-3 flex items-center justify-between"
+        className="sticky top-0 z-10 flex items-center justify-between px-5 py-3"
         style={{
           background: "var(--bg-secondary)",
           borderBottom: "1px solid var(--border)",
         }}
       >
-        <div className="flex items-center gap-1.5">
-          <Sparkles size={14} style={{ color: "var(--green)" }} />
+        <div className="flex items-center gap-2 min-w-0">
           <span
-            className="text-[10px] font-bold tracking-widest uppercase"
-            style={{ color: "var(--text-3)" }}
-          >
-            Insights
-          </span>
-        </div>
-        <button
-          onClick={onNewChat}
-          className="text-[10px] font-semibold flex items-center gap-1 px-2 py-1 rounded-md cursor-pointer transition-opacity hover:opacity-80"
-          style={{
-            background: "var(--bg-surface)",
-            border: "1px solid var(--border)",
-            color: "var(--text-3)",
-          }}
-        >
-          <RotateCcw size={10} />
-          New chat
-        </button>
-      </div>
-
-      <div className="px-5 py-4 space-y-5">
-        {/* Related follow-ups */}
-        {related.length > 0 && (
-          <div>
-            <p
-              className="text-[10px] font-bold uppercase tracking-wider mb-2"
-              style={{ color: "var(--text-4)" }}
-            >
-              Related questions
-            </p>
-            <div className="space-y-1.5">
-              {related.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => onPick(r)}
-                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-left cursor-pointer transition-colors"
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-2)",
-                  }}
-                >
-                  <ChevronRight
-                    size={12}
-                    style={{ color: "var(--green)", flexShrink: 0 }}
-                  />
-                  <span className="text-xs">{r}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent topics */}
-        {recentTopics.length > 0 && (
-          <div>
-            <p
-              className="text-[10px] font-bold uppercase tracking-wider mb-2"
-              style={{ color: "var(--text-4)" }}
-            >
-              Recent topics
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {recentTopics.map((t, i) => (
-                <div
-                  key={i}
-                  className="px-3 py-2 rounded-lg text-[11px]"
-                  style={{
-                    background: "var(--bg-surface)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text-3)",
-                  }}
-                >
-                  <span className="truncate block">{t.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Categories reference */}
-        <div>
-          <p
-            className="text-[10px] font-bold uppercase tracking-wider mb-2"
+            className="text-[10px] font-bold tracking-widest uppercase flex-shrink-0"
             style={{ color: "var(--text-4)" }}
           >
-            What Riko can answer
-          </p>
-          <div className="space-y-1.5">
-            {PROMPT_CATEGORIES.map((c) => (
-              <div
-                key={c.title}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                style={{
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border)",
-                }}
+            Result
+          </span>
+          {intent && (
+            <>
+              <span style={{ color: "var(--text-4)" }}>·</span>
+              <span
+                className="text-sm font-semibold truncate"
+                style={{ color: "var(--text-1)" }}
               >
-                <c.Icon size={14} style={{ color: c.color }} />
-                <span className="text-[11px] font-medium" style={{ color: "var(--text-2)" }}>
-                  {c.title}
-                </span>
-              </div>
-            ))}
-          </div>
+                {label}
+              </span>
+            </>
+          )}
         </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {intent && (
+            <>
+              <button
+                className="p-1.5 rounded-md cursor-pointer transition-opacity hover:opacity-70"
+                style={{ color: "var(--text-3)" }}
+                title="Download (demo)"
+                aria-label="Download result"
+              >
+                <Download size={14} />
+              </button>
+              <button
+                className="p-1.5 rounded-md cursor-pointer transition-opacity hover:opacity-70"
+                style={{ color: "var(--text-3)" }}
+                title="Share (demo)"
+                aria-label="Share result"
+              >
+                <Share2 size={14} />
+              </button>
+              <div
+                className="w-px h-4 mx-1"
+                style={{ background: "var(--border)" }}
+              />
+            </>
+          )}
+          <button
+            onClick={onNewChat}
+            className="text-[11px] font-semibold flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer transition-opacity hover:opacity-80"
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              color: "var(--text-3)",
+            }}
+          >
+            <RotateCcw size={11} />
+            New chat
+          </button>
+        </div>
+      </div>
+
+      {/* Main content — scrollable */}
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+        {Renderer ? (
+          <div className="space-y-4">
+            <Renderer />
+            {/* Related follow-ups below the main result */}
+            {related.length > 0 && (
+              <div>
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider mb-2 mt-2"
+                  style={{ color: "var(--text-4)" }}
+                >
+                  Suggested follow-ups
+                </p>
+                <div className="space-y-1.5">
+                  {related.map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => onPick(r)}
+                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-left cursor-pointer transition-colors hover:opacity-80"
+                      style={{
+                        background: "var(--bg-surface)",
+                        border: "1px solid var(--border)",
+                        color: "var(--text-2)",
+                      }}
+                    >
+                      <Sparkles
+                        size={11}
+                        style={{ color: "var(--green)", flexShrink: 0 }}
+                      />
+                      <span className="text-xs">{r}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          // Empty state — no active result
+          <div className="h-full flex flex-col items-center justify-center text-center gap-4">
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center"
+              style={{
+                background: "color-mix(in srgb, var(--green) 12%, transparent)",
+              }}
+            >
+              <Sparkles size={22} style={{ color: "var(--green)" }} />
+            </div>
+            <div>
+              <p
+                className="text-sm font-semibold"
+                style={{ color: "var(--text-1)" }}
+              >
+                {hasMessages
+                  ? "No result for this message"
+                  : "Ask Riko something"}
+              </p>
+              <p
+                className="text-xs mt-1 max-w-xs"
+                style={{ color: "var(--text-3)" }}
+              >
+                {hasMessages
+                  ? "Your answer will appear here when Riko responds."
+                  : "Your chart, table, or recon widget will show up here full-width."}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1611,7 +2050,18 @@ function InsightsPanel({
 /* ═══════════════════════════════════════════════════════════════
    Main chat
    ═══════════════════════════════════════════════════════════════ */
-export function ChatScreen() {
+interface ChatScreenProps {
+  /** Optional: a question pre-seeded from another screen (e.g. Dashboard
+   *  Causal Chain click). Auto-dispatches on mount if set, then calls
+   *  onQuestionConsumed so the parent can clear it. */
+  initialQuestion?: string | null;
+  onQuestionConsumed?: () => void;
+}
+
+export function ChatScreen({
+  initialQuestion,
+  onQuestionConsumed,
+}: ChatScreenProps = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pendingTyping, setPendingTyping] = useState(false);
@@ -1657,6 +2107,21 @@ export function ChatScreen() {
     }, 480);
   };
 
+  /* Consume initialQuestion from parent (e.g. Dashboard → Causal Chain node
+     click). Auto-dispatch on mount only when the question changes from null. */
+  const consumedQuestionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      initialQuestion &&
+      initialQuestion !== consumedQuestionRef.current
+    ) {
+      consumedQuestionRef.current = initialQuestion;
+      handleSend(initialQuestion);
+      onQuestionConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuestion]);
+
   const handleNewChat = () => {
     setMessages([]);
     setInput("");
@@ -1672,14 +2137,6 @@ export function ChatScreen() {
     return null;
   }, [messages]);
 
-  // Recent user topics for insights sidebar
-  const recentTopics = useMemo(() => {
-    return messages
-      .filter((m): m is ChatMessage & { role: "user" } => m.role === "user")
-      .slice(-5)
-      .reverse()
-      .map((m) => ({ intent: m.intent ?? "unknown", text: m.text }));
-  }, [messages]);
 
   /* ── Empty state ── */
   if (messages.length === 0) {
@@ -1791,7 +2248,7 @@ export function ChatScreen() {
     >
       {/* Left — conversation */}
       <div
-        className="flex flex-col flex-1 md:w-[60%] md:flex-none md:border-r min-w-0"
+        className="flex flex-col flex-1 md:w-[45%] md:flex-none md:border-r min-w-0"
         style={{ borderColor: "var(--border)" }}
       >
         <div
@@ -1813,14 +2270,17 @@ export function ChatScreen() {
         <InputBar value={input} onChange={setInput} onSend={() => handleSend()} />
       </div>
 
-      {/* Right — insights (desktop only) */}
+      {/* Right — Result panel (desktop only).
+         FireAI pattern: big chart/widget full-width, summary + chips
+         stay on the left in conversation. On mobile this panel is
+         hidden and charts render inline in the chat. */}
       <div
-        className="hidden md:flex md:flex-col md:w-[40%] min-w-0"
+        className="hidden md:flex md:flex-col md:w-[55%] min-w-0"
         style={{ background: "var(--bg-secondary)" }}
       >
-        <InsightsPanel
-          recentTopics={recentTopics}
+        <ResultPanel
           currentIntent={currentIntent}
+          hasMessages={messages.length > 0}
           onPick={handleSend}
           onNewChat={handleNewChat}
         />

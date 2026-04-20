@@ -34,6 +34,14 @@ const BOTTOM_MAP: Record<string, TabId> = {
 export default function Home() {
   const [tab, setTab] = useState<TabId>("dashboard");
   const [moreOpen, setMoreOpen] = useState(false);
+  // Cross-tab chat handoff: any screen can dispatch a question into Chat.
+  // Example: clicking a Causal Chain node on Dashboard opens Chat with
+  // "Why am I losing money?" already sent.
+  const [pendingChatQuestion, setPendingChatQuestion] = useState<string | null>(null);
+  const askRiko = (q: string) => {
+    setPendingChatQuestion(q);
+    setTab("chat");
+  };
   const { role, canSee, roleConfig } = useRbac();
   const { current: COMPANY, resetToDefault, isCustomSelection } = useCompany();
 
@@ -43,6 +51,7 @@ export default function Home() {
      change caused a race during hydration that bounced the user back. */
   useEffect(() => {
     if (!canSee(tab)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTab(roleConfig.homeTab as TabId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,8 +123,13 @@ export default function Home() {
         </header>
 
         <div className="p-4 md:p-6">
-          {tab === "dashboard" && <Dashboard />}
-          {tab === "chat" && <Chat />}
+          {tab === "dashboard" && <Dashboard onAskRiko={askRiko} />}
+          {tab === "chat" && (
+            <Chat
+              initialQuestion={pendingChatQuestion}
+              onQuestionConsumed={() => setPendingChatQuestion(null)}
+            />
+          )}
           {tab === "clients" && <Clients />}
           {tab === "gst" && <Gst />}
           {tab === "tds" && <Tds />}
