@@ -352,10 +352,11 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
                 : undefined
             }
             centerLabel={shape.total !== undefined ? "Total" : undefined}
+            bare
           />
         );
       case "bar":
-        return <ChatBarChart data={barData} currency={currency} />;
+        return <ChatBarChart data={barData} currency={currency} bare />;
       case "treemap":
         return (
           <CompositionTreemap
@@ -369,7 +370,7 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
           />
         );
       default:
-        return <ChatDonut data={donutData} />;
+        return <ChatDonut data={donutData} bare />;
     }
   }
 
@@ -388,11 +389,11 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
     }));
     switch (type) {
       case "bar":
-        return <ChatBarChart data={barData} currency={currency} />;
+        return <ChatBarChart data={barData} currency={currency} bare />;
       case "donut":
       case "pie":
         return (
-          <ChatDonut data={donutData} size={220} />
+          <ChatDonut data={donutData} size={220} bare />
         );
       case "treemap":
         return (
@@ -407,7 +408,7 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
           />
         );
       default:
-        return <ChatBarChart data={barData} currency={currency} />;
+        return <ChatBarChart data={barData} currency={currency} bare />;
     }
   }
 
@@ -422,6 +423,7 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
             showArea={false}
             highlight={shape.highlight}
             height={220}
+            bare
           />
         );
       case "area":
@@ -432,6 +434,7 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
             showArea={true}
             highlight={shape.highlight}
             height={220}
+            bare
           />
         );
       case "bar":
@@ -443,6 +446,7 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
               color: shape.color ?? "var(--green)",
             }))}
             currency={true}
+            bare
           />
         );
       default:
@@ -452,6 +456,7 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
             color={shape.color ?? "var(--green)"}
             showArea
             height={220}
+            bare
           />
         );
     }
@@ -513,6 +518,7 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
               caption: `${shape.values[i]} / ${a.max}`,
             }))}
             currency={false}
+            bare
           />
         );
       default:

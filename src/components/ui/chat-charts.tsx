@@ -39,13 +39,64 @@ export function ChatBarChart({
   title,
   showValues = true,
   currency = true,
+  bare = false,
 }: {
   data: BarDatum[];
   title?: string;
   showValues?: boolean;
   currency?: boolean;
+  /** Skip outer card/title when parent provides them (e.g. ChartRenderer). */
+  bare?: boolean;
 }) {
   const max = Math.max(...data.map((d) => Math.abs(d.value)), 1);
+
+  const rows = (
+    <div className="space-y-2.5">
+      {data.map((d, i) => {
+        const pct = (Math.abs(d.value) / max) * 100;
+        const color = d.color || "var(--green)";
+        return (
+          <div key={d.label + i}>
+            <div className="flex justify-between items-baseline text-[11px] mb-1">
+              <span className="truncate max-w-[65%]" style={{ color: "var(--text-2)" }}>
+                {d.label}
+              </span>
+              {showValues && (
+                <span
+                  className="font-bold tabular-nums"
+                  style={{
+                    color: "var(--text-1)",
+                    fontFamily: "'Space Grotesk', sans-serif",
+                  }}
+                >
+                  {currency ? fmt(d.value) : d.value.toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+            <div
+              className="h-2 rounded-full overflow-hidden"
+              style={{ background: "var(--bg-hover)" }}
+            >
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
+                className="h-full rounded-full"
+                style={{ background: color }}
+              />
+            </div>
+            {d.caption && (
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+                {d.caption}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (bare) return rows;
 
   return (
     <div
@@ -57,49 +108,7 @@ export function ChatBarChart({
           {title}
         </p>
       )}
-      <div className="space-y-2.5">
-        {data.map((d, i) => {
-          const pct = (Math.abs(d.value) / max) * 100;
-          const color = d.color || "var(--green)";
-          return (
-            <div key={d.label + i}>
-              <div className="flex justify-between items-baseline text-[11px] mb-1">
-                <span className="truncate max-w-[65%]" style={{ color: "var(--text-2)" }}>
-                  {d.label}
-                </span>
-                {showValues && (
-                  <span
-                    className="font-bold tabular-nums"
-                    style={{
-                      color: "var(--text-1)",
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}
-                  >
-                    {currency ? fmt(d.value) : d.value.toLocaleString("en-IN")}
-                  </span>
-                )}
-              </div>
-              <div
-                className="h-2 rounded-full overflow-hidden"
-                style={{ background: "var(--bg-hover)" }}
-              >
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
-                  className="h-full rounded-full"
-                  style={{ background: color }}
-                />
-              </div>
-              {d.caption && (
-                <p className="text-[10px] mt-0.5" style={{ color: "var(--text-4)" }}>
-                  {d.caption}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {rows}
     </div>
   );
 }
@@ -121,6 +130,7 @@ export function ChatLineChart({
   showArea = true,
   zeroLine = false,
   highlight,
+  bare = false,
 }: {
   data: LinePoint[];
   title?: string;
@@ -129,9 +139,12 @@ export function ChatLineChart({
   showArea?: boolean;
   zeroLine?: boolean;
   highlight?: { index: number; label: string };
+  /** When true, render only the SVG without the outer card/title.
+   *  Use when the parent (e.g. ChartRenderer) already provides the card. */
+  bare?: boolean;
 }) {
   const W = 360;
-  const pad = { top: 16, right: 12, bottom: 24, left: 40 };
+  const pad = { top: 16, right: 12, bottom: 24, left: 44 };
   const chartW = W - pad.left - pad.right;
   const chartH = height - pad.top - pad.bottom;
 
@@ -150,22 +163,13 @@ export function ChatLineChart({
 
   const zeroY = yScale(0);
 
-  return (
-    <div
-      className="rounded-xl p-4"
-      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+  const svgContent = (
+    <svg
+      viewBox={`0 0 ${W} ${height}`}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ width: "100%", height: "auto" }}
     >
-      {title && (
-        <p className="text-xs font-bold mb-2" style={{ color: "var(--text-1)" }}>
-          {title}
-        </p>
-      )}
-      <svg
-        viewBox={`0 0 ${W} ${height}`}
-        preserveAspectRatio="xMidYMid meet"
-        style={{ width: "100%", height: "auto" }}
-      >
-        {/* Gridlines (4 horizontal) */}
+      {/* Gridlines (4 horizontal) */}
         {[0, 0.25, 0.5, 0.75, 1].map((frac, i) => {
           const y = pad.top + chartH * (1 - frac);
           const val = min + range * frac;
@@ -186,7 +190,7 @@ export function ChatLineChart({
                 y={y + 3}
                 textAnchor="end"
                 fontSize="9"
-                fill="var(--text-4)"
+                fill="var(--text-3)"
                 fontFamily="'Space Grotesk', sans-serif"
               >
                 {fmt(val, false)}
@@ -259,39 +263,75 @@ export function ChatLineChart({
               y={height - 6}
               textAnchor="middle"
               fontSize="9"
-              fill="var(--text-4)"
+              fill="var(--text-3)"
             >
               {d.x}
             </text>
           );
         })}
 
-        {/* Highlight callout */}
-        {highlight && (
-          <g>
-            <rect
-              x={xScale(highlight.index) - 30}
-              y={yScale(data[highlight.index].y) - 22}
-              width={60}
-              height={16}
-              rx={3}
-              fill="var(--yellow)"
-              opacity={0.95}
-            />
-            <text
-              x={xScale(highlight.index)}
-              y={yScale(data[highlight.index].y) - 11}
-              textAnchor="middle"
-              fontSize="9"
-              fontWeight="700"
-              fill="#000"
-              fontFamily="'Space Grotesk', sans-serif"
-            >
-              {highlight.label}
-            </text>
-          </g>
-        )}
-      </svg>
+        {/* Highlight callout — clamps to chart area so it doesn't
+            overlap the Y-axis labels at the left edge or overflow
+            on the right edge. */}
+        {highlight && (() => {
+          const cx = xScale(highlight.index);
+          const dy = yScale(data[highlight.index].y);
+          const rectW = 68;
+          const rectH = 16;
+          // Clamp rect x so the callout stays within the plot area
+          const rectX = Math.max(
+            pad.left + 2,
+            Math.min(cx - rectW / 2, W - pad.right - rectW - 2)
+          );
+          // If callout would push into the top padding, place it BELOW
+          // the dot instead of above
+          const aboveY = dy - rectH - 6;
+          const belowY = dy + 6;
+          const rectY = aboveY < pad.top + 2 ? belowY : aboveY;
+          const textY = rectY + rectH / 2 + 3;
+          // Text anchor centered on rect, not on dot
+          const textX = rectX + rectW / 2;
+          return (
+            <g>
+              <rect
+                x={rectX}
+                y={rectY}
+                width={rectW}
+                height={rectH}
+                rx={3}
+                fill="var(--yellow)"
+                opacity={0.95}
+              />
+              <text
+                x={textX}
+                y={textY}
+                textAnchor="middle"
+                fontSize="9"
+                fontWeight="700"
+                fill="#000"
+                fontFamily="'Space Grotesk', sans-serif"
+              >
+                {highlight.label}
+              </text>
+            </g>
+          );
+        })()}
+    </svg>
+  );
+
+  if (bare) return svgContent;
+
+  return (
+    <div
+      className="rounded-xl p-4"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      {title && (
+        <p className="text-xs font-bold mb-2" style={{ color: "var(--text-1)" }}>
+          {title}
+        </p>
+      )}
+      {svgContent}
     </div>
   );
 }
@@ -312,12 +352,15 @@ export function ChatDonut({
   centerValue,
   centerLabel,
   size = 140,
+  bare = false,
 }: {
   data: DonutSlice[];
   title?: string;
   centerValue?: string;
   centerLabel?: string;
   size?: number;
+  /** Skip outer card/title when parent provides them. */
+  bare?: boolean;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   const cx = size / 2;
@@ -352,6 +395,73 @@ export function ChatDonut({
     return [...acc, { ...d, path, frac }];
   }, []);
 
+  const body = (
+    <div className="flex items-center gap-4">
+      <div className="relative flex-shrink-0">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {arcs.map((a, i) => (
+            <motion.path
+              key={i}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, delay: i * 0.06 }}
+              d={a.path}
+              fill={a.color}
+              style={{ transformOrigin: `${cx}px ${cy}px` }}
+            />
+          ))}
+        </svg>
+        {(centerValue || centerLabel) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            {centerValue && (
+              <span
+                className="text-base font-bold tabular-nums"
+                style={{
+                  color: "var(--text-1)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                {centerValue}
+              </span>
+            )}
+            {centerLabel && (
+              <span
+                className="text-[10px] uppercase tracking-wider"
+                style={{ color: "var(--text-3)" }}
+              >
+                {centerLabel}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex-1 space-y-1.5">
+        {arcs.map((a, i) => (
+          <div key={i} className="flex items-center gap-2 text-[11px]">
+            <span
+              className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+              style={{ background: a.color }}
+            />
+            <span className="flex-1 truncate" style={{ color: "var(--text-2)" }}>
+              {a.label}
+            </span>
+            <span
+              className="font-semibold tabular-nums"
+              style={{
+                color: "var(--text-1)",
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >
+              {(a.frac * 100).toFixed(0)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (bare) return body;
+
   return (
     <div
       className="rounded-xl p-4"
@@ -362,68 +472,7 @@ export function ChatDonut({
           {title}
         </p>
       )}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-shrink-0">
-          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-            {arcs.map((a, i) => (
-              <motion.path
-                key={i}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: i * 0.06 }}
-                d={a.path}
-                fill={a.color}
-                style={{ transformOrigin: `${cx}px ${cy}px` }}
-              />
-            ))}
-          </svg>
-          {(centerValue || centerLabel) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              {centerValue && (
-                <span
-                  className="text-base font-bold tabular-nums"
-                  style={{
-                    color: "var(--text-1)",
-                    fontFamily: "'Space Grotesk', sans-serif",
-                  }}
-                >
-                  {centerValue}
-                </span>
-              )}
-              {centerLabel && (
-                <span
-                  className="text-[9px] uppercase tracking-wider"
-                  style={{ color: "var(--text-4)" }}
-                >
-                  {centerLabel}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex-1 space-y-1.5">
-          {arcs.map((a, i) => (
-            <div key={i} className="flex items-center gap-2 text-[11px]">
-              <span
-                className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                style={{ background: a.color }}
-              />
-              <span className="flex-1 truncate" style={{ color: "var(--text-2)" }}>
-                {a.label}
-              </span>
-              <span
-                className="font-semibold tabular-nums"
-                style={{
-                  color: "var(--text-1)",
-                  fontFamily: "'Space Grotesk', sans-serif",
-                }}
-              >
-                {(a.frac * 100).toFixed(0)}%
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {body}
     </div>
   );
 }
@@ -619,12 +668,21 @@ export function ChatForecastChart({
   title?: string;
 }) {
   const W = 380;
-  const H = 160;
-  const pad = { top: 20, right: 12, bottom: 34, left: 44 };
+  const H = 180; // a bit taller to fit y-axis scale labels
+  const pad = { top: 16, right: 12, bottom: 40, left: 50 };
   const chartW = W - pad.left - pad.right;
   const chartH = H - pad.top - pad.bottom;
 
-  const allVals = weeks.flatMap((w) => [w.inflow, w.outflow, w.endBalance, 0]);
+  // Include `-w.outflow` so the Y-axis range covers the bottom of the
+  // outflow bars (bars extend DOWN from zero). Previous version only
+  // included +w.outflow which let the bars overflow the viewBox when
+  // outflow magnitude exceeded abs(minEndBalance).
+  const allVals = weeks.flatMap((w) => [
+    w.inflow,
+    -w.outflow,
+    w.endBalance,
+    0,
+  ]);
   const min = Math.min(...allVals);
   const max = Math.max(...allVals);
   const range = max - min || 1;
@@ -639,6 +697,20 @@ export function ChatForecastChart({
     .join(" ");
 
   const zeroY = yScale(0);
+
+  // Y-axis ticks: pick 4 round values across the range
+  const fmtAxis = (v: number): string => {
+    const abs = Math.abs(v);
+    const sign = v < 0 ? "-" : "";
+    if (abs >= 1e7) return `${sign}₹${(abs / 1e7).toFixed(1)}Cr`;
+    if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(1)}L`;
+    if (abs >= 1e3) return `${sign}₹${(abs / 1e3).toFixed(0)}K`;
+    return `${sign}${abs}`;
+  };
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((frac) => ({
+    v: min + range * frac,
+    y: pad.top + chartH * (1 - frac),
+  }));
 
   return (
     <div
@@ -655,27 +727,45 @@ export function ChatForecastChart({
         preserveAspectRatio="xMidYMid meet"
         style={{ width: "100%", height: "auto" }}
       >
-        {/* Zero line */}
-        <line
-          x1={pad.left}
-          y1={zeroY}
-          x2={W - pad.right}
-          y2={zeroY}
-          stroke="var(--red)"
-          strokeDasharray="3 3"
-          strokeWidth={1}
-          opacity={0.6}
-        />
-        <text
-          x={pad.left - 6}
-          y={zeroY + 3}
-          textAnchor="end"
-          fontSize="9"
-          fill="var(--red)"
-          fontFamily="'Space Grotesk', sans-serif"
-        >
-          0
-        </text>
+        {/* Y-axis gridlines + scale labels */}
+        {yTicks.map((t, i) => (
+          <g key={`tick-${i}`}>
+            <line
+              x1={pad.left}
+              y1={t.y}
+              x2={W - pad.right}
+              y2={t.y}
+              stroke="var(--border)"
+              strokeWidth={1}
+              strokeDasharray={i === 0 || i === yTicks.length - 1 ? "0" : "2 3"}
+              opacity={i === 0 || i === yTicks.length - 1 ? 0.8 : 0.35}
+            />
+            <text
+              x={pad.left - 6}
+              y={t.y + 3}
+              textAnchor="end"
+              fontSize="9"
+              fill="var(--text-3)"
+              fontFamily="'Space Grotesk', sans-serif"
+            >
+              {fmtAxis(t.v)}
+            </text>
+          </g>
+        ))}
+
+        {/* Zero line — stronger red dashed overlay when not at the edge */}
+        {zeroY > pad.top + 4 && zeroY < pad.top + chartH - 4 && (
+          <line
+            x1={pad.left}
+            y1={zeroY}
+            x2={W - pad.right}
+            y2={zeroY}
+            stroke="var(--red)"
+            strokeDasharray="3 3"
+            strokeWidth={1}
+            opacity={0.55}
+          />
+        )}
 
         {/* Inflow/outflow bars per week */}
         {weeks.map((w, i) => {
@@ -705,21 +795,22 @@ export function ChatForecastChart({
                 opacity={0.7}
                 rx={1}
               />
-              {/* week label */}
+              {/* week label — 2 lines, stronger contrast */}
               <text
                 x={cx}
-                y={H - 20}
+                y={H - 22}
                 textAnchor="middle"
-                fontSize="8"
-                fill="var(--text-4)"
+                fontSize="9"
+                fontWeight="600"
+                fill="var(--text-2)"
               >
                 {w.week.split(" ")[0]}
               </text>
               <text
                 x={cx}
-                y={H - 9}
+                y={H - 10}
                 textAnchor="middle"
-                fontSize="7.5"
+                fontSize="8"
                 fill="var(--text-4)"
               >
                 {w.week.split(" ").slice(1).join(" ").replace(/[()]/g, "")}
