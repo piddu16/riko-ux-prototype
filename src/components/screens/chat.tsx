@@ -12,10 +12,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { motion, AnimatePresence, MotionConfig } from "framer-motion";
+import { motion, MotionConfig } from "framer-motion";
 import {
   Send,
-  ChevronDown,
   ChevronRight,
   Wallet,
   Landmark,
@@ -59,6 +58,7 @@ import {
 import { ChatGstRecon } from "@/components/ui/chat-gst-recon";
 import { Gauge } from "@/components/ui/gauge";
 import { DeadStockTreemap } from "@/components/ui/dead-stock-treemap";
+import { ChartRenderer, type DataShape } from "@/components/ui/chart-switcher";
 
 /* ═══════════════════════════════════════════════════════════════
    Intents — what a message can be about
@@ -122,6 +122,10 @@ function classifyIntent(text: string): Intent {
 /* ═══════════════════════════════════════════════════════════════
    Shared UI helpers
    ═══════════════════════════════════════════════════════════════ */
+/* Always-visible insight callout. Previously this was a click-to-expand
+ * disclosure, but the insight IS the value — collapsing it hid the
+ * reasoning behind a click. Now flat: icon + title + body always shown.
+ * Keeps the existing Layer name so call sites don't change. */
 function Layer({
   color,
   icon,
@@ -133,39 +137,27 @@ function Layer({
   title: string;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
   return (
     <div
       className="rounded-lg overflow-hidden my-1.5"
       style={{ border: `1px solid color-mix(in srgb, ${color} 40%, transparent)` }}
     >
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-xs font-semibold cursor-pointer"
+      <div
+        className="flex items-center gap-2 px-3 py-2 text-xs font-semibold"
         style={{
           background: `color-mix(in srgb, ${color} 10%, transparent)`,
           color,
         }}
       >
-        <span>{icon}</span>
+        <span aria-hidden>{icon}</span>
         <span className="flex-1 text-left">{title}</span>
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="overflow-hidden"
-          >
-            <div className="px-3 py-2 text-xs" style={{ color: "var(--text-2)" }}>
-              {children}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
+      <div
+        className="px-3 py-2.5 text-xs leading-relaxed"
+        style={{ color: "var(--text-2)" }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -1525,17 +1517,22 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       </div>
     </div>
   ),
+  // Revenue trend: migrated to ChartRenderer — user can switch
+  // between line / area / bar representations of the same 12-month data.
   "revenue-trend": () => {
     const maxIdx = R.ms.reduce((m, v, i) => (v > R.ms[m] ? i : m), 0);
-    return (
-      <ChatLineChart
-        title="Monthly revenue · FY 2024-25"
-        data={MONTHS.map((m, i) => ({ x: m, y: R.ms[i] }))}
-        color="var(--green)"
-        height={220}
-        highlight={{ index: maxIdx, label: `${MONTHS[maxIdx]} ₹${fL(R.ms[maxIdx])}L` }}
-      />
-    );
+    const shape: DataShape = {
+      kind: "timeseries",
+      title: "Monthly revenue · FY 2024-25",
+      subtitle: `Total ₹${(R.rev / 1e7).toFixed(2)}Cr · ${K.yoy.toFixed(0)}% YoY`,
+      points: MONTHS.map((m, i) => ({ x: m, y: R.ms[i] })),
+      color: "var(--green)",
+      highlight: {
+        index: maxIdx,
+        label: `${MONTHS[maxIdx]} ₹${fL(R.ms[maxIdx])}L`,
+      },
+    };
+    return <ChartRenderer shape={shape} defaultType="line" />;
   },
   "cash-flow": () => (
     <ChatForecastChart
@@ -1584,37 +1581,26 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       </div>
     );
   },
+  // Expense breakdown: migrated to ChartRenderer — switch between
+  // donut / bar / treemap for the same 6 expense categories.
   "expense-breakdown": () => {
     const totalExp =
       R.mkt + R.emp + R.cac + R.ful + R.orc + R.ovh + R.interest + R.cogs;
-    return (
-      <div className="space-y-3">
-        <ChatDonut
-          title="Expense composition"
-          data={[
-            { label: "Marketing", value: R.mkt, color: "var(--red)" },
-            { label: "Employees", value: R.emp, color: "var(--blue)" },
-            { label: "CAC", value: R.cac, color: "var(--orange)" },
-            { label: "COGS", value: R.cogs, color: "var(--purple)" },
-            { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
-            { label: "Overheads", value: R.ovh + R.orc, color: "var(--text-4)" },
-          ]}
-          centerValue={`₹${(totalExp / 1e7).toFixed(1)}Cr`}
-          centerLabel="Total"
-          size={220}
-        />
-        <ChatBarChart
-          title="Top expense categories"
-          data={[
-            { label: "Marketing", value: R.mkt, color: "var(--red)" },
-            { label: "Employees", value: R.emp, color: "var(--blue)" },
-            { label: "CAC", value: R.cac, color: "var(--orange)" },
-            { label: "COGS", value: R.cogs, color: "var(--purple)" },
-            { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
-          ]}
-        />
-      </div>
-    );
+    const shape: DataShape = {
+      kind: "composition",
+      title: "Expense composition",
+      subtitle: `Total spend FY 2024-25: ₹${(totalExp / 1e7).toFixed(2)}Cr`,
+      total: totalExp,
+      parts: [
+        { label: "Marketing", value: R.mkt, color: "var(--red)" },
+        { label: "Employees", value: R.emp, color: "var(--blue)" },
+        { label: "CAC", value: R.cac, color: "var(--orange)" },
+        { label: "COGS", value: R.cogs, color: "var(--purple)" },
+        { label: "Fulfilment", value: R.ful, color: "var(--yellow)" },
+        { label: "Overheads", value: R.ovh + R.orc, color: "var(--text-4)" },
+      ],
+    };
+    return <ChartRenderer shape={shape} defaultType="donut" />;
   },
   waterfall: () => (
     <ChatWaterfall data={WATERFALL} title="P&L waterfall · Revenue to EBITDA" />
@@ -1661,10 +1647,15 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       </div>
     </div>
   ),
-  "top-customers": () => (
-    <ChatBarChart
-      title="Top customers by revenue"
-      data={TOP_CUSTOMERS.slice(0, 10).map((c) => ({
+  // Top customers: migrated to ChartRenderer — switch between
+  // bar / donut / treemap for top 10 customers by revenue.
+  "top-customers": () => {
+    const total = TOP_CUSTOMERS.reduce((s, c) => s + c.revenue, 0);
+    const shape: DataShape = {
+      kind: "categorical",
+      title: "Top customers by revenue",
+      subtitle: `Top 10 = ₹${(total / 1e7).toFixed(2)}Cr of ₹${(R.rev / 1e7).toFixed(2)}Cr`,
+      entries: TOP_CUSTOMERS.slice(0, 10).map((c) => ({
         label: c.name,
         value: c.revenue,
         color:
@@ -1674,9 +1665,10 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
             ? "var(--green)"
             : "var(--purple)",
         caption: `${c.orders} orders · LTV ₹${(c.ltv / 1e5).toFixed(1)}L · ${c.channel}`,
-      }))}
-    />
-  ),
+      })),
+    };
+    return <ChartRenderer shape={shape} defaultType="bar" />;
+  },
   "health-score": () => {
     const avg =
       HEALTH_SCORES.reduce((s, h) => s + h.score, 0) / HEALTH_SCORES.length;
