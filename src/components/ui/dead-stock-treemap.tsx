@@ -120,10 +120,12 @@ export function DeadStockTreemap({ height = 420, onAsk }: DeadStockTreemapProps)
               textStyle: { color: palette.text3, fontSize: 11 },
             },
           },
+          // Leaf-tile label (SKU tiles). Uses ECharts rich-text formatter
+          // with two styles: `n` for short name, `v` for value below.
           label: {
             show: true,
+            position: "inside",
             formatter: (p: { name: string; value: number }) => {
-              // Short label for the tile: name + locked value
               const short = p.name.length > 22 ? p.name.slice(0, 20) + "…" : p.name;
               return `{n|${short}}\n{v|${fmtINR(p.value)}}`;
             },
@@ -143,12 +145,17 @@ export function DeadStockTreemap({ height = 420, onAsk }: DeadStockTreemapProps)
               },
             },
           },
+          // Parent category strip. Plain formatter — rich syntax would
+          // render raw here because the upperLabel doesn't inherit the
+          // leaf label's `rich` config. Keep it simple.
           upperLabel: {
             show: true,
-            height: 24,
+            height: 22,
             color: palette.text1,
             fontWeight: 700,
             fontSize: 12,
+            formatter: (p: { name: string; value: number }) =>
+              `${p.name}  ·  ${fmtINR(p.value)}`,
           },
           itemStyle: {
             borderColor: palette.bg1,
@@ -156,16 +163,27 @@ export function DeadStockTreemap({ height = 420, onAsk }: DeadStockTreemapProps)
             gapWidth: 2,
           },
           levels: [
-            // Top-level category: neutral bg, heading-style label
+            // Level 0 — virtual root. Hide its upperLabel so the empty
+            // "root" strip doesn't render above the categories.
+            {
+              upperLabel: { show: false },
+              itemStyle: {
+                borderColor: palette.bg1,
+                borderWidth: 3,
+                gapWidth: 3,
+              },
+            },
+            // Level 1 — categories. Inherits the series upperLabel
+            // formatter (plain text: "Category · ₹X.XL").
             {
               itemStyle: {
                 borderColor: palette.bg1,
                 borderWidth: 3,
                 gapWidth: 3,
               },
-              upperLabel: { show: true, color: palette.text1 },
             },
-            // SKU leaves: color comes from itemStyle set per leaf
+            // Level 2 — SKU leaves. Inherits the series label rich
+            // formatter (name in `n` style + value in `v` style).
             {
               itemStyle: {
                 borderColor: palette.bg2,
