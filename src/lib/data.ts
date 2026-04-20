@@ -260,11 +260,15 @@ export interface Client {
   tags: string[];              // ["Priority", "FY26", "Referred"]
   monthlyHours: number;        // hrs logged this month
   monthlyBilled: number;       // ₹ billed this month
-  complianceCoverage: {        // per-filing, for this month
+  /** Per-filing coverage this month. Only surfaces filings Riko
+   *  actually supports via API — GST (GSTR-1 / 2B / 3B / 9), TDS,
+   *  bank recon. State taxes, FSSAI, e-way bills, etc. are
+   *  explicitly out of scope for automated coverage. */
+  complianceCoverage: {
     gstr1: boolean;
     gstr3b: boolean;
     tds: boolean;
-    pt: boolean;
+    bankRecon: boolean;  // Bank reconciliation done for the month
   };
   churnRisk: ChurnRisk;
   onboarding?: ClientOnboardStatus;
@@ -284,7 +288,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 43210", gstin: "27AABCB1234F1Z5",
     assignedTo: "u-rajesh", tags: ["Priority", "FY25 close"],
     monthlyHours: 18.5, monthlyBilled: 42000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, pt: false },
+    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, bankRecon: false },
     churnRisk: "low",
   },
   {
@@ -298,7 +302,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 99001", gstin: "24AABCS5678G1Z2",
     assignedTo: "u-priya", tags: ["FY25 close"],
     monthlyHours: 22.0, monthlyBilled: 48000,
-    complianceCoverage: { gstr1: false, gstr3b: true, tds: true, pt: false },
+    complianceCoverage: { gstr1: false, gstr3b: true, tds: true, bankRecon: false },
     churnRisk: "medium",
   },
   {
@@ -312,7 +316,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 11223", gstin: "24AAACK2345H1Z7",
     assignedTo: "u-rajesh", tags: [],
     monthlyHours: 12.5, monthlyBilled: 28000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: false, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: false, bankRecon: true },
     churnRisk: "none",
   },
   {
@@ -326,7 +330,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 55667", gstin: "27AABCM9876L1Z1",
     assignedTo: "u-vikram", tags: ["Priority"],
     monthlyHours: 15.0, monthlyBilled: 32000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: false },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: false },
     churnRisk: "none",
   },
   {
@@ -340,7 +344,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 33445", gstin: "27AABCP4455K1Z3",
     assignedTo: "u-priya", tags: ["Priority"],
     monthlyHours: 14.0, monthlyBilled: 38000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
     churnRisk: "none",
   },
   {
@@ -349,12 +353,12 @@ export const CLIENTS: Client[] = [
     revenueTrend: [55, 58, 62, 66, 70, 74, 76, 80, 82, 86, 88, 90],
     netPL: "+18.7L", healthScore: 82, status: "healthy", complianceScore: 90, complianceGrade: "A+",
     issues: [],
-    nextAction: { verb: "Renew", detail: "FY26 engagement letter", deadline: "2026-05-05", priority: "medium" },
+    nextAction: { verb: "Review", detail: "FY25 closing P&L with owner", deadline: "2026-04-30", priority: "medium" },
     misStatus: "Delivered", lastSync: "30m ago", lastSyncVouchers: 8, ownerLastLogin: "Today",
     contact: "+91 98765 77889", gstin: "29AABCS2222B1Z5",
     assignedTo: "u-vikram", tags: ["Growth"],
     monthlyHours: 8.0, monthlyBilled: 18000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
     churnRisk: "none",
   },
   {
@@ -362,13 +366,13 @@ export const CLIENTS: Client[] = [
     location: "Mumbai", revenue: "6.82Cr", revenueValue: 6.82e7, revenueYoY: 0.04,
     revenueTrend: [72, 74, 72, 76, 74, 78, 76, 80, 78, 82, 80, 84],
     netPL: "+28.4L", healthScore: 74, status: "warning", complianceScore: 80, complianceGrade: "A",
-    issues: ["FSSAI renewal in 14 days"],
-    nextAction: { verb: "Renew", detail: "FSSAI license", deadline: "2026-05-04", priority: "high" },
+    issues: ["GSTR-3B not filed yet", "Bank recon pending for March"],
+    nextAction: { verb: "File", detail: "GSTR-3B for March 2026", deadline: "2026-05-20", priority: "high" },
     misStatus: "In progress", lastSync: "6h ago", lastSyncVouchers: 22, ownerLastLogin: "2d ago",
     contact: "+91 98765 88220", gstin: "27AABCK3456F1Z9",
     assignedTo: "u-rajesh", tags: [],
     monthlyHours: 11.0, monthlyBilled: 26000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: true, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: false, tds: true, bankRecon: true },
     churnRisk: "none",
   },
   {
@@ -382,7 +386,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 22001", gstin: "07AABCG4567M1Z1",
     assignedTo: "u-priya", tags: [],
     monthlyHours: 9.5, monthlyBilled: 22000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, pt: false },
+    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, bankRecon: false },
     churnRisk: "low",
   },
   {
@@ -391,12 +395,12 @@ export const CLIENTS: Client[] = [
     revenueTrend: [82, 84, 85, 86, 88, 88, 90, 92, 90, 94, 92, 96],
     netPL: "+1.88Cr", healthScore: 86, status: "healthy", complianceScore: 92, complianceGrade: "A+",
     issues: [],
-    nextAction: { verb: "Prep", detail: "Statutory audit kickoff", priority: "medium" },
+    nextAction: { verb: "Finalize", detail: "FY25 closing entries + P&L", deadline: "2026-04-30", priority: "medium" },
     misStatus: "Delivered", lastSync: "45m ago", lastSyncVouchers: 142, ownerLastLogin: "Today",
     contact: "+91 98765 11111", gstin: "27AABCR5432L1Z4",
-    assignedTo: "u-rajesh", tags: ["Priority", "Statutory audit"],
+    assignedTo: "u-rajesh", tags: ["Priority", "FY25 close"],
     monthlyHours: 28.0, monthlyBilled: 75000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
     churnRisk: "none",
   },
   {
@@ -404,13 +408,13 @@ export const CLIENTS: Client[] = [
     location: "Pune", revenue: "3.88Cr", revenueValue: 3.88e7, revenueYoY: 0.18,
     revenueTrend: [60, 62, 64, 68, 70, 72, 76, 78, 82, 84, 86, 88],
     netPL: "+42.1L", healthScore: 79, status: "warning", complianceScore: 86, complianceGrade: "A",
-    issues: ["PT not filed Q4"],
-    nextAction: { verb: "File", detail: "Professional Tax Q4", deadline: "2026-04-30", priority: "medium" },
+    issues: ["Debtors aging 60d+"],
+    nextAction: { verb: "Review", detail: "Debtors aging & collection plan", deadline: "2026-04-28", priority: "medium" },
     misStatus: "Delivered", lastSync: "2h ago", lastSyncVouchers: 31, ownerLastLogin: "1d ago",
     contact: "+91 98765 33311", gstin: "27AABCJ6789N1Z2",
     assignedTo: "u-priya", tags: ["Growth"],
     monthlyHours: 10.5, monthlyBilled: 24000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: false },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: false },
     churnRisk: "none",
   },
   {
@@ -424,7 +428,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 66522", gstin: "33AABCS9876P1Z8",
     assignedTo: "u-vikram", tags: ["Growth"],
     monthlyHours: 13.0, monthlyBilled: 34000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
     churnRisk: "none",
   },
   {
@@ -438,7 +442,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 40403", gstin: "23AABCA1122Q1Z9",
     assignedTo: "u-rajesh", tags: ["FY25 close"],
     monthlyHours: 16.0, monthlyBilled: 38000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: false, pt: false },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: false, bankRecon: false },
     churnRisk: "medium",
   },
   {
@@ -452,7 +456,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 70707", gstin: "29AABCG7788R1Z3",
     assignedTo: "u-vikram", tags: ["Growth", "FY26"],
     monthlyHours: 7.0, monthlyBilled: 16000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
     churnRisk: "none",
     onboarding: "active",
   },
@@ -467,7 +471,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 88877", gstin: "06AABCA3344S1Z5",
     assignedTo: "u-priya", tags: [],
     monthlyHours: 11.5, monthlyBilled: 27000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: false },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: false },
     churnRisk: "none",
   },
   {
@@ -475,13 +479,13 @@ export const CLIENTS: Client[] = [
     location: "Jaipur", revenue: "6.3Cr", revenueValue: 6.3e7, revenueYoY: -0.02,
     revenueTrend: [78, 76, 74, 76, 74, 72, 74, 72, 70, 72, 70, 68],
     netPL: "+22.8L", healthScore: 69, status: "warning", complianceScore: 74, complianceGrade: "B",
-    issues: ["Gold stock valuation date needed", "E-way bill mismatches"],
-    nextAction: { verb: "Reconcile", detail: "E-way bill mismatches (14 entries)", deadline: "2026-04-26", priority: "high" },
+    issues: ["GSTR-3B not filed", "Closing stock valuation pending"],
+    nextAction: { verb: "File", detail: "GSTR-3B for March (overdue)", deadline: "2026-04-25", priority: "high" },
     misStatus: "Pending", lastSync: "7h ago", lastSyncVouchers: 19, ownerLastLogin: "4d ago",
     contact: "+91 98765 55544", gstin: "08AABCM5566T1Z8",
     assignedTo: "u-rajesh", tags: [],
     monthlyHours: 9.0, monthlyBilled: 21000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, bankRecon: true },
     churnRisk: "low",
   },
   {
@@ -495,7 +499,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 99988", gstin: "36AABCN7788U1Z2",
     assignedTo: "u-priya", tags: ["Priority"],
     monthlyHours: 15.5, monthlyBilled: 42000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, pt: true },
+    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
     churnRisk: "none",
   },
   {
@@ -509,7 +513,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 11100", gstin: "03AABCB8899V1Z6",
     assignedTo: "u-vikram", tags: ["FY25 close"],
     monthlyHours: 3.0, monthlyBilled: 8000,
-    complianceCoverage: { gstr1: false, gstr3b: false, tds: false, pt: false },
+    complianceCoverage: { gstr1: false, gstr3b: false, tds: false, bankRecon: false },
     churnRisk: "high",
   },
   {
@@ -523,7 +527,7 @@ export const CLIENTS: Client[] = [
     contact: "+91 98765 22233", gstin: "24AABCO9900W1Z9",
     assignedTo: "u-rajesh", tags: ["Onboarding", "FY26"],
     monthlyHours: 2.0, monthlyBilled: 0,
-    complianceCoverage: { gstr1: false, gstr3b: false, tds: false, pt: false },
+    complianceCoverage: { gstr1: false, gstr3b: false, tds: false, bankRecon: false },
     churnRisk: "none",
     onboarding: "sync-setup",
   },
@@ -615,8 +619,17 @@ export interface ComplianceDeadline {
 }
 
 export function computeComplianceCalendar(): ComplianceDeadline[] {
-  // Hardcoded for demo (matches the COMPLIANCE_ITEMS pattern but mapped
-  // to real clients from CLIENTS for realism on the strip).
+  // Only filings Riko actually automates:
+  //  • GST: GSTR-1, GSTR-2B ITC match, GSTR-3B, GSTR-9
+  //  • TDS: monthly payment + quarterly return
+  //  • Income Tax: Advance Tax reconciliation (TDS data), ITR prep
+  //  • Internal CA workflow: MIS delivery, FY25 closing review
+  //  • Bank recon (Riko module)
+  // Out of scope (removed from this calendar):
+  //  • FSSAI / trade licenses
+  //  • E-way bills
+  //  • Professional Tax (state-specific, not core)
+  //  • Engagement letter renewals (firm admin)
   const base: Array<{
     date: string;
     filing: string;
@@ -624,18 +637,18 @@ export function computeComplianceCalendar(): ComplianceDeadline[] {
     severity: "urgent" | "soon" | "upcoming";
     clientNames: string[];
   }> = [
-    { date: "2026-04-22", filing: "Advance Tax Q4", section: "Income Tax",   severity: "urgent",   clientNames: ["Mumbai Distributors", "Agarwal Tractors LLP", "Bandra Soap Pvt Ltd"] },
-    { date: "2026-04-23", filing: "MIS delivery",    section: "Client",       severity: "urgent",   clientNames: ["Kothari Traders"] },
-    { date: "2026-04-24", filing: "TDS Payment",     section: "194Q, 194J",   severity: "urgent",   clientNames: ["Gupta Hardware Co", "Agarwal Tractors LLP", "Mehta Jewels & Co"] },
-    { date: "2026-04-25", filing: "GSTR-2B recon",   section: "ITC matching", severity: "soon",     clientNames: ["Gupta Hardware Co"] },
-    { date: "2026-04-26", filing: "E-way bill recon",section: "Movement",     severity: "soon",     clientNames: ["Mehta Jewels & Co"] },
-    { date: "2026-04-28", filing: "Owner review",    section: "Client",       severity: "soon",     clientNames: ["Sri Balaji Exports", "Om Infra Builders"] },
-    { date: "2026-04-30", filing: "Professional Tax",section: "State",        severity: "soon",     clientNames: ["Joshi Pharma Traders"] },
-    { date: "2026-05-05", filing: "Engagement letter",section: "FY26 renewal",severity: "upcoming", clientNames: ["Sai Enterprises"] },
-    { date: "2026-05-07", filing: "TDS Payment",     section: "Monthly",      severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
-    { date: "2026-05-11", filing: "GSTR-1",           section: "Outward",      severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Bhatia Exports", "Kothari Traders", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Om Infra Builders"] },
-    { date: "2026-05-15", filing: "GSTR-9 prep",      section: "Annual",       severity: "upcoming", clientNames: ["Nexus Electronics Pvt Ltd"] },
-    { date: "2026-05-20", filing: "GSTR-3B",          section: "Monthly",      severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
+    { date: "2026-04-22", filing: "Advance Tax recon", section: "FY25 year-end",   severity: "urgent",   clientNames: ["Bandra Soap Pvt Ltd", "Agarwal Tractors LLP", "Mumbai Distributors"] },
+    { date: "2026-04-23", filing: "MIS delivery",      section: "CA workflow",     severity: "urgent",   clientNames: ["Kothari Traders", "Bandra Soap Pvt Ltd", "Mumbai Distributors"] },
+    { date: "2026-04-24", filing: "TDS Q4 return prep",section: "Form 24Q/26Q",    severity: "urgent",   clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Agarwal Tractors LLP"] },
+    { date: "2026-04-25", filing: "GSTR-2B ITC match", section: "ITC matching",    severity: "soon",     clientNames: ["Bandra Soap Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co", "Surat Textiles Pvt Ltd", "Agarwal Tractors LLP"] },
+    { date: "2026-04-28", filing: "FY25 closing review",section: "CA workflow",    severity: "soon",     clientNames: ["Sri Balaji Exports", "Reliance Retail - Bandra", "Sai Enterprises", "Joshi Pharma Traders"] },
+    { date: "2026-04-30", filing: "TDS Payment (Mar)", section: "Monthly · special March deadline", severity: "soon", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
+    { date: "2026-04-30", filing: "Bank reconciliation",section: "Month-end",      severity: "soon",     clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
+    { date: "2026-05-07", filing: "TDS Payment",       section: "Monthly · for April", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
+    { date: "2026-05-11", filing: "GSTR-1",             section: "Outward supplies", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Bhatia Exports", "Kothari Traders", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Om Infra Builders"] },
+    { date: "2026-05-15", filing: "GSTR-9 annual prep", section: "FY25 annual",     severity: "upcoming", clientNames: ["Nexus Electronics Pvt Ltd", "Reliance Retail - Bandra"] },
+    { date: "2026-05-20", filing: "GSTR-3B",             section: "Monthly summary", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
+    { date: "2026-05-31", filing: "TDS Q4 return",       section: "Form 24Q/26Q filing", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mumbai Distributors", "Agarwal Tractors LLP"] },
   ];
 
   // Group by date

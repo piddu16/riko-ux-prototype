@@ -514,7 +514,7 @@ function ComplianceStrip({
             Compliance calendar
           </p>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
-            Next 21 days · tap a date to filter clients affected
+            GST · TDS · MIS · Bank recon — tap a date to filter clients affected
           </p>
         </div>
         <button
