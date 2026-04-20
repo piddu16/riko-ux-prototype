@@ -59,6 +59,7 @@ import { ChatGstRecon } from "@/components/ui/chat-gst-recon";
 import { Gauge } from "@/components/ui/gauge";
 import { DeadStockTreemap } from "@/components/ui/dead-stock-treemap";
 import { ChartRenderer, type DataShape } from "@/components/ui/chart-switcher";
+import { COHORT_RETENTION } from "@/lib/data";
 
 /* ═══════════════════════════════════════════════════════════════
    Intents — what a message can be about
@@ -79,6 +80,9 @@ type Intent =
   | "health-score"
   | "inventory-dead"
   | "returns"
+  | "cohort-retention"
+  | "money-flow"
+  | "customer-ltv"
   | "unknown";
 
 type ChatMessage =
@@ -101,12 +105,18 @@ function classifyIntent(text: string): Intent {
   if (/runway|months.*left|how.*long.*survive|cash.*runway/.test(q)) return "runway";
   if (/waterfall|p&l|profit.*loss|loss.*why|losing.*money/.test(q))
     return "waterfall";
+  if (/money.*flow|sankey|where.*cash.*goes|cash.*flow.*diagram|p&l.*flow/.test(q))
+    return "money-flow";
+  if (/cohort|retention|repeat.*purchas|customer.*retention|sticky/.test(q))
+    return "cohort-retention";
+  if (/customer.*segment|customer.*value|whales|ltv.*vs|ltv.*scatter|customer.*recency/.test(q))
+    return "customer-ltv";
   if (/expens.*break|where.*money|spend.*break|cost.*break/.test(q))
     return "expense-breakdown";
   if (/(current|quick|cash).*ratio|liquidity/.test(q)) return "current-ratio";
   if (/owe.*me|receivab|debtor|collect|overdue/.test(q)) return "receivables";
   if (/\bi.*owe|pay.*vendor|payabl|creditor|msme/.test(q)) return "payables";
-  if (/top.*customer|best.*customer|biggest.*client|ltv/.test(q))
+  if (/top.*customer|best.*customer|biggest.*client|\bltv\b/.test(q))
     return "top-customers";
   if (/dead.*stock|slow.*moving|obsolete.*sku|expiring/.test(q))
     return "inventory-dead";
@@ -1312,6 +1322,128 @@ function ExchangeReturns({ onFollowup }: { onFollowup: (q: string) => void }) {
   );
 }
 
+/* ── Cohort retention ── */
+function ExchangeCohortRetention({ onFollowup }: { onFollowup: (q: string) => void }) {
+  // Approximate repeat rate: how much of the earliest cohort is still active now.
+  const oldest = COHORT_RETENTION[0];
+  const stillActive = oldest.retention[oldest.retention.length - 1];
+  const avgQ2Retention =
+    COHORT_RETENTION
+      .filter((c) => c.retention.length >= 2)
+      .reduce((s, c) => s + c.retention[1], 0) /
+    COHORT_RETENTION.filter((c) => c.retention.length >= 2).length;
+
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Customer retention cohorts
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              {COHORT_RETENTION.length} quarterly cohorts · avg Q2 retention{" "}
+              {avgQ2Retention.toFixed(0)}%
+            </p>
+          </div>
+          <Pill color="var(--blue)">{stillActive}% of FY23 Q1 still active</Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Q2 retention improved from <strong>68%</strong> (FY23 Q1) to{" "}
+          <strong>82%</strong> (FY24 Q2) — product is getting stickier. But
+          long-tail retention (Q8) is only <strong>{stillActive}%</strong>.
+          Subscription or refill-reminder WhatsApp flow could unlock the dormant
+          half.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["Top customers by LTV", "Customer LTV scatter", "Revenue trend"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/* ── Money flow (sankey) ── */
+function ExchangeMoneyFlow({ onFollowup }: { onFollowup: (q: string) => void }) {
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+          Where your money flows
+        </p>
+        <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+          Revenue to Net P&amp;L — ribbon width shows relative size of each flow
+        </p>
+      </div>
+
+      <Layer color="var(--red)" icon="💡" title="Riko's take">
+        <p>
+          Marketing + CAC together are the thickest outflow at ₹
+          {((R.mkt + R.cac) / 1e7).toFixed(2)}Cr — 52% of total spend. That&apos;s
+          the single biggest lever for getting to profitability.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["P&L waterfall", "Cash runway", "Expense breakdown"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
+/* ── Customer LTV scatter ── */
+function ExchangeCustomerLtv({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const top = TOP_CUSTOMERS.slice(0, 5);
+  return (
+    <RikoMsg>
+      <div
+        className="rounded-xl p-4 mb-2"
+        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              Customer LTV vs recency
+            </p>
+            <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+              Each dot = one customer · size = order count · color = channel
+            </p>
+          </div>
+          <Pill color="var(--green)">
+            Top LTV: ₹{(top[0].ltv / 1e5).toFixed(1)}L
+          </Pill>
+        </div>
+      </div>
+
+      <Layer color="var(--yellow)" icon="💡" title="Riko's take">
+        <p>
+          Amazon has the highest LTV customer (₹
+          {(TOP_CUSTOMERS[1].ltv / 1e5).toFixed(1)}L, 298 orders) but their
+          return rate is 32%. Website D2C has lower LTV per customer but better
+          margins and repeat rate — double down on D2C marketing.
+        </p>
+      </Layer>
+
+      <Chips
+        items={["Cohort retention", "Top customers by revenue", "Returns by channel"]}
+        onPick={onFollowup}
+      />
+    </RikoMsg>
+  );
+}
+
 /* ── Unknown fallback ── */
 function ExchangeUnknown({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
@@ -1377,6 +1509,9 @@ const EXCHANGE_RENDERERS: Record<
   "health-score": ExchangeHealthScore,
   "inventory-dead": ExchangeDeadStock,
   returns: ExchangeReturns,
+  "cohort-retention": ExchangeCohortRetention,
+  "money-flow": ExchangeMoneyFlow,
+  "customer-ltv": ExchangeCustomerLtv,
   unknown: ExchangeUnknown,
 };
 
@@ -1392,6 +1527,9 @@ const INTENT_LABELS: Record<Intent, string> = {
   payables: "Payables",
   mis: "MIS report",
   "revenue-trend": "Revenue trend",
+  "cohort-retention": "Cohort retention",
+  "money-flow": "Money flow",
+  "customer-ltv": "Customer LTV",
   "cash-flow": "Cash flow forecast",
   runway: "Runway",
   "expense-breakdown": "Expense breakdown",
@@ -1669,53 +1807,125 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     };
     return <ChartRenderer shape={shape} defaultType="bar" />;
   },
+  // Health score: migrated to ChartRenderer — switches between
+  // radar (default, shows shape at a glance) and bar (ranked dimensions).
   "health-score": () => {
     const avg =
       HEALTH_SCORES.reduce((s, h) => s + h.score, 0) / HEALTH_SCORES.length;
-    return (
-      <div
-        className="rounded-xl p-5"
-        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
-      >
-        <div className="flex flex-col items-center mb-4">
-          <Gauge
-            value={avg}
-            min={0}
-            max={100}
-            thresholds={{ red: 40, yellow: 70 }}
-            size={180}
-            label="Overall health"
-          />
-        </div>
-        <div className="space-y-3">
-          {HEALTH_SCORES.map((h) => (
-            <div key={h.label}>
-              <div className="flex justify-between text-xs mb-1">
-                <span style={{ color: "var(--text-2)" }}>{h.label}</span>
-                <span
-                  className="tabular-nums font-bold"
-                  style={{ color: h.color, fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  {h.score}
-                </span>
-              </div>
-              <div
-                className="h-2 rounded-full overflow-hidden"
-                style={{ background: "var(--bg-hover)" }}
-              >
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${h.score}%` }}
-                  transition={{ duration: 0.6 }}
-                  className="h-full rounded-full"
-                  style={{ background: h.color }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+    const shape: DataShape = {
+      kind: "radar",
+      title: "Business health dimensions",
+      subtitle: `Overall ${avg.toFixed(0)}/100 · weakest dimension drags the rest`,
+      axes: HEALTH_SCORES.map((h) => ({ name: h.label, max: 100 })),
+      values: HEALTH_SCORES.map((h) => h.score),
+      seriesName: "Bandra Soap",
+      color: "var(--green)",
+    };
+    return <ChartRenderer shape={shape} defaultType="radar" />;
+  },
+  // Cohort retention heatmap. Rows = cohort quarters, cols = tenure periods.
+  "cohort-retention": () => {
+    const cols = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"];
+    const rows = COHORT_RETENTION.map((c) => c.cohort);
+    // Pad each row to 8 cols with NaN for missing (future) quarters.
+    const values = COHORT_RETENTION.map((c) => {
+      const row: number[] = [];
+      for (let i = 0; i < 8; i++) {
+        row.push(c.retention[i] ?? NaN);
+      }
+      return row;
+    });
+    const shape: DataShape = {
+      kind: "matrix",
+      title: "Customer retention by cohort",
+      subtitle: "Rows = acquisition quarter · cols = tenure · color = % still active",
+      rows,
+      cols,
+      values,
+      format: "percent",
+      colorDirection: "higher-better",
+    };
+    return <ChartRenderer shape={shape} defaultType="heatmap" />;
+  },
+  // Money flow sankey. Revenue channels → Net P&L with proportional ribbons.
+  "money-flow": () => {
+    // Build nodes + links. Amount at each edge = what's flowing through.
+    // Use approximate channel splits (matching CausalChain) + R numbers.
+    const channelRev = {
+      Marketplace: R.rev * 0.55,
+      "Website D2C": R.rev * 0.34,
+      "B2B Offline": R.rev * 0.11,
+    };
+    const shape: DataShape = {
+      kind: "flow",
+      title: "Money flow · Revenue to Net P&L",
+      subtitle: "Ribbon width shows the size of each flow — thick = big lever",
+      nodes: [
+        { name: "Marketplace", category: "source" },
+        { name: "Website D2C", category: "source" },
+        { name: "B2B Offline", category: "source" },
+        { name: "Total Revenue", category: "total" },
+        { name: "COGS", category: "deduction" },
+        { name: "Gross Profit", category: "total" },
+        { name: "Marketing", category: "deduction" },
+        { name: "CAC", category: "deduction" },
+        { name: "Employees", category: "deduction" },
+        { name: "Fulfilment", category: "deduction" },
+        { name: "Overheads", category: "deduction" },
+        { name: "EBITDA (loss)", category: "result" },
+      ],
+      links: [
+        { source: "Marketplace", target: "Total Revenue", value: channelRev.Marketplace },
+        { source: "Website D2C", target: "Total Revenue", value: channelRev["Website D2C"] },
+        { source: "B2B Offline", target: "Total Revenue", value: channelRev["B2B Offline"] },
+        { source: "Total Revenue", target: "COGS", value: R.cogs },
+        { source: "Total Revenue", target: "Gross Profit", value: R.gp },
+        { source: "Gross Profit", target: "Marketing", value: R.mkt },
+        { source: "Gross Profit", target: "CAC", value: R.cac },
+        { source: "Gross Profit", target: "Employees", value: R.emp },
+        { source: "Gross Profit", target: "Fulfilment", value: R.ful },
+        { source: "Gross Profit", target: "Overheads", value: R.ovh + R.orc },
+        {
+          source: "Gross Profit",
+          target: "EBITDA (loss)",
+          // Flow out to EBITDA must be positive for sankey; use absolute burn
+          value: Math.max(0, R.gp - (R.mkt + R.cac + R.emp + R.ful + R.ovh + R.orc)),
+        },
+      ],
+    };
+    return <ChartRenderer shape={shape} defaultType="sankey" />;
+  },
+  // Customer LTV vs recency scatter.
+  "customer-ltv": () => {
+    // "Today" = April 15 2026 for computing days-since-last-order
+    const TODAY = new Date("2026-04-15").getTime();
+    const parseDate = (s: string): number => {
+      const t = new Date(s).getTime();
+      return Number.isNaN(t) ? TODAY : t;
+    };
+    const shape: DataShape = {
+      kind: "scatter",
+      title: "Customer LTV vs recency",
+      subtitle: "Dot size = order count · color = channel · top-left is the ideal zone",
+      points: TOP_CUSTOMERS.map((c) => {
+        const daysSince = Math.max(
+          0,
+          Math.round((TODAY - parseDate(c.lastOrder)) / (1000 * 60 * 60 * 24))
+        );
+        return {
+          x: daysSince,
+          y: c.ltv,
+          label: c.name,
+          size: c.orders,
+          category: c.channel,
+        };
+      }),
+      xLabel: "Days since last order",
+      yLabel: "Lifetime value",
+      xIsCurrency: false,
+      yIsCurrency: true,
+    };
+    return <ChartRenderer shape={shape} defaultType="bubble" />;
   },
   // Dead stock: ECharts treemap on desktop Result panel. Clicks dispatch
   // a liquidation question into Chat via the context's onAsk.
@@ -1791,8 +2001,8 @@ const PROMPT_CATEGORIES = [
     prompts: [
       "Revenue trend this year",
       "Top customers by revenue",
-      "Why am I losing money?",
-      "Business health score",
+      "Customer LTV vs recency",
+      "Cohort retention",
     ],
   },
   {
@@ -1802,8 +2012,8 @@ const PROMPT_CATEGORIES = [
     prompts: [
       "Dead stock SKUs",
       "Expense breakdown",
-      "Returns by channel",
-      "Generate March MIS",
+      "Money flow diagram",
+      "Business health score",
     ],
   },
 ];

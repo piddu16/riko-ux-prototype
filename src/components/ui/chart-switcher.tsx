@@ -31,6 +31,8 @@ import {
   AreaChart,
   LayoutGrid,
   Check,
+  ScatterChart as ScatterIcon,
+  Radar,
 } from "lucide-react";
 import {
   ChatBarChart,
@@ -41,6 +43,10 @@ import {
   type DonutSlice,
 } from "./chat-charts";
 import { CompositionTreemap } from "./composition-treemap";
+import { CohortHeatmap } from "./chart-matrix";
+import { MoneyFlowSankey, type SankeyNode, type SankeyLink } from "./chart-sankey";
+import { CustomerScatter, type ScatterPoint } from "./chart-scatter";
+import { HealthRadar, type RadarAxis } from "./chart-radar";
 
 /* ═══════════════════════════════════════════════════════════════
    DataShape — the structure of the data, independent of how we
@@ -69,6 +75,42 @@ export type DataShape =
       points: { x: string; y: number }[];
       color?: string;
       highlight?: { index: number; label: string };
+    }
+  | {
+      kind: "matrix";
+      title: string;
+      subtitle?: string;
+      rows: string[];
+      cols: string[];
+      values: number[][];
+      format?: "percent" | "currency" | "number";
+      colorDirection?: "higher-better" | "higher-worse";
+    }
+  | {
+      kind: "flow";
+      title: string;
+      subtitle?: string;
+      nodes: SankeyNode[];
+      links: SankeyLink[];
+    }
+  | {
+      kind: "scatter";
+      title: string;
+      subtitle?: string;
+      points: ScatterPoint[];
+      xLabel?: string;
+      yLabel?: string;
+      xIsCurrency?: boolean;
+      yIsCurrency?: boolean;
+    }
+  | {
+      kind: "radar";
+      title: string;
+      subtitle?: string;
+      axes: RadarAxis[];
+      values: number[];
+      seriesName?: string;
+      color?: string;
     };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -80,7 +122,12 @@ export type ChartType =
   | "bar"
   | "treemap"
   | "line"
-  | "area";
+  | "area"
+  | "heatmap"
+  | "sankey"
+  | "scatter"
+  | "bubble"
+  | "radar";
 
 /** Which chart types are valid for each data shape.
  *  Order matters — first entry is the default recommendation. */
@@ -88,6 +135,10 @@ export const CHART_TYPES_FOR_SHAPE: Record<DataShape["kind"], ChartType[]> = {
   composition: ["donut", "bar", "treemap"],
   categorical: ["bar", "donut", "treemap"],
   timeseries: ["line", "area", "bar"],
+  matrix: ["heatmap"],
+  flow: ["sankey"],
+  scatter: ["scatter", "bubble"],
+  radar: ["radar", "bar"],
 };
 
 export const CHART_LABELS: Record<ChartType, string> = {
@@ -97,6 +148,11 @@ export const CHART_LABELS: Record<ChartType, string> = {
   treemap: "Treemap",
   line: "Line",
   area: "Area",
+  heatmap: "Heatmap",
+  sankey: "Sankey",
+  scatter: "Scatter",
+  bubble: "Bubble",
+  radar: "Radar",
 };
 
 export const CHART_ICONS: Record<ChartType, typeof BarChart3> = {
@@ -106,6 +162,11 @@ export const CHART_ICONS: Record<ChartType, typeof BarChart3> = {
   treemap: LayoutGrid,
   line: LineIcon,
   area: AreaChart,
+  heatmap: LayoutGrid,
+  sankey: BarChart3, // lucide has no sankey icon; bar chart is close enough
+  scatter: ScatterIcon,
+  bubble: ScatterIcon,
+  radar: Radar as typeof BarChart3,
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -396,6 +457,76 @@ function renderByShape(shape: DataShape, type: ChartType): React.ReactElement {
     }
   }
 
+  if (shape.kind === "matrix") {
+    // Only heatmap is valid for matrix today.
+    return (
+      <CohortHeatmap
+        rows={shape.rows}
+        cols={shape.cols}
+        values={shape.values}
+        height={Math.max(260, shape.rows.length * 40 + 80)}
+        format={shape.format ?? "number"}
+        colorDirection={shape.colorDirection ?? "higher-better"}
+      />
+    );
+  }
+
+  if (shape.kind === "flow") {
+    // Only sankey is valid for flow today.
+    return (
+      <MoneyFlowSankey nodes={shape.nodes} links={shape.links} height={420} />
+    );
+  }
+
+  if (shape.kind === "scatter") {
+    // scatter vs bubble: same chart, bubble scales by size field.
+    return (
+      <CustomerScatter
+        points={shape.points}
+        xLabel={shape.xLabel}
+        yLabel={shape.yLabel}
+        xIsCurrency={shape.xIsCurrency}
+        yIsCurrency={shape.yIsCurrency}
+        asBubble={type === "bubble"}
+      />
+    );
+  }
+
+  if (shape.kind === "radar") {
+    switch (type) {
+      case "radar":
+        return (
+          <HealthRadar
+            axes={shape.axes}
+            values={shape.values}
+            seriesName={shape.seriesName}
+            areaColor={shape.color}
+          />
+        );
+      case "bar":
+        return (
+          <ChatBarChart
+            data={shape.axes.map((a, i) => ({
+              label: a.name,
+              value: shape.values[i],
+              color: shape.color ?? "var(--green)",
+              caption: `${shape.values[i]} / ${a.max}`,
+            }))}
+            currency={false}
+          />
+        );
+      default:
+        return (
+          <HealthRadar
+            axes={shape.axes}
+            values={shape.values}
+            seriesName={shape.seriesName}
+            areaColor={shape.color}
+          />
+        );
+    }
+  }
+
   // Unreachable (exhaustive above) but TS wants it.
   return <div />;
 }
@@ -437,5 +568,13 @@ export function recommendChartType(shape: DataShape): ChartType {
       return shape.entries.length > 6 ? "bar" : "bar";
     case "timeseries":
       return "line";
+    case "matrix":
+      return "heatmap";
+    case "flow":
+      return "sankey";
+    case "scatter":
+      return shape.points.some((p) => p.size !== undefined) ? "bubble" : "scatter";
+    case "radar":
+      return "radar";
   }
 }
