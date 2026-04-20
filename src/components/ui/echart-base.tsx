@@ -266,3 +266,26 @@ export function fmtINR(v: number): string {
   if (abs >= 1e3) return `${sign}₹${(abs / 1e3).toFixed(0)}K`;
   return `${sign}₹${abs}`;
 }
+
+/** Resolve a CSS color string. If it's `var(--name)` or
+ *  `var(--name, fallback)` we substitute the computed property value
+ *  from the document root. Otherwise return the input unchanged.
+ *
+ *  ECharts doesn't understand CSS custom properties — passing
+ *  "var(--blue)" to itemStyle.color gives you a pale/broken render.
+ *  Always run user-supplied colors through this before handing them
+ *  to an ECharts option. */
+export function resolveCssVar(val: string | undefined): string | undefined {
+  if (!val) return val;
+  if (!val.includes("var(")) return val;
+  if (typeof window === "undefined") return val;
+  const root = getComputedStyle(document.documentElement);
+  return val.replace(
+    /var\(\s*(--[a-zA-Z0-9-]+)(?:\s*,\s*([^)]+))?\s*\)/g,
+    (_, name, fallback) => {
+      const resolved = root.getPropertyValue(name).trim();
+      if (resolved) return resolved;
+      return (fallback ?? "").trim();
+    }
+  );
+}

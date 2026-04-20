@@ -17,6 +17,7 @@ import {
   EChartsBase,
   useRikoPalette,
   rikoChartDefaults,
+  resolveCssVar,
 } from "./echart-base";
 
 export interface RadarAxis {
@@ -40,7 +41,8 @@ export function HealthRadar({
 }) {
   const palette = useRikoPalette();
   const defaults = rikoChartDefaults(palette);
-  const color = areaColor ?? palette.green;
+  // Resolve the color eagerly — ECharts can't parse var(--xxx).
+  const color = resolveCssVar(areaColor) ?? palette.green;
 
   const option = useMemo(
     () => ({

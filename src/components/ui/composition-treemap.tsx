@@ -18,6 +18,7 @@ import {
   useRikoPalette,
   rikoChartDefaults,
   fmtINR,
+  resolveCssVar,
 } from "./echart-base";
 
 export interface TreemapSlice {
@@ -104,8 +105,10 @@ export function CompositionTreemap({
             name: d.name,
             value: d.value,
             itemStyle: {
+              // Resolve CSS custom props (var(--blue)) to hex before
+              // handing to ECharts — it doesn't parse them natively.
               color:
-                d.color ??
+                resolveCssVar(d.color) ??
                 [
                   palette.green,
                   palette.blue,

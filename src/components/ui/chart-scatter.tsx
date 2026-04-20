@@ -22,6 +22,7 @@ import {
   useRikoPalette,
   rikoChartDefaults,
   fmtINR,
+  resolveCssVar,
 } from "./echart-base";
 
 export interface ScatterPoint {
@@ -77,7 +78,7 @@ export function CustomerScatter({
       type: "scatter" as const,
       data: pts.map((p) => ({
         value: [p.x, p.y, p.size ?? 1, p.label],
-        itemStyle: p.color ? { color: p.color } : undefined,
+        itemStyle: p.color ? { color: resolveCssVar(p.color) } : undefined,
       })),
       symbolSize: (val: (number | string)[]) => {
         if (!asBubble) return 10;
