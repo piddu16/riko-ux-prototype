@@ -23,7 +23,7 @@ const sectionAnim = {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-function daysUntil(dateStr: string, today = new Date("2026-04-17")): number {
+function daysUntil(dateStr: string, today = new Date("2026-04-21")): number {
   // dateStr like "7 May 2026"
   const months: Record<string, number> = {
     Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
@@ -82,40 +82,45 @@ export function TdsScreen() {
       .sort((a, b) => b.tdsAmount - a.tdsAmount);
   }, [search, sectionFilter]);
 
-  /* Stat card data — 4 upcoming dates */
-  const daysToDeposit = daysUntil(TDS_UPCOMING.depositDueDate);
+  /* Stat card data — 4 upcoming statutory dates, CBDT-accurate.
+     Rule 30 (March special deadline), Rule 31A (Q4 return),
+     Rule 31 (Form 16/16A). */
+  const daysToMarch = daysUntil(TDS_UPCOMING.marchDepositDueDate);
+  const daysToApril = daysUntil(TDS_UPCOMING.aprilDepositDueDate);
+  const daysToQ4Return = daysUntil(TDS_UPCOMING.quarterlyReturnDueDate);
+  const daysToForm16 = daysUntil(TDS_UPCOMING.form16DueDate);
   const statCards = [
     {
-      label: "TDS Deposit Due",
-      date: TDS_UPCOMING.depositDueDate,
-      amount: formatINR(TDS_UPCOMING.depositAmount),
-      urgent: daysToDeposit >= 0 && daysToDeposit < 7,
-      daysNote: daysToDeposit >= 0 ? `in ${daysToDeposit}d` : `${-daysToDeposit}d overdue`,
+      label: "March TDS Deposit",
+      date: TDS_UPCOMING.marchDepositDueDate,
+      amount: formatINR(TDS_UPCOMING.marchDepositAmount),
+      urgent: daysToMarch >= 0 && daysToMarch < 14,
+      daysNote: daysToMarch >= 0 ? `in ${daysToMarch}d` : `${-daysToMarch}d overdue`,
       icon: "deposit",
     },
     {
-      label: "Quarterly Return (24Q/26Q)",
+      label: "April TDS Deposit",
+      date: TDS_UPCOMING.aprilDepositDueDate,
+      amount: formatINR(TDS_UPCOMING.aprilDepositAmount),
+      urgent: daysToApril >= 0 && daysToApril < 7,
+      daysNote: `in ${daysToApril}d`,
+      icon: "deposit",
+    },
+    {
+      label: "Q4 TDS Return (24Q + 26Q)",
       date: TDS_UPCOMING.quarterlyReturnDueDate,
-      amount: "Q4 filing",
+      amount: "Jan-Mar FY25",
       urgent: false,
-      daysNote: `in ${daysUntil(TDS_UPCOMING.quarterlyReturnDueDate)}d`,
+      daysNote: `in ${daysToQ4Return}d`,
       icon: "filing",
     },
     {
-      label: "Form 16 Issuance",
+      label: "Form 16 / 16A Issuance",
       date: TDS_UPCOMING.form16DueDate,
-      amount: "Employees",
+      amount: "All deductees",
       urgent: false,
-      daysNote: `in ${daysUntil(TDS_UPCOMING.form16DueDate)}d`,
+      daysNote: `in ${daysToForm16}d`,
       icon: "form16",
-    },
-    {
-      label: "Form 24Q (Annual)",
-      date: TDS_UPCOMING.salaryTdsDueDate,
-      amount: "Salary TDS",
-      urgent: false,
-      daysNote: `in ${daysUntil(TDS_UPCOMING.salaryTdsDueDate)}d`,
-      icon: "form24q",
     },
   ];
 

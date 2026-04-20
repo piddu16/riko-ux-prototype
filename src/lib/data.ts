@@ -282,8 +282,8 @@ export const CLIENTS: Client[] = [
     location: "Mumbai", revenue: "9.25Cr", revenueValue: 9.25e7, revenueYoY: -0.18,
     revenueTrend: [68, 72, 78, 82, 76, 70, 66, 62, 58, 54, 50, 48],
     netPL: "-2.24Cr", healthScore: 48, status: "critical", complianceScore: 62, complianceGrade: "C",
-    issues: ["Runway 0.3mo", "GSTR-3B due in 3 days", "₹4.6L excess ITC"],
-    nextAction: { verb: "Call", detail: "Yogesh re: runway + GSTR-3B", deadline: "2026-04-22", priority: "urgent" },
+    issues: ["Runway 0.3mo", "GSTR-3B for March overdue (1d)", "₹4.6L excess ITC"],
+    nextAction: { verb: "Call", detail: "Yogesh re: runway + overdue GSTR-3B", deadline: "2026-04-22", priority: "urgent" },
     misStatus: "Pending", lastSync: "2h ago", lastSyncVouchers: 48, ownerLastLogin: "Today",
     contact: "+91 98765 43210", gstin: "27AABCB1234F1Z5",
     assignedTo: "u-rajesh", tags: ["Priority", "FY25 close"],
@@ -296,8 +296,8 @@ export const CLIENTS: Client[] = [
     location: "Surat", revenue: "18.4Cr", revenueValue: 18.4e7, revenueYoY: -0.08,
     revenueTrend: [95, 98, 92, 88, 85, 82, 78, 75, 72, 68, 62, 58],
     netPL: "-1.12Cr", healthScore: 54, status: "critical", complianceScore: 58, complianceGrade: "C",
-    issues: ["Burn rate ₹24L/mo", "GSTR-1 late filing"],
-    nextAction: { verb: "File", detail: "GSTR-1 (7 days overdue)", deadline: "2026-04-13", priority: "urgent" },
+    issues: ["Burn rate ₹24L/mo", "GSTR-1 for March overdue (10d)"],
+    nextAction: { verb: "File", detail: "GSTR-1 for March · 10 days overdue", deadline: "2026-04-11", priority: "urgent" },
     misStatus: "Pending", lastSync: "4h ago", lastSyncVouchers: 112, ownerLastLogin: "3d ago",
     contact: "+91 98765 99001", gstin: "24AABCS5678G1Z2",
     assignedTo: "u-priya", tags: ["FY25 close"],
@@ -366,8 +366,8 @@ export const CLIENTS: Client[] = [
     location: "Mumbai", revenue: "6.82Cr", revenueValue: 6.82e7, revenueYoY: 0.04,
     revenueTrend: [72, 74, 72, 76, 74, 78, 76, 80, 78, 82, 80, 84],
     netPL: "+28.4L", healthScore: 74, status: "warning", complianceScore: 80, complianceGrade: "A",
-    issues: ["GSTR-3B not filed yet", "Bank recon pending for March"],
-    nextAction: { verb: "File", detail: "GSTR-3B for March 2026", deadline: "2026-05-20", priority: "high" },
+    issues: ["GSTR-3B for March overdue (1d)", "Bank recon pending for March"],
+    nextAction: { verb: "File", detail: "GSTR-3B for March · overdue", deadline: "2026-04-20", priority: "urgent" },
     misStatus: "In progress", lastSync: "6h ago", lastSyncVouchers: 22, ownerLastLogin: "2d ago",
     contact: "+91 98765 88220", gstin: "27AABCK3456F1Z9",
     assignedTo: "u-rajesh", tags: [],
@@ -380,8 +380,8 @@ export const CLIENTS: Client[] = [
     location: "Delhi", revenue: "5.48Cr", revenueValue: 5.48e7, revenueYoY: -0.03,
     revenueTrend: [80, 78, 76, 74, 76, 72, 70, 68, 72, 70, 68, 66],
     netPL: "+12.8L", healthScore: 68, status: "warning", complianceScore: 72, complianceGrade: "B",
-    issues: ["GSTR-2B mismatch ₹1.8L", "Stock write-off pending"],
-    nextAction: { verb: "Reconcile", detail: "GSTR-2B ITC mismatch", deadline: "2026-04-25", priority: "high" },
+    issues: ["Mar GSTR-2B mismatch ₹1.8L unresolved", "Stock write-off pending"],
+    nextAction: { verb: "Reconcile", detail: "Mar GSTR-2B mismatch before May cycle", deadline: "2026-05-14", priority: "high" },
     misStatus: "Pending", lastSync: "8h ago", lastSyncVouchers: 15, ownerLastLogin: "5d ago",
     contact: "+91 98765 22001", gstin: "07AABCG4567M1Z1",
     assignedTo: "u-priya", tags: [],
@@ -479,8 +479,8 @@ export const CLIENTS: Client[] = [
     location: "Jaipur", revenue: "6.3Cr", revenueValue: 6.3e7, revenueYoY: -0.02,
     revenueTrend: [78, 76, 74, 76, 74, 72, 74, 72, 70, 72, 70, 68],
     netPL: "+22.8L", healthScore: 69, status: "warning", complianceScore: 74, complianceGrade: "B",
-    issues: ["GSTR-3B not filed", "Closing stock valuation pending"],
-    nextAction: { verb: "File", detail: "GSTR-3B for March (overdue)", deadline: "2026-04-25", priority: "high" },
+    issues: ["GSTR-3B for March overdue (1d)", "Closing stock valuation pending"],
+    nextAction: { verb: "File", detail: "GSTR-3B for March · overdue", deadline: "2026-04-20", priority: "urgent" },
     misStatus: "Pending", lastSync: "7h ago", lastSyncVouchers: 19, ownerLastLogin: "4d ago",
     contact: "+91 98765 55544", gstin: "08AABCM5566T1Z8",
     assignedTo: "u-rajesh", tags: [],
@@ -619,17 +619,23 @@ export interface ComplianceDeadline {
 }
 
 export function computeComplianceCalendar(): ComplianceDeadline[] {
-  // Only filings Riko actually automates:
-  //  • GST: GSTR-1, GSTR-2B ITC match, GSTR-3B, GSTR-9
-  //  • TDS: monthly payment + quarterly return
-  //  • Income Tax: Advance Tax reconciliation (TDS data), ITR prep
-  //  • Internal CA workflow: MIS delivery, FY25 closing review
-  //  • Bank recon (Riko module)
-  // Out of scope (removed from this calendar):
-  //  • FSSAI / trade licenses
-  //  • E-way bills
-  //  • Professional Tax (state-specific, not core)
-  //  • Engagement letter renewals (firm admin)
+  // Only filings Riko actually automates, dated per CBIC + CBDT
+  // statutory rules:
+  //
+  // GST monthly cycle (for April 2026 data, filed in May):
+  //   • GSTR-1: due 11th of following month (CBIC Rule 59)
+  //   • GSTR-2B: auto-generates 14th (ITC statement)
+  //   • GSTR-2B recon window: 14th → 19th
+  //   • GSTR-3B: due 20th of following month (CBIC Rule 61)
+  //
+  // TDS (CBDT Rules 30 + 31A):
+  //   • Monthly deposit: 7th of following month
+  //   • March deposit: 30 April (special)
+  //   • Q4 return (24Q/26Q): 31 May
+  //   • Form 16 / 16A: 15 June of AY
+  //
+  // Out of scope for Riko: FSSAI, e-way bills, Professional Tax,
+  // engagement letters.
   const base: Array<{
     date: string;
     filing: string;
@@ -637,18 +643,18 @@ export function computeComplianceCalendar(): ComplianceDeadline[] {
     severity: "urgent" | "soon" | "upcoming";
     clientNames: string[];
   }> = [
-    { date: "2026-04-22", filing: "Advance Tax recon", section: "FY25 year-end",   severity: "urgent",   clientNames: ["Bandra Soap Pvt Ltd", "Agarwal Tractors LLP", "Mumbai Distributors"] },
-    { date: "2026-04-23", filing: "MIS delivery",      section: "CA workflow",     severity: "urgent",   clientNames: ["Kothari Traders", "Bandra Soap Pvt Ltd", "Mumbai Distributors"] },
-    { date: "2026-04-24", filing: "TDS Q4 return prep",section: "Form 24Q/26Q",    severity: "urgent",   clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Agarwal Tractors LLP"] },
-    { date: "2026-04-25", filing: "GSTR-2B ITC match", section: "ITC matching",    severity: "soon",     clientNames: ["Bandra Soap Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co", "Surat Textiles Pvt Ltd", "Agarwal Tractors LLP"] },
-    { date: "2026-04-28", filing: "FY25 closing review",section: "CA workflow",    severity: "soon",     clientNames: ["Sri Balaji Exports", "Reliance Retail - Bandra", "Sai Enterprises", "Joshi Pharma Traders"] },
-    { date: "2026-04-30", filing: "TDS Payment (Mar)", section: "Monthly · special March deadline", severity: "soon", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
-    { date: "2026-04-30", filing: "Bank reconciliation",section: "Month-end",      severity: "soon",     clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
-    { date: "2026-05-07", filing: "TDS Payment",       section: "Monthly · for April", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
-    { date: "2026-05-11", filing: "GSTR-1",             section: "Outward supplies", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Bhatia Exports", "Kothari Traders", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Om Infra Builders"] },
-    { date: "2026-05-15", filing: "GSTR-9 annual prep", section: "FY25 annual",     severity: "upcoming", clientNames: ["Nexus Electronics Pvt Ltd", "Reliance Retail - Bandra"] },
-    { date: "2026-05-20", filing: "GSTR-3B",             section: "Monthly summary", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
-    { date: "2026-05-31", filing: "TDS Q4 return",       section: "Form 24Q/26Q filing", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mumbai Distributors", "Agarwal Tractors LLP"] },
+    { date: "2026-04-22", filing: "Advance Tax recon",   section: "FY25 year-end",        severity: "urgent",   clientNames: ["Bandra Soap Pvt Ltd", "Agarwal Tractors LLP", "Mumbai Distributors"] },
+    { date: "2026-04-23", filing: "MIS delivery",        section: "CA workflow · March",  severity: "urgent",   clientNames: ["Kothari Traders", "Bandra Soap Pvt Ltd", "Mumbai Distributors"] },
+    { date: "2026-04-24", filing: "TDS Q4 return prep",  section: "Form 24Q/26Q",         severity: "urgent",   clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Agarwal Tractors LLP"] },
+    { date: "2026-04-28", filing: "FY25 closing review", section: "CA workflow",          severity: "soon",     clientNames: ["Sri Balaji Exports", "Reliance Retail - Bandra", "Sai Enterprises", "Joshi Pharma Traders"] },
+    { date: "2026-04-30", filing: "TDS Payment (Mar)",   section: "CBDT Rule 30 · special March deadline", severity: "soon", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
+    { date: "2026-04-30", filing: "Bank reconciliation", section: "Month-end",            severity: "soon",     clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Agarwal Tractors LLP", "Arora Logistics Pvt Ltd"] },
+    { date: "2026-05-07", filing: "TDS Payment (Apr)",   section: "CBDT Rule 30 · monthly",severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
+    { date: "2026-05-11", filing: "GSTR-1 (Apr)",        section: "CBIC Rule 59 · file by 11th", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Bhatia Exports", "Kothari Traders", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Om Infra Builders"] },
+    { date: "2026-05-14", filing: "GSTR-2B ITC match",   section: "2B drops — recon window 14-19", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
+    { date: "2026-05-20", filing: "GSTR-3B (Apr)",       section: "CBIC Rule 61 · file by 20th", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Krishna Foods Pvt Ltd", "Gupta Hardware Co", "Mehta Jewels & Co"] },
+    { date: "2026-05-31", filing: "TDS Q4 return",       section: "Form 24Q + 26Q · CBDT Rule 31A", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Gupta Hardware Co", "Mumbai Distributors", "Agarwal Tractors LLP"] },
+    { date: "2026-06-15", filing: "Form 16 / 16A",        section: "CBDT Rule 31 · all deductees", severity: "upcoming", clientNames: ["Bandra Soap Pvt Ltd", "Surat Textiles Pvt Ltd", "Patel Industries", "Mumbai Distributors", "Nexus Electronics Pvt Ltd", "Reliance Retail - Bandra", "Arora Logistics Pvt Ltd"] },
   ];
 
   // Group by date
@@ -1153,12 +1159,33 @@ export const TDS_SECTIONS = [
   { section: "194H", desc: "Commission / brokerage", transactions: 8, liability: 18500, rate: 5, period: "March 2026" },
 ];
 
+/** Accurate CBDT deadlines per Income Tax Act, Rule 30 (TDS payment)
+ *  and Rule 31A (TDS returns). Reference: CBDT notifications + Rule 31.
+ *
+ *  Rule 30 — TDS payment:
+ *    • Normal months:  7th of following month
+ *    • March TDS:      30 April (special deadline)
+ *  Rule 31A — Quarterly returns (Form 24Q salary + 26Q non-salary):
+ *    • Q1 Apr-Jun:  31 July
+ *    • Q2 Jul-Sep:  31 October
+ *    • Q3 Oct-Dec:  31 January
+ *    • Q4 Jan-Mar:  31 May
+ *  Rule 31 — Certificates:
+ *    • Form 16 (salary):     15 June of AY
+ *    • Form 16A (non-salary): 15 days after each Q's return deadline
+ *                             (so Q4 Form 16A = 15 June as well)
+ */
 export const TDS_UPCOMING = {
-  depositDueDate: "7 May 2026",
-  depositAmount: 524500, // 5.24L
-  quarterlyReturnDueDate: "15 May 2026", // 24Q/26Q
-  form16DueDate: "31 May 2026", // annual for employees
-  salaryTdsDueDate: "30 Jun 2026", // Form 24Q Q4
+  // Most urgent: March TDS payment — Apr 30 (Rule 30 special March deadline)
+  marchDepositDueDate: "30 Apr 2026",
+  marchDepositAmount: 524500,
+  // Next monthly: April TDS payment — May 7 (normal rule)
+  aprilDepositDueDate: "7 May 2026",
+  aprilDepositAmount: 198400,
+  // Q4 FY25-26 return — 31 May 2026 (Rule 31A)
+  quarterlyReturnDueDate: "31 May 2026",
+  // Form 16 (salary) + Form 16A (Q4 non-salary) — both 15 June
+  form16DueDate: "15 Jun 2026",
 };
 
 export const TDS_DEDUCTEES = [
