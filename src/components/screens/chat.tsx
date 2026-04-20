@@ -16,6 +16,7 @@ import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
   Send,
   ChevronRight,
+  ChevronDown,
   Wallet,
   Landmark,
   TrendingUp,
@@ -131,7 +132,15 @@ type Intent =
 
 type ChatMessage =
   | { id: string; role: "user"; text: string; intent?: Intent }
-  | { id: string; role: "assistant"; intent: Intent; typing?: boolean };
+  | {
+      id: string;
+      role: "assistant";
+      intent: Intent;
+      typing?: boolean;
+      /** How long Riko "thought" (fake but feels real — used to render
+       *  the "Analyzed in X.Xs ▸" chip at the top of the response). */
+      thinkingDurationMs?: number;
+    };
 
 /* ═══════════════════════════════════════════════════════════════
    Intent classifier — matches user text to an intent
@@ -298,29 +307,147 @@ function RikoMsg({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TypingIndicator() {
+/* ── ThinkingLive — shown WHILE Riko is "thinking" (fake delay).
+   Counts up in real-time so the user sees "Analyzing · 0.3s / 0.7s / 1.2s".
+   Replaces the old 3-dot typing indicator. */
+function ThinkingLive({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setElapsed(Date.now() - startedAt);
+    }, 80);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
+
+  const seconds = (elapsed / 1000).toFixed(1);
   return (
     <RikoMsg>
       <div
-        className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl"
-        style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+        className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px] font-medium"
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border)",
+          color: "var(--text-3)",
+        }}
       >
-        {[0, 1, 2].map((i) => (
-          <motion.span
-            key={i}
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ background: "var(--green)" }}
-            animate={{ opacity: [0.3, 1, 0.3] }}
-            transition={{
-              duration: 1.1,
-              repeat: Infinity,
-              delay: i * 0.18,
-              ease: "easeInOut",
-            }}
-          />
-        ))}
+        <motion.span
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style={{ background: "var(--green)" }}
+          animate={{ opacity: [0.35, 1, 0.35] }}
+          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <span>Analyzing</span>
+        <span
+          className="tabular-nums"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: "var(--text-2)" }}
+        >
+          {seconds}s
+        </span>
       </div>
     </RikoMsg>
+  );
+}
+
+/* ── ThinkingChip (done state) — persists at the top of every
+   assistant response as "✨ Analyzed in 1.2s ▸". Expands on click
+   to reveal what Riko "looked at" — fake-plausible per intent. */
+function ThinkingChip({
+  durationMs,
+  reasoning,
+}: {
+  durationMs: number;
+  reasoning?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const seconds = (durationMs / 1000).toFixed(1);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => reasoning && setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors hover:opacity-80"
+        style={{
+          background: "color-mix(in srgb, var(--green) 8%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--green) 22%, transparent)",
+          color: "var(--text-2)",
+          cursor: reasoning ? "pointer" : "default",
+        }}
+        aria-expanded={open}
+      >
+        <Sparkles size={11} style={{ color: "var(--green)" }} />
+        <span>Analyzed in </span>
+        <span
+          className="tabular-nums"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", color: "var(--text-1)" }}
+        >
+          {seconds}s
+        </span>
+        {reasoning && (
+          open ? <ChevronDown size={11} /> : <ChevronRight size={11} />
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {open && reasoning && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div
+              className="mt-1.5 px-3 py-2 rounded-md text-[11px] leading-relaxed"
+              style={{
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                color: "var(--text-3)",
+              }}
+            >
+              {reasoning}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ── GeneratedBadge — small "✦ Generated · {intent label}" stamp
+   next to the thinking chip, showing what Riko actually produced. */
+function GeneratedBadge({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium"
+      style={{
+        background: "color-mix(in srgb, var(--purple) 10%, transparent)",
+        border: "1px solid color-mix(in srgb, var(--purple) 25%, transparent)",
+        color: "var(--text-2)",
+      }}
+    >
+      <span aria-hidden style={{ color: "var(--purple)" }}>
+        ✦
+      </span>
+      <span style={{ color: "var(--text-4)" }}>Generated ·</span>
+      <span style={{ color: "var(--text-1)" }}>{label}</span>
+    </span>
+  );
+}
+
+/* ── ThinkingRow — renders the chip row above an assistant response.
+   Aligned with the message body (offset past the avatar) so the
+   chips sit where the content would start. */
+function ThinkingRow({
+  intent,
+  durationMs,
+}: {
+  intent: Intent;
+  durationMs: number;
+}) {
+  return (
+    <div className="ml-9 mb-2 flex items-center gap-2 flex-wrap">
+      <ThinkingChip durationMs={durationMs} reasoning={INTENT_REASONING[intent]} />
+      <GeneratedBadge label={INTENT_LABELS[intent]} />
+    </div>
   );
 }
 
@@ -1838,6 +1965,63 @@ const EXCHANGE_RENDERERS: Record<
    (via md:hidden wrappers inside each Exchange) and instead
    rendered full-width here by intent.
    ═══════════════════════════════════════════════════════════════ */
+/** Per-intent reasoning text shown when the user expands the
+ *  "Analyzed in X.Xs" chip. Keep each to 1-2 crisp sentences — this
+ *  reads as authentic AI thinking, not a verbose log. Tune for
+ *  authority, not exhaustiveness. */
+const INTENT_REASONING: Record<Intent, string> = {
+  "current-ratio":
+    "Pulled current assets (cash, debtors, closing stock, other CA) and current liabilities (creditors, provisions) from the latest Balance Sheet. Divided to compute the ratio.",
+  receivables:
+    "Scanned the debtor ledger across 10 parties + 298 bills. Aged each bill into 0-30, 30-90, 90-365, and 365+ day buckets. Ranked by amount + days.",
+  payables:
+    "Pulled creditor ledger, flagged MSME-registered vendors per the MSME Development Act, and computed days aged for each.",
+  mis:
+    "Compiled P&L, Balance Sheet, Key Ratios, Receivables, and GST summary into the standard MIS format your CA expects.",
+  "revenue-trend":
+    "Pulled monthly revenue from the Sales ledger across April 2024 – March 2025. Computed YoY vs FY23-24 and identified the best/worst months.",
+  "cash-flow":
+    "Forecasted 6 weeks of cash using confirmed receivables + recurring expenses. Ran 5 scenarios varying Nykaa collection, GST refund, and marketing spend.",
+  runway:
+    "Divided current cash (₹5.6L) by average monthly burn (₹18.6L) to get runway in months, then converted to days for urgency framing.",
+  "expense-breakdown":
+    "Aggregated indirect expenses by category from the P&L: Marketing, CAC, Employees, Fulfilment, COGS, and Overheads.",
+  waterfall:
+    "Walked through the P&L line items — Revenue → Gross Profit → EBITDA — showing each deduction and its magnitude.",
+  "gst-recon":
+    "Fetched GSTR-2B for March 2026 from the portal. Matched 147 Tally purchase invoices against 143 portal records. Flagged 7 value mismatches and 12 missing entries.",
+  "gst-health":
+    "Pulled 18 months of filing history. Computed ITC match rate vs GSTR-2A, average filing delay, excess unused ITC, and the filing streak.",
+  "top-customers":
+    "Pulled customer master and grouped sales by PAN across all channels. Ranked by revenue, computed LTV, orders, and return rate per customer.",
+  "health-score":
+    "Ran 4 dimension scores — Profitability, Liquidity, Efficiency, Growth — from the latest financials and took the mean for the overall.",
+  "inventory-dead":
+    "Cross-referenced the SKU master with 90+ day sales data. Computed locked capital per SKU, days since last sale, and grouped by category.",
+  returns:
+    "Pulled credit notes across channels for FY24-25. Computed return rate per channel and identified the top return reasons.",
+  "cohort-retention":
+    "Grouped customers by acquisition quarter. Tracked how many from each cohort continued to buy in subsequent quarters.",
+  "money-flow":
+    "Traced rupees from revenue channels through each deduction to Net P&L. Flow widths proportional to the amount flowing through.",
+  "customer-ltv":
+    "Computed days-since-last-order per customer. Plotted against lifetime value with order count driving bubble size and channel driving color.",
+  "cyclic-transactions":
+    "Cross-matched customer PANs against supplier PANs. Flagged parties appearing on both sides and ranked by the cycled amount.",
+  "related-party":
+    "Flagged parties with common directors, 20%+ common ownership, or explicit group relationships. Pulled sales + purchases per party.",
+  "recurring-revenue":
+    "Identified PANs with 2+ months of purchases in the FY. Computed recurring revenue share and monthly new-vs-repeat split.",
+  "hsn-wise":
+    "Grouped GSTR-1 outward supplies by HSN code. Ranked by taxable value. Cross-checked HSN coverage for Table 12 compliance.",
+  "state-wise":
+    "Grouped GSTR-1 sales by buyer state code. Computed per-state share and flagged the home state (Maharashtra) separately.",
+  "filing-delay":
+    "Pulled 24 months of GSTR-1 and GSTR-3B filing dates. Computed delay days vs each return's statutory due date.",
+  unknown:
+    "Couldn't confidently map your query to a known topic. Showing starter questions across cash, compliance, growth, and operations.",
+};
+
 const INTENT_LABELS: Record<Intent, string> = {
   "current-ratio": "Current ratio",
   receivables: "Receivables",
@@ -1881,6 +2065,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "composition",
       title: "Current Assets composition",
       subtitle: `Total CA ₹${fL(K.ca)}L · CR ${K.cr.toFixed(2)}`,
+      insight:
+        "Current Ratio 2.60 reads healthy, but 83% of current assets are inventory. Your Quick Ratio (0.46) tells the truer story — liquidity depends on selling that stock.",
       total: K.ca,
       parts: [
         { label: "Inventory", value: R.stkC, color: "var(--purple)" },
@@ -1930,6 +2116,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "categorical",
       title: "Top vendors you owe",
       subtitle: `₹${(total / 1e7).toFixed(2)}Cr payable · ₹${(msmeTotal / 1e5).toFixed(1)}L to MSMEs`,
+      insight: `₹${(total / 1e7).toFixed(2)}Cr payable across vendors. ₹${(msmeTotal / 1e5).toFixed(1)}L is owed to MSME-registered suppliers — those must clear within 45 days per the MSME Development Act, or Section 43B(h) disallows the expense.`,
       entries: PAYABLES.slice(0, 8).map((p) => ({
         label: p.name,
         value: p.amount,
@@ -1996,6 +2183,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "timeseries",
       title: "Monthly revenue · FY 2024-25",
       subtitle: `Total ₹${(R.rev / 1e7).toFixed(2)}Cr · ${K.yoy.toFixed(0)}% YoY`,
+      insight:
+        "Revenue peaked in April (₹16.8L) before a steady Q2-Q3 decline. Website D2C is growing 95% YoY while marketplaces returned heavily — D2C is the comeback lever.",
       points: MONTHS.map((m, i) => ({ x: m, y: R.ms[i] })),
       color: "var(--green)",
       highlight: {
@@ -2061,6 +2250,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "composition",
       title: "Expense composition",
       subtitle: `Total spend FY 2024-25: ₹${(totalExp / 1e7).toFixed(2)}Cr`,
+      insight: `Marketing + CAC together are ₹${((R.mkt + R.cac) / 1e7).toFixed(2)}Cr — larger than your Gross Profit. Cutting 30% here saves ~₹${((R.mkt + R.cac) * 0.3 / 12 / 1e5).toFixed(1)}L/mo and buys months of runway.`,
       total: totalExp,
       parts: [
         { label: "Marketing", value: R.mkt, color: "var(--red)" },
@@ -2126,6 +2316,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "categorical",
       title: "Top customers by revenue",
       subtitle: `Top 10 = ₹${(total / 1e7).toFixed(2)}Cr of ₹${(R.rev / 1e7).toFixed(2)}Cr`,
+      insight:
+        "Nykaa, Amazon, and Website D2C drive ~70% of revenue. D2C has the highest LTV (₹98L) and lowest return rate (5.7%) — double down on direct acquisition.",
       entries: TOP_CUSTOMERS.slice(0, 10).map((c) => ({
         label: c.name,
         value: c.revenue,
@@ -2149,6 +2341,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "radar",
       title: "Business health dimensions",
       subtitle: `Overall ${avg.toFixed(0)}/100 · weakest dimension drags the rest`,
+      insight:
+        "Growth (15/100) is dragging the overall score. Revenue is -55% YoY — rebuilding via Website D2C (+95%) is the fastest single lever.",
       axes: HEALTH_SCORES.map((h) => ({ name: h.label, max: 100 })),
       values: HEALTH_SCORES.map((h) => h.score),
       seriesName: "Bandra Soap",
@@ -2172,6 +2366,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "matrix",
       title: "Customer retention by cohort",
       subtitle: "Rows = acquisition quarter · cols = tenure · color = % still active",
+      insight:
+        "Q2 retention climbed from 68% (FY23 Q1) to 82% (FY24 Q2) — the product is getting stickier. Long-tail retention (Q8) is still only 21%, so refill-reminder WhatsApp flows could unlock the dormant half.",
       rows,
       cols,
       values,
@@ -2193,6 +2389,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "flow",
       title: "Money flow · Revenue to Net P&L",
       subtitle: "Ribbon width shows the size of each flow — thick = big lever",
+      insight:
+        "Marketing + CAC together are the thickest outflow at ₹3.94Cr — 52% of all spend. That's your single biggest lever to profitability; halve it and you're cash-flow neutral.",
       nodes: [
         { name: "Marketplace", category: "source" },
         { name: "Website D2C", category: "source" },
@@ -2240,6 +2438,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "scatter",
       title: "Customer LTV vs recency",
       subtitle: "Dot size = order count · color = channel · top-left is the ideal zone",
+      insight:
+        "Amazon has the highest LTV customer (₹112L over 298 orders) but 32% of those orders come back as returns. Website D2C has lower LTV per customer but cleaner margins — cheaper to grow.",
       points: TOP_CUSTOMERS.map((c) => {
         const daysSince = Math.max(
           0,
@@ -2272,6 +2472,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "categorical",
       title: "Returns by channel",
       subtitle: `₹${(RETURNS_SUMMARY.totalReturns / 1e7).toFixed(2)}Cr returned · ${RETURNS_SUMMARY.returnRate.toFixed(1)}% of gross sales`,
+      insight:
+        "Amazon's return rate is 32.5% — 4× your D2C channel's 5.7%. Damaged-in-transit is the top reason. Better packaging + switching to standard FBA could cut returns 50%+ and recover ~₹37L/quarter.",
       entries: RETURNS_BY_CHANNEL.map((c) => ({
         label: c.channel,
         value: c.returns,
@@ -2294,6 +2496,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       title: "Cyclic transactions · same party as buyer + seller",
       subtitle:
         "Bar = cycled amount (min of sales, purchases) · color = severity",
+      insight:
+        "Patel Traders is 70% cycled — their purchases from you nearly match your purchases from them. GST officers flag this as potential round-tripping. Document the business rationale before scrutiny or restructure.",
       entries: CYCLIC_TRANSACTIONS.map((c) => ({
         label: c.partyName,
         value: Math.min(c.totalSales, c.totalPurchases),
@@ -2328,6 +2532,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "categorical",
       title: "Related-party transactions",
       subtitle: "Green = outward (sales) · red = inward (purchases)",
+      insight:
+        "₹74L in related-party transactions flagged. Keep third-party price benchmarks + a signed transfer-pricing policy + board minutes on file — that's your Section 40A(2) defense if the AO asks.",
       entries,
     };
     return <ChartRenderer shape={shape} defaultType="bar" />;
@@ -2339,6 +2545,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "timeseries",
       title: "Repeat customer revenue %",
       subtitle: `Sticky-revenue trend · FY total: ${RECURRING_REVENUE.recurringPct.toFixed(0)}% recurring`,
+      insight:
+        "85% of revenue is recurring — the business is genuinely sticky. Monthly repeat % climbed from 68% (Apr) to 92% (Dec). Product-market fit is tightening even while total revenue slipped.",
       points: RECURRING_REVENUE.monthly.map((m) => ({
         x: m.month,
         y: m.repeatPct,
@@ -2361,6 +2569,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "categorical",
       title: "Sales by HSN code",
       subtitle: `${HSN_WISE_SALES.length} codes · GSTR-1 Table 12`,
+      insight:
+        "Hair oil (HSN 33059011) is 37% of taxable turnover — ₹3.42Cr. Your GSTR-1 Table 12 summary is compliant. All codes sit at 18% GST, so no rate-misclassification risk.",
       entries: HSN_WISE_SALES.map((h) => ({
         label: `${h.hsn} · ${h.particulars.slice(0, 30)}${h.particulars.length > 30 ? "…" : ""}`,
         value: h.taxableValue,
@@ -2376,6 +2586,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "categorical",
       title: "Sales by state",
       subtitle: "Taxable value per state · colors reflect home state vs outside",
+      insight:
+        "Maharashtra, Karnataka, and Delhi drive 62% of taxable sales. If you register in UP or Haryana, you convert IGST on those shipments into local CGST+SGST — better ITC utilisation.",
       entries: STATE_WISE_SALES.map((s) => ({
         label: s.state,
         value: s.taxableValue,
@@ -2393,6 +2605,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       kind: "matrix",
       title: "Filing delay days · 24 months",
       subtitle: "Green = on time · red = late · rows are GSTR-1 and GSTR-3B",
+      insight: `${FILING_STATS.onTimeMonths} of ${FILING_STATS.totalMonthsTracked} filings on time (${((FILING_STATS.onTimeMonths / FILING_STATS.totalMonthsTracked) * 100).toFixed(0)}%). Slippages cluster in GSTR-3B, not GSTR-1 — meaning the data is ready but the cash to pay liability isn't. Prep 3B on the 15th anyway; ITC often covers the payable and you can file zero-cash.`,
       rows: [...FILING_DELAYS.returnTypes],
       cols: FILING_DELAYS.months,
       values: FILING_DELAYS.delayDays,
@@ -2769,7 +2982,10 @@ export function ChatScreen({
 }: ChatScreenProps = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [pendingTyping, setPendingTyping] = useState(false);
+  // Track WHEN thinking started so we can show a live timer AND compute
+  // the final duration to persist on the assistant message for the
+  // "Analyzed in X.Xs" chip. Null = not thinking.
+  const [thinkingStartedAt, setThinkingStartedAt] = useState<number | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   // Monotonic counter for message IDs (avoids Date.now purity complaints)
   const idSeq = useRef(0);
@@ -2787,7 +3003,39 @@ export function ChatScreen({
     if (distanceFromBottom < 120) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [messages, pendingTyping]);
+  }, [messages, thinkingStartedAt]);
+
+  /** Per-intent delay feel. Complex queries (recon, forecasts, cohort)
+   *  take longer so the "Analyzed in X.Xs" feels earned. Simpler ones
+   *  resolve fast. Tune these as the feel evolves. */
+  const delayFor = (intent: Intent): number => {
+    switch (intent) {
+      case "gst-recon":
+      case "cash-flow":
+      case "cohort-retention":
+      case "money-flow":
+      case "filing-delay":
+        return 1600;
+      case "revenue-trend":
+      case "customer-ltv":
+      case "top-customers":
+      case "inventory-dead":
+      case "waterfall":
+      case "state-wise":
+      case "hsn-wise":
+        return 1200;
+      case "runway":
+      case "current-ratio":
+      case "gst-health":
+      case "health-score":
+      case "recurring-revenue":
+      case "cyclic-transactions":
+      case "related-party":
+        return 900;
+      default:
+        return 700;
+    }
+  };
 
   const handleSend = (raw?: string) => {
     const text = (raw ?? input).trim();
@@ -2795,21 +3043,32 @@ export function ChatScreen({
     const intent = classifyIntent(text);
     const uId = nextId("u");
     const aId = nextId("a");
+    const delay = delayFor(intent);
 
     setMessages((prev) => [
       ...prev,
       { id: uId, role: "user", text, intent },
     ]);
     setInput("");
-    setPendingTyping(true);
+    // Snapshot start time; ThinkingLive reads this via a ref-stable constant
+    const startedAt = performance.now();
+    // Using performance.now is a write to an external resource rather than
+    // a render-side read; the lint rule allows this.
+    setThinkingStartedAt(Date.now());
 
-    // fake thinking delay → render assistant
-    // (fixed delay keeps the component render pure; React's purity rules
-    //  disallow Math.random() inside the render-adjacent closure)
     window.setTimeout(() => {
-      setPendingTyping(false);
-      setMessages((prev) => [...prev, { id: aId, role: "assistant", intent }]);
-    }, 480);
+      const elapsed = Math.round(performance.now() - startedAt);
+      setThinkingStartedAt(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: aId,
+          role: "assistant",
+          intent,
+          thinkingDurationMs: elapsed,
+        },
+      ]);
+    }, delay);
   };
 
   /* Consume initialQuestion from parent (e.g. Dashboard → Causal Chain node
@@ -2830,7 +3089,7 @@ export function ChatScreen({
   const handleNewChat = () => {
     setMessages([]);
     setInput("");
-    setPendingTyping(false);
+    setThinkingStartedAt(null);
   };
 
   // Current intent = last assistant message intent
@@ -2968,9 +3227,19 @@ export function ChatScreen({
               return <UserBubble key={m.id} text={m.text} />;
             }
             const Renderer = EXCHANGE_RENDERERS[m.intent];
-            return <Renderer key={m.id} onFollowup={handleSend} />;
+            return (
+              <div key={m.id}>
+                <ThinkingRow
+                  intent={m.intent}
+                  durationMs={m.thinkingDurationMs ?? 1000}
+                />
+                <Renderer onFollowup={handleSend} />
+              </div>
+            );
           })}
-          {pendingTyping && <TypingIndicator />}
+          {thinkingStartedAt !== null && (
+            <ThinkingLive startedAt={thinkingStartedAt} />
+          )}
         </div>
         <InputBar value={input} onChange={setInput} onSend={() => handleSend()} />
       </div>

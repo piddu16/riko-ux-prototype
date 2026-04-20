@@ -34,6 +34,7 @@ import {
   Check,
   ScatterChart as ScatterIcon,
   Radar,
+  Sparkles,
 } from "lucide-react";
 import {
   ChatBarChart,
@@ -88,31 +89,39 @@ const HealthRadar = dynamic(
    DataShape — the structure of the data, independent of how we
    want to draw it
    ═══════════════════════════════════════════════════════════════ */
+/** Quick-insight text shown above the chart as a one-line takeaway.
+ *  Kept on DataShape (not hard-coded in ChartRenderer) because the
+ *  right insight depends on the specific data, not the chart type. */
+interface WithInsight {
+  /** Plain-English one-liner. Will render prefixed with "Quick insight:". */
+  insight?: string;
+}
+
 export type DataShape =
-  | {
+  | (WithInsight & {
       kind: "composition";
       title: string;
       subtitle?: string;
       parts: { label: string; value: number; color?: string }[];
       total?: number;
       currency?: boolean; // default true
-    }
-  | {
+    })
+  | (WithInsight & {
       kind: "categorical";
       title: string;
       subtitle?: string;
       entries: { label: string; value: number; color?: string; caption?: string }[];
       currency?: boolean; // default true
-    }
-  | {
+    })
+  | (WithInsight & {
       kind: "timeseries";
       title: string;
       subtitle?: string;
       points: { x: string; y: number }[];
       color?: string;
       highlight?: { index: number; label: string };
-    }
-  | {
+    })
+  | (WithInsight & {
       kind: "matrix";
       title: string;
       subtitle?: string;
@@ -121,15 +130,15 @@ export type DataShape =
       values: number[][];
       format?: "percent" | "currency" | "number";
       colorDirection?: "higher-better" | "higher-worse";
-    }
-  | {
+    })
+  | (WithInsight & {
       kind: "flow";
       title: string;
       subtitle?: string;
       nodes: SankeyNode[];
       links: SankeyLink[];
-    }
-  | {
+    })
+  | (WithInsight & {
       kind: "scatter";
       title: string;
       subtitle?: string;
@@ -138,8 +147,8 @@ export type DataShape =
       yLabel?: string;
       xIsCurrency?: boolean;
       yIsCurrency?: boolean;
-    }
-  | {
+    })
+  | (WithInsight & {
       kind: "radar";
       title: string;
       subtitle?: string;
@@ -147,7 +156,7 @@ export type DataShape =
       values: number[];
       seriesName?: string;
       color?: string;
-    };
+    });
 
 /* ═══════════════════════════════════════════════════════════════
    ChartType — every visual we can render, across all shapes
@@ -332,6 +341,34 @@ export function ChartRenderer({
         border: "1px solid var(--border)",
       }}
     >
+      {/* Quick insight — one-line takeaway above the chart.
+         Hex-style pattern: a plain-English "here's what this says"
+         ABOVE the visualization, so the user gets the answer in
+         1 second even without studying the chart. */}
+      {shape.insight && (
+        <div
+          className="flex items-start gap-2 mb-3 px-3 py-2 rounded-lg"
+          style={{
+            background: "color-mix(in srgb, var(--green) 8%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--green) 22%, transparent)",
+          }}
+        >
+          <Sparkles
+            size={12}
+            style={{ color: "var(--green)", flexShrink: 0, marginTop: 3 }}
+          />
+          <p
+            className="text-[12px] leading-relaxed"
+            style={{ color: "var(--text-1)" }}
+          >
+            <span className="font-semibold" style={{ color: "var(--green)" }}>
+              Quick insight:
+            </span>{" "}
+            {shape.insight}
+          </p>
+        </div>
+      )}
+
       {/* Header with title + switcher */}
       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
         <div className="min-w-0">
