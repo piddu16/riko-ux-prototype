@@ -1229,38 +1229,57 @@ function InsightsTab() {
             (FY25 − FY24) / FY24 per month
           </span>
         </div>
-        <div className="flex items-center gap-1" style={{ height: 120 }}>
+        {/* Divergent bars: positive grow up from center, negative grow down.
+            No inner motion.divs — nested whileInView with initial height: 0
+            can stall the intersection observer. Parent card already animates. */}
+        <div className="relative" style={{ height: 130 }}>
+          {/* Zero baseline */}
+          <div
+            className="absolute inset-x-0 top-1/2 h-[1px] -translate-y-px"
+            style={{ background: "var(--border)" }}
+          />
+          <div className="absolute inset-0 flex items-stretch gap-1">
+            {yoyByMonth.map((m) => {
+              const barH = (Math.abs(m.pct) / yoyMax) * 60; // max 60px each side of baseline
+              const positive = m.pct >= 0;
+              return (
+                <div key={m.month} className="flex-1 flex flex-col">
+                  <div className="h-1/2 flex flex-col justify-end items-center">
+                    {positive && (
+                      <div
+                        className="w-full rounded-t-md min-w-[8px]"
+                        style={{ height: barH, background: "var(--green)" }}
+                      />
+                    )}
+                  </div>
+                  <div className="h-1/2 flex flex-col justify-start items-center">
+                    {!positive && (
+                      <div
+                        className="w-full rounded-b-md min-w-[8px]"
+                        style={{ height: barH, background: "var(--red)" }}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        {/* Month labels + pct values */}
+        <div className="flex gap-1 mt-2">
           {yoyByMonth.map((m) => {
-            const h = (Math.abs(m.pct) / yoyMax) * 50;
             const positive = m.pct >= 0;
             return (
-              <div key={m.month} className="flex-1 flex flex-col items-center justify-center">
-                <div className="w-full flex flex-col items-center" style={{ height: 50, justifyContent: "flex-end" }}>
-                  {positive && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      whileInView={{ height: h }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5 }}
-                      className="w-full rounded-t-md min-w-[10px]"
-                      style={{ background: "var(--green)" }}
-                    />
-                  )}
-                </div>
-                <div className="w-full h-[1px]" style={{ background: "var(--border)" }} />
-                <div className="w-full flex flex-col items-center" style={{ height: 50 }}>
-                  {!positive && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      whileInView={{ height: h }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5 }}
-                      className="w-full rounded-b-md min-w-[10px]"
-                      style={{ background: "var(--red)" }}
-                    />
-                  )}
-                </div>
-                <span className="text-[9px] leading-none mt-1" style={{ color: "var(--text-4)" }}>{m.month}</span>
+              <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5">
+                <span
+                  className="text-[9px] tabular-nums font-semibold"
+                  style={{ color: positive ? "var(--green)" : "var(--red)" }}
+                >
+                  {positive ? "+" : ""}{m.pct.toFixed(0)}%
+                </span>
+                <span className="text-[9px] leading-none" style={{ color: "var(--text-4)" }}>
+                  {m.month}
+                </span>
               </div>
             );
           })}
