@@ -43,41 +43,59 @@ function channelColor(channel: string): string {
   return "var(--text-3)";
 }
 
-/* ── Monthly revenue bars (FY25) with FY24 line overlay ──
- *    Both series are SUM(sales vouchers) GROUP BY month, different years. ── */
+/* ── Monthly revenue bars with FY24 ghost overlay ──
+ *    Each column renders two absolute-positioned bars sharing the same
+ *    baseline: FY24 (semi-transparent + dashed outline, rendered first so
+ *    it sits behind) and FY25 (solid green, on top). Where FY25 >= FY24
+ *    you only see solid green; where FY24 was taller, the ghost peeks out
+ *    above the solid bar = visual cue for YoY decline. ── */
 function RevenueChart() {
   const data = R.ms;
   const priorYear = R_FY24_MS;
   const max = Math.max(...data, ...priorYear);
   const barH = 160;
-  const barCount = data.length;
-
-  /* SVG overlay points for prior-year line */
-  const svgW = barCount * 40;
-  const pyPoints = priorYear.map((v, i) => {
-    const x = (i / (barCount - 1)) * (svgW - 16) + 8;
-    const y = barH - (v / max) * (barH - 16) + 8;
-    return { x, y };
-  });
-  const pathD = pyPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
 
   return (
-    <div className="relative">
-      <div className="flex items-end gap-1" style={{ height: barH }}>
+    <div>
+      <div className="flex items-end gap-1" style={{ height: barH + 18 }}>
         {data.map((v, i) => {
-          const h = (v / max) * (barH - 24);
+          const fy25H = (v / max) * (barH - 24);
+          const fy24H = (priorYear[i] / max) * (barH - 24);
+          const colBarH = Math.max(fy25H, fy24H);
           return (
-            <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1">
-              <motion.div
-                initial={{ height: 0 }}
-                whileInView={{ height: h }}
-                viewport={{ once: true, amount: 0.3 }}
-                transition={{ duration: 0.5, delay: i * 0.04 }}
-                className="w-full rounded-t-md min-w-[14px]"
-                style={{ background: "var(--green)" }}
-              />
+            <div
+              key={i}
+              className="flex-1 flex flex-col items-center justify-end h-full"
+            >
+              <div
+                className="relative w-full"
+                style={{ height: colBarH, minWidth: 14 }}
+              >
+                {/* FY24 ghost — rendered first, sits behind */}
+                <motion.div
+                  initial={{ height: 0 }}
+                  whileInView={{ height: fy24H }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ duration: 0.5, delay: i * 0.04 }}
+                  className="absolute bottom-0 inset-x-0 rounded-t-md"
+                  style={{
+                    background: "color-mix(in srgb, var(--text-4) 10%, transparent)",
+                    border: "1px dashed color-mix(in srgb, var(--text-4) 50%, transparent)",
+                    borderBottom: "none",
+                  }}
+                />
+                {/* FY25 solid — rendered second, sits on top */}
+                <motion.div
+                  initial={{ height: 0 }}
+                  whileInView={{ height: fy25H }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ duration: 0.5, delay: i * 0.04 }}
+                  className="absolute bottom-0 inset-x-0 rounded-t-md"
+                  style={{ background: "var(--green)" }}
+                />
+              </div>
               <span
-                className="text-[9px] leading-none"
+                className="text-[9px] leading-none mt-1"
                 style={{ color: "var(--text-4)" }}
               >
                 {MONTHS[i]}
@@ -86,19 +104,6 @@ function RevenueChart() {
           );
         })}
       </div>
-
-      <svg
-        className="absolute inset-0 w-full pointer-events-none"
-        style={{ height: barH }}
-        viewBox={`0 0 ${svgW} ${barH + 16}`}
-        preserveAspectRatio="none"
-        fill="none"
-      >
-        <path d={pathD} stroke="var(--text-4)" strokeWidth={1.5} strokeDasharray="3 3" fill="none" strokeLinejoin="round" />
-        {pyPoints.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="var(--text-4)" />
-        ))}
-      </svg>
     </div>
   );
 }
@@ -340,8 +345,17 @@ export function SalesScreen() {
                 FY25
               </span>
               <span className="flex items-center gap-1.5 text-[10px]" style={{ color: "var(--text-4)" }}>
-                <span className="w-4 h-[2px] rounded-sm" style={{ background: "var(--text-4)" }} />
+                <span
+                  className="w-2.5 h-2.5 rounded-sm"
+                  style={{
+                    background: "color-mix(in srgb, var(--text-4) 10%, transparent)",
+                    border: "1px dashed color-mix(in srgb, var(--text-4) 50%, transparent)",
+                  }}
+                />
                 FY24
+              </span>
+              <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                · ghost peeks above solid = YoY decline
               </span>
             </div>
           </motion.div>
