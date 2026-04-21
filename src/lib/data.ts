@@ -876,17 +876,144 @@ export const RECONCILIATION = {
   mismatchValue: 310000, // 3.1L
   itcAtRiskValue: 570000, // 5.7L
   lastRunAt: "12 Apr 2026, 11:42 AM",
+  /** Per-invoice recon lines — a representative sample (production
+   *  would hold all ~147 rows). Covers ~12 suppliers so Vendor view
+   *  aggregation shows meaningful per-supplier counts. */
   lines: [
-    { id: "r1", supplier: "GOOGLE INDIA PVT LTD", gstin: "29AACCG0527D1Z8", tallyAmt: 163988, portalAmt: 163988, status: "matched" as ReconStatus, invoiceNo: "G-4412", date: "30 Mar 2026" },
-    { id: "r2", supplier: "Amazon - Creations", gstin: "29AAHCA9099B1Z4", tallyAmt: 228186, portalAmt: 228186, status: "matched" as ReconStatus, invoiceNo: "AMZ-9921", date: "28 Mar 2026" },
-    { id: "r3", supplier: "Shiprocket Logistics", gstin: "07AAGCS5867P1Z9", tallyAmt: 32100, portalAmt: 31500, status: "mismatch" as ReconStatus, invoiceNo: "SR-2301", date: "25 Mar 2026", issue: "Portal shows ₹31,500 vs Tally ₹32,100 — ₹600 tax diff" },
-    { id: "r4", supplier: "Nykaa Mumbai 2", gstin: "27AADCN7487G1ZF", tallyAmt: 146500, portalAmt: null, status: "missing_portal" as ReconStatus, invoiceNo: "NYK-MH-1182", date: "22 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
-    { id: "r5", supplier: "Paytm (One97 Communications)", gstin: "07AAACT2727Q1ZV", tallyAmt: 89000, portalAmt: null, status: "missing_portal" as ReconStatus, invoiceNo: "PYT-2245", date: "20 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
-    { id: "r6", supplier: "Raw Material Supplier Co", gstin: "24AAACR1234P1Z2", tallyAmt: 145600, portalAmt: null, status: "missing_portal" as ReconStatus, invoiceNo: "RMS-0845", date: "18 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
-    { id: "r7", supplier: "Mumbai Packaging Ltd", gstin: "27AAACM5555P1Z2", tallyAmt: null, portalAmt: 58400, status: "missing_tally" as ReconStatus, invoiceNo: "MPL-3301", date: "15 Mar 2026", issue: "Invoice in 2B but not recorded in Tally" },
-    { id: "r8", supplier: "Flipkart Marketplace", gstin: "29AACCF0123P1Z8", tallyAmt: 156800, portalAmt: 156800, status: "matched" as ReconStatus, invoiceNo: "FLP-8821", date: "28 Mar 2026" },
+    // GOOGLE INDIA — 3 invoices, all matched
+    { id: "r1",  supplier: "GOOGLE INDIA PVT LTD",    gstin: "29AACCG0527D1Z8", tallyAmt: 163988, portalAmt: 163988, status: "matched" as ReconStatus,        invoiceNo: "G-4412",       date: "30 Mar 2026" },
+    { id: "r2",  supplier: "GOOGLE INDIA PVT LTD",    gstin: "29AACCG0527D1Z8", tallyAmt:  82400, portalAmt:  82400, status: "matched" as ReconStatus,        invoiceNo: "G-4389",       date: "22 Mar 2026" },
+    { id: "r3",  supplier: "GOOGLE INDIA PVT LTD",    gstin: "29AACCG0527D1Z8", tallyAmt:  42100, portalAmt:  42100, status: "matched" as ReconStatus,        invoiceNo: "G-4352",       date: "08 Mar 2026" },
+    // Amazon - Creations — 4 invoices, 1 mismatch
+    { id: "r4",  supplier: "Amazon - Creations",      gstin: "29AAHCA9099B1Z4", tallyAmt: 228186, portalAmt: 228186, status: "matched" as ReconStatus,        invoiceNo: "AMZ-9921",     date: "28 Mar 2026" },
+    { id: "r5",  supplier: "Amazon - Creations",      gstin: "29AAHCA9099B1Z4", tallyAmt: 108621, portalAmt: 108621, status: "matched" as ReconStatus,        invoiceNo: "AMZ-9885",     date: "20 Mar 2026" },
+    { id: "r6",  supplier: "Amazon - Creations",      gstin: "29AAHCA9099B1Z4", tallyAmt:  95086, portalAmt:  92500, status: "mismatch" as ReconStatus,        invoiceNo: "AMZ-9820",     date: "14 Mar 2026", issue: "Portal shows ₹92,500 vs Tally ₹95,086 — ₹2,586 diff" },
+    { id: "r7",  supplier: "Amazon - Creations",      gstin: "29AAHCA9099B1Z4", tallyAmt:  19821, portalAmt:  19821, status: "matched" as ReconStatus,        invoiceNo: "AMZ-9744",     date: "05 Mar 2026" },
+    // Shiprocket — 2 invoices, 1 mismatch
+    { id: "r8",  supplier: "Shiprocket Logistics",    gstin: "07AAGCS5867P1Z9", tallyAmt:  32100, portalAmt:  31500, status: "mismatch" as ReconStatus,        invoiceNo: "SR-2301",      date: "25 Mar 2026", issue: "Portal shows ₹31,500 vs Tally ₹32,100 — ₹600 tax diff" },
+    { id: "r9",  supplier: "Shiprocket Logistics",    gstin: "07AAGCS5867P1Z9", tallyAmt:  28400, portalAmt:  28400, status: "matched" as ReconStatus,        invoiceNo: "SR-2256",      date: "12 Mar 2026" },
+    // Nykaa Mumbai 2 — 2 invoices, both missing from portal (supplier hasn't filed)
+    { id: "r10", supplier: "Nykaa Mumbai 2",          gstin: "27AADCN7487G1ZF", tallyAmt: 146500, portalAmt: null,   status: "missing_portal" as ReconStatus,  invoiceNo: "NYK-MH-1182",  date: "22 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
+    { id: "r11", supplier: "Nykaa Mumbai 2",          gstin: "27AADCN7487G1ZF", tallyAmt:  98400, portalAmt: null,   status: "missing_portal" as ReconStatus,  invoiceNo: "NYK-MH-1141",  date: "10 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
+    // Paytm — 1 invoice, missing from portal
+    { id: "r12", supplier: "Paytm (One97 Communications)", gstin: "07AAACT2727Q1ZV", tallyAmt:  89000, portalAmt: null, status: "missing_portal" as ReconStatus, invoiceNo: "PYT-2245",    date: "20 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
+    // Raw Material Supplier — 1 invoice, missing from portal
+    { id: "r13", supplier: "Raw Material Supplier Co",gstin: "24AAACR1234P1Z2", tallyAmt: 145600, portalAmt: null,   status: "missing_portal" as ReconStatus,  invoiceNo: "RMS-0845",     date: "18 Mar 2026", issue: "Supplier has not filed GSTR-1 yet" },
+    // Mumbai Packaging — 1 invoice, in 2B but not in Tally
+    { id: "r14", supplier: "Mumbai Packaging Ltd",    gstin: "27AAACM5555P1Z2", tallyAmt: null,   portalAmt:  58400, status: "missing_tally" as ReconStatus,   invoiceNo: "MPL-3301",     date: "15 Mar 2026", issue: "Invoice in 2B but not recorded in Tally" },
+    // Flipkart — 2 matched
+    { id: "r15", supplier: "Flipkart Marketplace",    gstin: "29AACCF0123P1Z8", tallyAmt: 156800, portalAmt: 156800, status: "matched" as ReconStatus,        invoiceNo: "FLP-8821",     date: "28 Mar 2026" },
+    { id: "r16", supplier: "Flipkart Marketplace",    gstin: "29AACCF0123P1Z8", tallyAmt:  94200, portalAmt:  94200, status: "matched" as ReconStatus,        invoiceNo: "FLP-8740",     date: "15 Mar 2026" },
+    // Freshworks — 1 matched
+    { id: "r17", supplier: "Freshworks India",        gstin: "33AADCF1122K1ZX", tallyAmt:  14850, portalAmt:  14850, status: "matched" as ReconStatus,        invoiceNo: "FD-88112",     date: "10 Mar 2026" },
+    // Razorpay — 1 matched
+    { id: "r18", supplier: "Razorpay Software",       gstin: "29AADCR1155P1Z8", tallyAmt:  42600, portalAmt:  42600, status: "matched" as ReconStatus,        invoiceNo: "RZP-10045",    date: "18 Mar 2026" },
+    // Kiran Labels — 1 mismatch
+    { id: "r19", supplier: "Kiran Labels & Stickers", gstin: "24AAACK7777K1Z5", tallyAmt:  98500, portalAmt:  96000, status: "mismatch" as ReconStatus,        invoiceNo: "KLS-0412",     date: "09 Mar 2026", issue: "Portal ₹96,000 vs Tally ₹98,500 — rounding in rate?" },
+    // Office Landlord — 1 missing from Tally
+    { id: "r20", supplier: "Ajay Mehta (Landlord)",   gstin: "27AJYPM4321M1Z8", tallyAmt: null,   portalAmt:  80000, status: "missing_tally" as ReconStatus,   invoiceNo: "AJM-2025-03",  date: "01 Mar 2026", issue: "March rent invoice in 2B — not yet booked in Tally" },
   ],
 };
+
+/** Monthly 2B reconciliation rollup — last 6 months. Powers the
+ *  Month view on the Recon tab (Suvit-inspired pattern — helps CAs
+ *  spot period-level drift at a glance). Derivable from running the
+ *  same reconcile_gstr2b tool per month and storing snapshots in
+ *  gst_reconciliation_results. */
+export interface ReconciliationMonthly {
+  month: string;       // "Mar 2026"
+  monthIso: string;    // "2026-03"
+  tallyInvoices: number;
+  portalInvoices: number;
+  matched: number;
+  mismatches: number;
+  missingFromPortal: number;
+  missingFromTally: number;
+  matchedValue: number;
+  itcAtRiskValue: number;
+}
+
+export const RECONCILIATION_MONTHLY: ReconciliationMonthly[] = [
+  { month: "Oct 2025", monthIso: "2025-10", tallyInvoices: 132, portalInvoices: 130, matched: 125, mismatches: 3, missingFromPortal: 4, missingFromTally: 2, matchedValue: 3_820_000, itcAtRiskValue: 1_80_000 },
+  { month: "Nov 2025", monthIso: "2025-11", tallyInvoices: 141, portalInvoices: 138, matched: 131, mismatches: 4, missingFromPortal: 6, missingFromTally: 3, matchedValue: 4_12_0000, itcAtRiskValue: 2_40_000 },
+  { month: "Dec 2025", monthIso: "2025-12", tallyInvoices: 158, portalInvoices: 154, matched: 146, mismatches: 5, missingFromPortal: 7, missingFromTally: 4, matchedValue: 4_680_000, itcAtRiskValue: 3_15_000 },
+  { month: "Jan 2026", monthIso: "2026-01", tallyInvoices: 139, portalInvoices: 136, matched: 128, mismatches: 4, missingFromPortal: 7, missingFromTally: 3, matchedValue: 4_05_0000, itcAtRiskValue: 2_85_000 },
+  { month: "Feb 2026", monthIso: "2026-02", tallyInvoices: 144, portalInvoices: 141, matched: 133, mismatches: 5, missingFromPortal: 6, missingFromTally: 3, matchedValue: 4_18_0000, itcAtRiskValue: 2_60_000 },
+  { month: "Mar 2026", monthIso: "2026-03", tallyInvoices: 147, portalInvoices: 143, matched: 128, mismatches: 7, missingFromPortal: 8, missingFromTally: 4, matchedValue: 4_230_000, itcAtRiskValue: 5_70_000 },
+];
+
+/** Vendor-level aggregation of the current period's recon lines.
+ *  Derived purely from RECONCILIATION.lines — no new data needed.
+ *  CAs think at the supplier level ("is Amazon fully matching?"),
+ *  not the invoice level. */
+export interface ReconciliationVendor {
+  supplier: string;
+  gstin: string;
+  totalInvoices: number;
+  totalTallyValue: number;
+  totalPortalValue: number;
+  matched: number;
+  mismatches: number;
+  missingFromPortal: number;
+  missingFromTally: number;
+  /** Overall status rollup — worst-case wins: mismatch/missing > matched. */
+  status: "all-matched" | "has-mismatch" | "has-missing-portal" | "has-missing-tally";
+  /** ITC at risk from missing_portal invoices only. */
+  itcAtRisk: number;
+}
+
+export function computeReconciliationByVendor(): ReconciliationVendor[] {
+  const byGstin = new Map<string, ReconciliationVendor>();
+  for (const line of RECONCILIATION.lines) {
+    const key = line.gstin;
+    const existing = byGstin.get(key) ?? {
+      supplier: line.supplier,
+      gstin: line.gstin,
+      totalInvoices: 0,
+      totalTallyValue: 0,
+      totalPortalValue: 0,
+      matched: 0,
+      mismatches: 0,
+      missingFromPortal: 0,
+      missingFromTally: 0,
+      status: "all-matched" as ReconciliationVendor["status"],
+      itcAtRisk: 0,
+    };
+    existing.totalInvoices++;
+    if (line.tallyAmt) existing.totalTallyValue += line.tallyAmt;
+    if (line.portalAmt) existing.totalPortalValue += line.portalAmt;
+    if (line.status === "matched") existing.matched++;
+    if (line.status === "mismatch") existing.mismatches++;
+    if (line.status === "missing_portal") {
+      existing.missingFromPortal++;
+      if (line.tallyAmt) {
+        // Approx ITC at risk — 18% of taxable. (Demo simplification;
+        // production would pull per-line tax breakdown from Tally.)
+        existing.itcAtRisk += Math.round(line.tallyAmt * 0.18);
+      }
+    }
+    if (line.status === "missing_tally") existing.missingFromTally++;
+    byGstin.set(key, existing);
+  }
+  // Compute rollup status (worst-case wins)
+  const vendors = [...byGstin.values()].map((v) => ({
+    ...v,
+    status: (v.missingFromPortal > 0
+      ? "has-missing-portal"
+      : v.missingFromTally > 0
+      ? "has-missing-tally"
+      : v.mismatches > 0
+      ? "has-mismatch"
+      : "all-matched") as ReconciliationVendor["status"],
+  }));
+  // Sort: problem vendors first (most to fewest issues), then matched
+  return vendors.sort((a, b) => {
+    const aIssues = a.mismatches + a.missingFromPortal + a.missingFromTally;
+    const bIssues = b.mismatches + b.missingFromPortal + b.missingFromTally;
+    if (aIssues !== bIssues) return bIssues - aIssues;
+    return b.totalInvoices - a.totalInvoices;
+  });
+}
 
 export const PRE_FILING_TRIAGE = {
   gstr1: {

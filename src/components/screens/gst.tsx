@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   RefreshCw,
@@ -24,6 +24,8 @@ import {
   GSTINS,
   GST_DATA_FRESHNESS,
   RECONCILIATION,
+  RECONCILIATION_MONTHLY,
+  computeReconciliationByVendor,
   PRE_FILING_TRIAGE,
   FILING_STATE,
   FILING_HISTORY,
@@ -506,6 +508,8 @@ export function GstScreen() {
   const [selectedGstin, setSelectedGstin] = useState(GSTINS[0].id);
   const [activeTab, setActiveTab] = useState<TabKey>("recon");
   const [reconFilter, setReconFilter] = useState<string>("all");
+  const [reconView, setReconView] = useState<"invoice" | "vendor" | "month">("invoice");
+  const reconVendors = useMemo(() => computeReconciliationByVendor(), []);
   const [historyFilter, setHistoryFilter] = useState<string>("all");
   const [otpOpen, setOtpOpen] = useState(false);
   const [otpPurpose, setOtpPurpose] = useState<string>("GST consent");
@@ -963,7 +967,42 @@ export function GstScreen() {
             </button>
           </div>
 
-          {/* Filter chips */}
+          {/* View toggle: Invoice / Vendor / Month — pattern from Suvit's
+               recon UX. Invoice = per-row (current default). Vendor =
+               aggregated by supplier (what CAs think in). Month =
+               6-month rollup for period-level drift. */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-4)" }}>
+              View
+            </span>
+            <div
+              className="flex rounded-lg p-0.5"
+              style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+            >
+              {(["invoice", "vendor", "month"] as const).map((v) => {
+                const active = reconView === v;
+                const label = v === "invoice" ? "Invoice" : v === "vendor" ? "Vendor" : "Month";
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setReconView(v)}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer transition-colors"
+                    style={{
+                      background: active ? "color-mix(in srgb, var(--green) 15%, transparent)" : "transparent",
+                      color: active ? "var(--green)" : "var(--text-3)",
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Filter chips — only show for Invoice view; Vendor + Month
+              views have their own aggregations and don't need row-level
+              status filtering. */}
+          {reconView === "invoice" && (
           <div className="flex flex-wrap gap-1.5">
             {[
               { key: "all", label: `All ${RECONCILIATION.totalTallyInvoices}` },
@@ -1000,8 +1039,10 @@ export function GstScreen() {
               );
             })}
           </div>
+          )}
 
-          {/* Table */}
+          {/* Invoice-level table (Invoice view only) */}
+          {reconView === "invoice" && (
           <div
             className="rounded-xl overflow-hidden"
             style={{
@@ -1173,8 +1214,15 @@ export function GstScreen() {
               </div>
             )}
           </div>
+          )}
 
-          {/* Bulk action */}
+          {/* Vendor view — aggregated by supplier */}
+          {reconView === "vendor" && <VendorReconTable vendors={reconVendors} />}
+
+          {/* Month view — 6-month rollup */}
+          {reconView === "month" && <MonthReconTable monthly={RECONCILIATION_MONTHLY} />}
+
+          {/* Bulk action — available across all views */}
           <div>
             <button
               type="button"
@@ -1953,6 +2001,200 @@ export function GstScreen() {
           console.log(`[${otpPurpose}] OTP received (not logged for security)`, otp.length, "digits")
         }
       />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   VendorReconTable — aggregated by supplier (Suvit-inspired)
+   ══════════════════════════════════════════════════════════════════ */
+function VendorReconTable({
+  vendors,
+}: {
+  vendors: ReturnType<typeof computeReconciliationByVendor>;
+}) {
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr style={{ background: "var(--bg-secondary)", color: "var(--text-4)" }}>
+              <th className="text-left px-3 py-2 font-medium">Supplier</th>
+              <th className="text-left px-3 py-2 font-medium">GSTIN</th>
+              <th className="text-right px-3 py-2 font-medium">Invoices</th>
+              <th className="text-right px-3 py-2 font-medium">Tally value</th>
+              <th className="text-right px-3 py-2 font-medium">Portal value</th>
+              <th className="text-center px-3 py-2 font-medium">Matched</th>
+              <th className="text-center px-3 py-2 font-medium">Mismatch</th>
+              <th className="text-center px-3 py-2 font-medium">Missing (portal / tally)</th>
+              <th className="text-right px-3 py-2 font-medium">ITC at risk</th>
+              <th className="text-left px-3 py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {vendors.map((v) => {
+              const statusMeta = {
+                "all-matched":        { label: "All matched",       color: "var(--green)" },
+                "has-mismatch":       { label: "Has mismatch",      color: "var(--yellow)" },
+                "has-missing-portal": { label: "Awaiting supplier", color: "var(--red)" },
+                "has-missing-tally":  { label: "Missing in books",  color: "var(--orange)" },
+              }[v.status];
+              return (
+                <tr key={v.gstin} style={{ borderTop: "1px solid var(--border)" }}>
+                  <td className="px-3 py-2 font-semibold" style={{ color: "var(--text-1)" }}>
+                    {v.supplier}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[10px]" style={{ color: "var(--text-4)" }}>
+                    {v.gstin}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--text-2)" }}>
+                    {v.totalInvoices}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    ₹{v.totalTallyValue.toLocaleString("en-IN")}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--text-3)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {v.totalPortalValue > 0 ? `₹${v.totalPortalValue.toLocaleString("en-IN")}` : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: v.matched > 0 ? "var(--green)" : "var(--text-4)" }}>
+                    {v.matched}
+                  </td>
+                  <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: v.mismatches > 0 ? "var(--yellow)" : "var(--text-4)" }}>
+                    {v.mismatches}
+                  </td>
+                  <td className="px-3 py-2 text-center tabular-nums text-[11px]" style={{ color: "var(--text-3)" }}>
+                    <span style={{ color: v.missingFromPortal > 0 ? "var(--red)" : "var(--text-4)" }}>
+                      {v.missingFromPortal}
+                    </span>
+                    {" / "}
+                    <span style={{ color: v.missingFromTally > 0 ? "var(--orange)" : "var(--text-4)" }}>
+                      {v.missingFromTally}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: v.itcAtRisk > 0 ? "var(--red)" : "var(--text-4)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {v.itcAtRisk > 0 ? `₹${v.itcAtRisk.toLocaleString("en-IN")}` : "—"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded"
+                      style={{
+                        color: statusMeta.color,
+                        background: `color-mix(in srgb, ${statusMeta.color} 14%, transparent)`,
+                      }}
+                    >
+                      {statusMeta.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {vendors.length === 0 && (
+        <div className="px-4 py-6 text-center" style={{ color: "var(--text-4)" }}>
+          <p className="text-xs">No vendors with recon activity this period.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   MonthReconTable — 6-month rollup (Suvit-inspired Month view)
+   ══════════════════════════════════════════════════════════════════ */
+function MonthReconTable({
+  monthly,
+}: {
+  monthly: typeof RECONCILIATION_MONTHLY;
+}) {
+  // Current month (last entry) = benchmark for diff column
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr style={{ background: "var(--bg-secondary)", color: "var(--text-4)" }}>
+              <th className="text-left px-3 py-2 font-medium">Month</th>
+              <th className="text-right px-3 py-2 font-medium">Tally inv.</th>
+              <th className="text-right px-3 py-2 font-medium">Portal inv.</th>
+              <th className="text-right px-3 py-2 font-medium">Diff</th>
+              <th className="text-center px-3 py-2 font-medium">Matched</th>
+              <th className="text-center px-3 py-2 font-medium">Mismatch</th>
+              <th className="text-center px-3 py-2 font-medium">Missing (portal / tally)</th>
+              <th className="text-right px-3 py-2 font-medium">Matched value</th>
+              <th className="text-right px-3 py-2 font-medium">ITC at risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...monthly].reverse().map((m, i) => {
+              const diff = m.tallyInvoices - m.portalInvoices;
+              const diffColor = diff === 0 ? "var(--green)" : diff > 0 ? "var(--yellow)" : "var(--blue)";
+              const isCurrent = i === 0;
+              return (
+                <tr
+                  key={m.monthIso}
+                  style={{
+                    borderTop: "1px solid var(--border)",
+                    background: isCurrent ? "color-mix(in srgb, var(--green) 5%, transparent)" : "transparent",
+                  }}
+                >
+                  <td className="px-3 py-2 font-semibold" style={{ color: "var(--text-1)" }}>
+                    {m.month}
+                    {isCurrent && (
+                      <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--green)" }}>
+                        · current
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--text-2)" }}>
+                    {m.tallyInvoices}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--text-3)" }}>
+                    {m.portalInvoices}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: diffColor }}>
+                    {diff > 0 ? "+" : ""}{diff}
+                  </td>
+                  <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: "var(--green)" }}>
+                    {m.matched}
+                  </td>
+                  <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: m.mismatches > 0 ? "var(--yellow)" : "var(--text-4)" }}>
+                    {m.mismatches}
+                  </td>
+                  <td className="px-3 py-2 text-center tabular-nums text-[11px]" style={{ color: "var(--text-3)" }}>
+                    <span style={{ color: m.missingFromPortal > 0 ? "var(--red)" : "var(--text-4)" }}>
+                      {m.missingFromPortal}
+                    </span>
+                    {" / "}
+                    <span style={{ color: m.missingFromTally > 0 ? "var(--orange)" : "var(--text-4)" }}>
+                      {m.missingFromTally}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    ₹{(m.matchedValue / 1e5).toFixed(1)}L
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: m.itcAtRiskValue > 0 ? "var(--red)" : "var(--text-4)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    ₹{(m.itcAtRiskValue / 1e5).toFixed(1)}L
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div
+        className="px-4 py-3 text-[11px]"
+        style={{ background: "var(--bg-secondary)", borderTop: "1px solid var(--border)", color: "var(--text-3)" }}
+      >
+        <strong style={{ color: "var(--text-2)" }}>Diff</strong> = Tally invoices − Portal invoices. Positive = your books have more than the portal (suppliers haven&apos;t filed yet, watch ITC at risk). Negative = portal has invoices you haven&apos;t booked.
+      </div>
     </div>
   );
 }
