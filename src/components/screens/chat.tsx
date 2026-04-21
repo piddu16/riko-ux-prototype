@@ -1571,16 +1571,15 @@ function ExchangeReturns({ onFollowup }: { onFollowup: (q: string) => void }) {
                 : c.rate > 10
                 ? "var(--orange)"
                 : "var(--yellow)",
-            caption: `${c.rate.toFixed(1)}% rate · top reason: ${c.topReason}`,
+            caption: `${c.rate.toFixed(1)}% rate · ${c.count} credit notes`,
           }))}
         />
       </div>
 
-      <Layer color="var(--red)" icon="💡" title="Amazon is the problem">
+      <Layer color="var(--red)" icon="💡" title="Amazon vs D2C gap">
         <p>
-          Amazon has a <strong>32.5%</strong> return rate — 4x your D2C channel. Damaged-in-transit
-          is the top reason. Better packaging + switch to standard FBA could cut returns by
-          50%+, recovering ~₹{((7420000 * 0.5) / 1e5).toFixed(1)}L/quarter.
+          Amazon has a <strong>32.5%</strong> return rate — 5.7× your Website D2C channel (5.7%).
+          Returns by channel are grouped from credit notes on the sales ledger.
         </p>
       </Layer>
 
@@ -3268,7 +3267,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       title: "Returns by channel",
       subtitle: `₹${(RETURNS_SUMMARY.totalReturns / 1e7).toFixed(2)}Cr returned · ${RETURNS_SUMMARY.returnRate.toFixed(1)}% of gross sales`,
       insight:
-        "Amazon's return rate is 32.5% — 4× your D2C channel's 5.7%. Damaged-in-transit is the top reason. Better packaging + switching to standard FBA could cut returns 50%+ and recover ~₹37L/quarter.",
+        "Amazon's return rate is 32.5% — 5.7× your Website D2C channel's 5.7%. Total returns this year: ₹1.62Cr across 847 credit notes.",
       entries: RETURNS_BY_CHANNEL.map((c) => ({
         label: c.channel,
         value: c.returns,
@@ -3278,7 +3277,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
             : c.rate > 10
             ? "var(--orange)"
             : "var(--yellow)",
-        caption: `${c.rate.toFixed(1)}% rate · top reason: ${c.topReason}`,
+        caption: `${c.rate.toFixed(1)}% rate · ${c.count} credit notes`,
       })),
     };
     return <ChartRenderer shape={shape} defaultType="bar" />;

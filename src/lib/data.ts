@@ -1313,13 +1313,16 @@ export const RETURNS_SUMMARY = {
   trendPct: 8.3,
 };
 
+/* Returns grouped by sales ledger (channel = ledger name in Tally).
+ * Source: credit notes GROUP BY sales ledger vs sales vouchers GROUP BY sales ledger.
+ * No reason/category field — Tally credit-note narration is free text, not structured. */
 export const RETURNS_BY_CHANNEL = [
-  { channel: "Amazon", returns: 7420000, sales: 22800000, rate: 32.5, count: 298, topReason: "Damaged in transit" },
-  { channel: "Flipkart", returns: 3180000, sales: 19800000, rate: 16.1, count: 187, topReason: "Wrong product" },
-  { channel: "Nykaa", returns: 2850000, sales: 32400000, rate: 8.8, count: 142, topReason: "Customer not satisfied" },
-  { channel: "Website D2C", returns: 1820000, sales: 32200000, rate: 5.7, count: 184, topReason: "Wrong address" },
-  { channel: "Meesho", returns: 620000, sales: 3850000, rate: 16.1, count: 31, topReason: "Cash on delivery refused" },
-  { channel: "Others", returns: 336404, sales: 7702204, rate: 4.4, count: 5, topReason: "Various" },
+  { channel: "Amazon", returns: 7420000, sales: 22800000, rate: 32.5, count: 298 },
+  { channel: "Flipkart", returns: 3180000, sales: 19800000, rate: 16.1, count: 187 },
+  { channel: "Nykaa", returns: 2850000, sales: 32400000, rate: 8.8, count: 142 },
+  { channel: "Website D2C", returns: 1820000, sales: 32200000, rate: 5.7, count: 184 },
+  { channel: "Meesho", returns: 620000, sales: 3850000, rate: 16.1, count: 31 },
+  { channel: "Others", returns: 336404, sales: 7702204, rate: 4.4, count: 5 },
 ];
 
 export const TOP_RETURNED_SKUS = [
@@ -1328,6 +1331,38 @@ export const TOP_RETURNED_SKUS = [
   { sku: "SKU-007", name: "Niacinamide Serum 30ml", returns: 89, rate: 12.4, loss: 534000 },
   { sku: "SKU-006", name: "150 Gm Riko Jar New Tube", returns: 76, rate: 8.1, loss: 456000 },
   { sku: "SKU-001", name: "100 Gm Riko Jar", returns: 54, rate: 4.2, loss: 324000 },
+];
+
+/* Top SKUs by revenue — GROUP BY stock_item on sales line items, SUM(amount) DESC.
+ * avgSalesRate / avgCostRate come from Tally stock master's Last Sale Rate / Last
+ * Purchase Rate (both standard fields). marginPct = (sales-cost)/sales. */
+export const TOP_SKUS_BY_REVENUE = [
+  { sku: "SKU-001", name: "100 Gm Riko Jar",                 hsn: "33079090", qty: 14820, revenue: 18680000, avgSalesRate: 1260, avgCostRate: 742, marginPct: 41.1 },
+  { sku: "SKU-006", name: "150 Gm Riko Jar New Tube",        hsn: "33079090", qty:  9140, revenue: 15640000, avgSalesRate: 1711, avgCostRate: 974, marginPct: 43.1 },
+  { sku: "SKU-007", name: "Niacinamide Serum 30ml",          hsn: "33049990", qty:  7180, revenue: 14360000, avgSalesRate: 2000, avgCostRate: 1120, marginPct: 44.0 },
+  { sku: "SKU-010", name: "Sunscreen SPF50 60ml",            hsn: "33049990", qty:  8420, revenue: 12630000, avgSalesRate: 1500, avgCostRate: 780, marginPct: 48.0 },
+  { sku: "SKU-008", name: "Vitamin C Face Wash 100ml",       hsn: "34022090", qty:  9840, revenue:  9840000, avgSalesRate: 1000, avgCostRate: 540, marginPct: 46.0 },
+  { sku: "SKU-005", name: "100 GM CHINA SURAH K TOAN Paste", hsn: "33079090", qty:  4920, revenue:  7380000, avgSalesRate: 1500, avgCostRate: 1080, marginPct: 28.0 },
+  { sku: "SKU-004", name: "100 GM BROWN GLASS JAR",          hsn: "3923",     qty:  4820, revenue:  6270000, avgSalesRate: 1300, avgCostRate: 1092, marginPct: 16.0 },
+  { sku: "SKU-009", name: "Retinol Night Cream 50g",         hsn: "33049990", qty:  3160, revenue:  4740000, avgSalesRate: 1500, avgCostRate: 720, marginPct: 52.0 },
+  { sku: "SKU-003", name: "100 Gm Riko Jar - SF",            hsn: "33079090", qty:  2840, revenue:  2410000, avgSalesRate:  849, avgCostRate: 580, marginPct: 31.7 },
+  { sku: "SKU-002", name: "100 Gm Riko Jar Cap",             hsn: "3923",     qty:  2560, revenue:   573000, avgSalesRate:  224, avgCostRate: 170, marginPct: 24.1 },
+];
+
+/* Monthly revenue for prior FY (FY24) — used for YoY overlay on the revenue chart.
+ * Source: SUM(sales vouchers) GROUP BY month on the prior FY ledger. R.fy24 is the
+ * total; this is the month-by-month distribution. Apr..Mar order matches R.ms. */
+export const R_FY24_MS = [
+  1_420_000, 1_580_000, 1_320_000, 1_190_000, 1_680_000, 1_880_000,
+  2_120_000, 1_940_000, 1_620_000, 1_490_000, 1_640_000, 1_720_027,
+];
+
+/* Customer concentration ladder — top N / total. Source: TOP_CUSTOMERS sorted. */
+export const CUSTOMER_CONCENTRATION = [
+  { bucket: "Top 1",  pct: 23.7, revenue: 3240000 },
+  { bucket: "Top 3",  pct: 67.8, revenue: 9310000 },
+  { bucket: "Top 5",  pct: 85.2, revenue: 11700000 },
+  { bucket: "Top 10", pct: 98.9, revenue: 13714000 },
 ];
 
 /* ============================================================
