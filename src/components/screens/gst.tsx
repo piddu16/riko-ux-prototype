@@ -64,6 +64,8 @@ const phaseLabel: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 const reconStatusColor: Record<string, string> = {
   matched: "var(--green)",
+  manual_matched: "#10B981",   // slightly cooler green to signal "human-accepted"
+  partial_match: "var(--orange)",
   mismatch: "var(--yellow)",
   missing_portal: "var(--red)",
   missing_tally: "var(--blue)",
@@ -71,6 +73,8 @@ const reconStatusColor: Record<string, string> = {
 
 const reconStatusLabel: Record<string, string> = {
   matched: "Matched",
+  manual_matched: "Manual matched",
+  partial_match: "Partial match",
   mismatch: "Mismatch",
   missing_portal: "Missing on portal",
   missing_tally: "Missing in Tally",
@@ -877,8 +881,8 @@ export function GstScreen() {
             {[
               {
                 label: "Matched",
-                count: RECONCILIATION.matched,
-                amount: fL(RECONCILIATION.matchedValue),
+                count: RECONCILIATION.matched + RECONCILIATION.manualMatched + RECONCILIATION.partialMatch,
+                amount: `${fL(RECONCILIATION.matchedValue + RECONCILIATION.manualMatchedValue + RECONCILIATION.partialMatchValue)} · Auto ${RECONCILIATION.matched} · Manual ${RECONCILIATION.manualMatched} · Partial ${RECONCILIATION.partialMatch}`,
                 color: "var(--green)",
                 icon: <Check size={14} />,
               },
@@ -1007,6 +1011,8 @@ export function GstScreen() {
             {[
               { key: "all", label: `All ${RECONCILIATION.totalTallyInvoices}` },
               { key: "matched", label: `Matched ${RECONCILIATION.matched}` },
+              { key: "manual_matched", label: `Manual matched ${RECONCILIATION.manualMatched}` },
+              { key: "partial_match", label: `Partial match ${RECONCILIATION.partialMatch}` },
               { key: "mismatch", label: `Mismatch ${RECONCILIATION.mismatches}` },
               {
                 key: "missing_portal",
@@ -2027,7 +2033,7 @@ function VendorReconTable({
               <th className="text-right px-3 py-2 font-medium">Invoices</th>
               <th className="text-right px-3 py-2 font-medium">Tally value</th>
               <th className="text-right px-3 py-2 font-medium">Portal value</th>
-              <th className="text-center px-3 py-2 font-medium">Matched</th>
+              <th className="text-center px-3 py-2 font-medium" title="Auto / Manual / Partial">Matched (A/M/P)</th>
               <th className="text-center px-3 py-2 font-medium">Mismatch</th>
               <th className="text-center px-3 py-2 font-medium">Missing (portal / tally)</th>
               <th className="text-right px-3 py-2 font-medium">ITC at risk</th>
@@ -2038,6 +2044,7 @@ function VendorReconTable({
             {vendors.map((v) => {
               const statusMeta = {
                 "all-matched":        { label: "All matched",       color: "var(--green)" },
+                "has-partial":        { label: "Has partial",       color: "#F97316" },
                 "has-mismatch":       { label: "Has mismatch",      color: "var(--yellow)" },
                 "has-missing-portal": { label: "Awaiting supplier", color: "var(--red)" },
                 "has-missing-tally":  { label: "Missing in books",  color: "var(--orange)" },
@@ -2059,8 +2066,18 @@ function VendorReconTable({
                   <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--text-3)", fontFamily: "'Space Grotesk', sans-serif" }}>
                     {v.totalPortalValue > 0 ? `₹${v.totalPortalValue.toLocaleString("en-IN")}` : "—"}
                   </td>
-                  <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: v.matched > 0 ? "var(--green)" : "var(--text-4)" }}>
-                    {v.matched}
+                  <td className="px-3 py-2 text-center tabular-nums text-[11px]" title="Auto-matched / Manual-matched / Partial match">
+                    <span className="font-semibold" style={{ color: v.matched > 0 ? "var(--green)" : "var(--text-4)" }}>
+                      {v.matched}
+                    </span>
+                    <span style={{ color: "var(--text-4)" }}> / </span>
+                    <span className="font-semibold" style={{ color: v.manualMatched > 0 ? "#10B981" : "var(--text-4)" }}>
+                      {v.manualMatched}
+                    </span>
+                    <span style={{ color: "var(--text-4)" }}> / </span>
+                    <span className="font-semibold" style={{ color: v.partialMatch > 0 ? "var(--orange)" : "var(--text-4)" }}>
+                      {v.partialMatch}
+                    </span>
                   </td>
                   <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: v.mismatches > 0 ? "var(--yellow)" : "var(--text-4)" }}>
                     {v.mismatches}
@@ -2125,7 +2142,7 @@ function MonthReconTable({
               <th className="text-right px-3 py-2 font-medium">Tally inv.</th>
               <th className="text-right px-3 py-2 font-medium">Portal inv.</th>
               <th className="text-right px-3 py-2 font-medium">Diff</th>
-              <th className="text-center px-3 py-2 font-medium">Matched</th>
+              <th className="text-center px-3 py-2 font-medium" title="Auto / Manual / Partial">Matched (A/M/P)</th>
               <th className="text-center px-3 py-2 font-medium">Mismatch</th>
               <th className="text-center px-3 py-2 font-medium">Missing (portal / tally)</th>
               <th className="text-right px-3 py-2 font-medium">Matched value</th>
@@ -2162,8 +2179,18 @@ function MonthReconTable({
                   <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: diffColor }}>
                     {diff > 0 ? "+" : ""}{diff}
                   </td>
-                  <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: "var(--green)" }}>
-                    {m.matched}
+                  <td className="px-3 py-2 text-center tabular-nums text-[11px]" title="Auto-matched / Manual-matched / Partial match">
+                    <span className="font-semibold" style={{ color: "var(--green)" }}>
+                      {m.matched}
+                    </span>
+                    <span style={{ color: "var(--text-4)" }}> / </span>
+                    <span className="font-semibold" style={{ color: m.manualMatched > 0 ? "#10B981" : "var(--text-4)" }}>
+                      {m.manualMatched}
+                    </span>
+                    <span style={{ color: "var(--text-4)" }}> / </span>
+                    <span className="font-semibold" style={{ color: m.partialMatch > 0 ? "var(--orange)" : "var(--text-4)" }}>
+                      {m.partialMatch}
+                    </span>
                   </td>
                   <td className="px-3 py-2 text-center tabular-nums font-semibold" style={{ color: m.mismatches > 0 ? "var(--yellow)" : "var(--text-4)" }}>
                     {m.mismatches}

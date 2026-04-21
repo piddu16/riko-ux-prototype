@@ -28,6 +28,8 @@ const STATUS_META: Record<
   { label: string; color: string; icon: typeof CheckCircle2; short: string }
 > = {
   matched: { label: "Matched", color: "var(--green)", icon: CheckCircle2, short: "Match" },
+  manual_matched: { label: "Manual matched", color: "#10B981", icon: CheckCircle2, short: "Manual" },
+  partial_match: { label: "Partial match", color: "var(--orange)", icon: AlertTriangle, short: "Partial" },
   mismatch: { label: "Value mismatch", color: "var(--yellow)", icon: AlertTriangle, short: "Mismatch" },
   missing_portal: {
     label: "Missing from 2B",

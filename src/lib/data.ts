@@ -862,17 +862,40 @@ export const GST_DATA_FRESHNESS = {
   tallySync: { asOf: "2 hours ago", status: "healthy" },
 };
 
-export type ReconStatus = "matched" | "mismatch" | "missing_portal" | "missing_tally";
+/** 2B reconciliation status buckets. Matches Suvit's 5-category
+ *  pattern (help.suvit.io/articles/gst-reco-overview):
+ *   - matched:       auto-matched by system
+ *   - manual_matched: human accepted a near-match as OK (audit trail)
+ *   - partial_match: some fields match but not all (e.g. invoice # matches but amount differs)
+ *   - mismatch:      materially different — needs investigation
+ *   - missing_portal: in Tally, not in 2B (supplier hasn't filed)
+ *   - missing_tally:  in 2B, not in Tally (invoice not yet booked)
+ */
+export type ReconStatus =
+  | "matched"
+  | "manual_matched"
+  | "partial_match"
+  | "mismatch"
+  | "missing_portal"
+  | "missing_tally";
 
 export const RECONCILIATION = {
   period: "March 2026",
   totalTallyInvoices: 147,
   totalPortalInvoices: 143,
-  matched: 128,
+  // Match breakdown — all 3 "successful" buckets; auto is the default,
+  // manual is when a CA explicitly accepted a near-match (audit trail),
+  // partial is when some fields agreed but not all (e.g. tax split).
+  matched: 118,        // auto-matched by system
+  manualMatched: 6,    // human-accepted near-matches
+  partialMatch: 4,     // some fields match, some don't (e.g. tax split)
   mismatches: 7,
   missingFromPortal: 8,
   missingFromTally: 4,
-  matchedValue: 4230000, // 42.3L
+  // 118 + 6 + 4 + 7 + 8 + 4 = 147 ✓
+  matchedValue: 3_900_000,       // 39L — auto-matched only
+  manualMatchedValue: 230_000,   // 2.3L — near-matches accepted
+  partialMatchValue: 100_000,    // 1L — split-level partial matches
   mismatchValue: 310000, // 3.1L
   itcAtRiskValue: 570000, // 5.7L
   lastRunAt: "12 Apr 2026, 11:42 AM",
@@ -904,10 +927,10 @@ export const RECONCILIATION = {
     // Flipkart — 2 matched
     { id: "r15", supplier: "Flipkart Marketplace",    gstin: "29AACCF0123P1Z8", tallyAmt: 156800, portalAmt: 156800, status: "matched" as ReconStatus,        invoiceNo: "FLP-8821",     date: "28 Mar 2026" },
     { id: "r16", supplier: "Flipkart Marketplace",    gstin: "29AACCF0123P1Z8", tallyAmt:  94200, portalAmt:  94200, status: "matched" as ReconStatus,        invoiceNo: "FLP-8740",     date: "15 Mar 2026" },
-    // Freshworks — 1 matched
-    { id: "r17", supplier: "Freshworks India",        gstin: "33AADCF1122K1ZX", tallyAmt:  14850, portalAmt:  14850, status: "matched" as ReconStatus,        invoiceNo: "FD-88112",     date: "10 Mar 2026" },
-    // Razorpay — 1 matched
-    { id: "r18", supplier: "Razorpay Software",       gstin: "29AADCR1155P1Z8", tallyAmt:  42600, portalAmt:  42600, status: "matched" as ReconStatus,        invoiceNo: "RZP-10045",    date: "18 Mar 2026" },
+    // Freshworks — manual_matched (₹5 rounding, CA accepted)
+    { id: "r17", supplier: "Freshworks India",        gstin: "33AADCF1122K1ZX", tallyAmt:  14850, portalAmt:  14845, status: "manual_matched" as ReconStatus, invoiceNo: "FD-88112",     date: "10 Mar 2026", issue: "₹5 rounding diff — manually accepted within tolerance" },
+    // Razorpay — partial_match (invoice # + amount match, but tax split differs)
+    { id: "r18", supplier: "Razorpay Software",       gstin: "29AADCR1155P1Z8", tallyAmt:  42600, portalAmt:  42600, status: "partial_match" as ReconStatus,  invoiceNo: "RZP-10045",    date: "18 Mar 2026", issue: "Amount matches but tax split differs — portal shows IGST ₹7,668, books have CGST+SGST" },
     // Kiran Labels — 1 mismatch
     { id: "r19", supplier: "Kiran Labels & Stickers", gstin: "24AAACK7777K1Z5", tallyAmt:  98500, portalAmt:  96000, status: "mismatch" as ReconStatus,        invoiceNo: "KLS-0412",     date: "09 Mar 2026", issue: "Portal ₹96,000 vs Tally ₹98,500 — rounding in rate?" },
     // Office Landlord — 1 missing from Tally
@@ -925,21 +948,23 @@ export interface ReconciliationMonthly {
   monthIso: string;    // "2026-03"
   tallyInvoices: number;
   portalInvoices: number;
-  matched: number;
+  matched: number;          // auto-matched
+  manualMatched: number;    // human-accepted near-matches
+  partialMatch: number;     // some fields agree, some don't
   mismatches: number;
   missingFromPortal: number;
   missingFromTally: number;
-  matchedValue: number;
+  matchedValue: number;     // sum of all 3 match buckets
   itcAtRiskValue: number;
 }
 
 export const RECONCILIATION_MONTHLY: ReconciliationMonthly[] = [
-  { month: "Oct 2025", monthIso: "2025-10", tallyInvoices: 132, portalInvoices: 130, matched: 125, mismatches: 3, missingFromPortal: 4, missingFromTally: 2, matchedValue: 3_820_000, itcAtRiskValue: 1_80_000 },
-  { month: "Nov 2025", monthIso: "2025-11", tallyInvoices: 141, portalInvoices: 138, matched: 131, mismatches: 4, missingFromPortal: 6, missingFromTally: 3, matchedValue: 4_12_0000, itcAtRiskValue: 2_40_000 },
-  { month: "Dec 2025", monthIso: "2025-12", tallyInvoices: 158, portalInvoices: 154, matched: 146, mismatches: 5, missingFromPortal: 7, missingFromTally: 4, matchedValue: 4_680_000, itcAtRiskValue: 3_15_000 },
-  { month: "Jan 2026", monthIso: "2026-01", tallyInvoices: 139, portalInvoices: 136, matched: 128, mismatches: 4, missingFromPortal: 7, missingFromTally: 3, matchedValue: 4_05_0000, itcAtRiskValue: 2_85_000 },
-  { month: "Feb 2026", monthIso: "2026-02", tallyInvoices: 144, portalInvoices: 141, matched: 133, mismatches: 5, missingFromPortal: 6, missingFromTally: 3, matchedValue: 4_18_0000, itcAtRiskValue: 2_60_000 },
-  { month: "Mar 2026", monthIso: "2026-03", tallyInvoices: 147, portalInvoices: 143, matched: 128, mismatches: 7, missingFromPortal: 8, missingFromTally: 4, matchedValue: 4_230_000, itcAtRiskValue: 5_70_000 },
+  { month: "Oct 2025", monthIso: "2025-10", tallyInvoices: 132, portalInvoices: 130, matched: 119, manualMatched: 4, partialMatch: 2, mismatches: 3, missingFromPortal: 4, missingFromTally: 2, matchedValue: 3_820_000, itcAtRiskValue: 1_80_000 },
+  { month: "Nov 2025", monthIso: "2025-11", tallyInvoices: 141, portalInvoices: 138, matched: 124, manualMatched: 5, partialMatch: 2, mismatches: 4, missingFromPortal: 6, missingFromTally: 3, matchedValue: 4_120_000, itcAtRiskValue: 2_40_000 },
+  { month: "Dec 2025", monthIso: "2025-12", tallyInvoices: 158, portalInvoices: 154, matched: 138, manualMatched: 5, partialMatch: 3, mismatches: 5, missingFromPortal: 7, missingFromTally: 4, matchedValue: 4_680_000, itcAtRiskValue: 3_15_000 },
+  { month: "Jan 2026", monthIso: "2026-01", tallyInvoices: 139, portalInvoices: 136, matched: 119, manualMatched: 6, partialMatch: 3, mismatches: 4, missingFromPortal: 7, missingFromTally: 3, matchedValue: 4_050_000, itcAtRiskValue: 2_85_000 },
+  { month: "Feb 2026", monthIso: "2026-02", tallyInvoices: 144, portalInvoices: 141, matched: 124, manualMatched: 6, partialMatch: 3, mismatches: 5, missingFromPortal: 6, missingFromTally: 3, matchedValue: 4_180_000, itcAtRiskValue: 2_60_000 },
+  { month: "Mar 2026", monthIso: "2026-03", tallyInvoices: 147, portalInvoices: 143, matched: 118, manualMatched: 6, partialMatch: 4, mismatches: 7, missingFromPortal: 8, missingFromTally: 4, matchedValue: 4_230_000, itcAtRiskValue: 5_70_000 },
 ];
 
 /** Vendor-level aggregation of the current period's recon lines.
@@ -952,12 +977,19 @@ export interface ReconciliationVendor {
   totalInvoices: number;
   totalTallyValue: number;
   totalPortalValue: number;
-  matched: number;
+  matched: number;          // auto-matched
+  manualMatched: number;    // human-accepted near-matches
+  partialMatch: number;     // some fields agree, some don't
   mismatches: number;
   missingFromPortal: number;
   missingFromTally: number;
-  /** Overall status rollup — worst-case wins: mismatch/missing > matched. */
-  status: "all-matched" | "has-mismatch" | "has-missing-portal" | "has-missing-tally";
+  /** Overall status rollup — worst-case wins. */
+  status:
+    | "all-matched"
+    | "has-partial"
+    | "has-mismatch"
+    | "has-missing-portal"
+    | "has-missing-tally";
   /** ITC at risk from missing_portal invoices only. */
   itcAtRisk: number;
 }
@@ -973,6 +1005,8 @@ export function computeReconciliationByVendor(): ReconciliationVendor[] {
       totalTallyValue: 0,
       totalPortalValue: 0,
       matched: 0,
+      manualMatched: 0,
+      partialMatch: 0,
       mismatches: 0,
       missingFromPortal: 0,
       missingFromTally: 0,
@@ -983,6 +1017,8 @@ export function computeReconciliationByVendor(): ReconciliationVendor[] {
     if (line.tallyAmt) existing.totalTallyValue += line.tallyAmt;
     if (line.portalAmt) existing.totalPortalValue += line.portalAmt;
     if (line.status === "matched") existing.matched++;
+    if (line.status === "manual_matched") existing.manualMatched++;
+    if (line.status === "partial_match") existing.partialMatch++;
     if (line.status === "mismatch") existing.mismatches++;
     if (line.status === "missing_portal") {
       existing.missingFromPortal++;
@@ -995,7 +1031,8 @@ export function computeReconciliationByVendor(): ReconciliationVendor[] {
     if (line.status === "missing_tally") existing.missingFromTally++;
     byGstin.set(key, existing);
   }
-  // Compute rollup status (worst-case wins)
+  // Compute rollup status (worst-case wins). Partial-match is its own
+  // tier — less severe than a true mismatch but worth flagging.
   const vendors = [...byGstin.values()].map((v) => ({
     ...v,
     status: (v.missingFromPortal > 0
@@ -1004,12 +1041,14 @@ export function computeReconciliationByVendor(): ReconciliationVendor[] {
       ? "has-missing-tally"
       : v.mismatches > 0
       ? "has-mismatch"
+      : v.partialMatch > 0
+      ? "has-partial"
       : "all-matched") as ReconciliationVendor["status"],
   }));
   // Sort: problem vendors first (most to fewest issues), then matched
   return vendors.sort((a, b) => {
-    const aIssues = a.mismatches + a.missingFromPortal + a.missingFromTally;
-    const bIssues = b.mismatches + b.missingFromPortal + b.missingFromTally;
+    const aIssues = a.mismatches + a.missingFromPortal + a.missingFromTally + a.partialMatch;
+    const bIssues = b.mismatches + b.missingFromPortal + b.missingFromTally + b.partialMatch;
     if (aIssues !== bIssues) return bIssues - aIssues;
     return b.totalInvoices - a.totalInvoices;
   });
@@ -1102,9 +1141,13 @@ export const FILING_HISTORY = [
 export const GST_HEALTH = {
   /** From INFINI GST Advanced API — returned directly, not a composite. */
   complianceRating: "A" as "A+" | "A" | "B" | "C" | "D" | "E",
-  filingStreak: 18, // months in a row, derived from filing history
+  /** Months since the last missed/late filing. Mirrors the filing
+   *  tracker below — Jul 2025 GSTR-1 was filed late, so streak
+   *  counts from Aug 2025 → Mar 2026 = 9 consecutive on-time months.
+   *  (Still an A rating because 1 late in 12m is within grace.) */
+  filingStreak: 9,
   avgDaysBeforeDue: 3.2,
-  missedDeadlines12m: 0,
+  missedDeadlines12m: 1, // the Jul 2025 GSTR-1
   itcMatchRate: 87, // %, derived from 2B recon output
   excessItcUnclaimed: 461000, // ₹4.61L, derived from 2B vs 3B diff
 };
