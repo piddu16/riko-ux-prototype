@@ -1204,30 +1204,41 @@ function ExchangeGstRecon({ onFollowup }: { onFollowup: (q: string) => void }) {
   );
 }
 
-/* ── GST health ── */
+/* ── GST health — reflects INFINI's compliance rating verbatim ── */
 function ExchangeGstHealth({ onFollowup }: { onFollowup: (q: string) => void }) {
-  const scoreColor =
-    GST_HEALTH.score < 50
-      ? "var(--red)"
-      : GST_HEALTH.score < 75
-      ? "var(--yellow)"
-      : "var(--green)";
+  const rating = GST_HEALTH.complianceRating;
+  const ratingColor =
+    rating === "A+" || rating === "A" ? "var(--green)"
+    : rating === "B"                   ? "var(--blue)"
+    : rating === "C"                   ? "var(--yellow)"
+    :                                    "var(--red)";
   return (
     <RikoMsg>
-      {/* Mobile: full gauge + 4-row metric list */}
+      {/* Mobile: compliance rating badge + 4-row metric list */}
       <div
         className="md:hidden rounded-xl p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-4">
-          <Gauge
-            value={GST_HEALTH.score}
-            min={0}
-            max={100}
-            thresholds={{ red: 50, yellow: 75 }}
-            size={120}
-            label="GST Health"
-          />
+          <div
+            className="flex flex-col items-center justify-center rounded-full flex-shrink-0"
+            style={{
+              width: 100,
+              height: 100,
+              background: `color-mix(in srgb, ${ratingColor} 14%, transparent)`,
+              border: `3px solid ${ratingColor}`,
+            }}
+          >
+            <span
+              className="text-4xl font-bold leading-none"
+              style={{ color: ratingColor, fontFamily: "'Space Grotesk', sans-serif" }}
+            >
+              {rating}
+            </span>
+            <span className="text-[8px] uppercase tracking-wider mt-1" style={{ color: "var(--text-4)" }}>
+              rating
+            </span>
+          </div>
           <div className="flex-1 space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
               <span style={{ color: "var(--text-3)" }}>Filing streak</span>
@@ -1272,19 +1283,19 @@ function ExchangeGstHealth({ onFollowup }: { onFollowup: (q: string) => void }) 
         </div>
       </div>
 
-      {/* Desktop: compact summary (gauge + full metrics live in Result panel) */}
+      {/* Desktop: compact summary */}
       <div
         className="hidden md:block rounded-xl p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
-          GST Health score
+          Compliance rating · from INFINI
         </p>
         <p
           className="text-3xl font-bold leading-none mt-1"
-          style={{ color: scoreColor, fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{ color: ratingColor, fontFamily: "'Space Grotesk', sans-serif" }}
         >
-          {GST_HEALTH.score}<span className="text-lg" style={{ color: "var(--text-4)" }}>/100</span>
+          {rating}
         </p>
         <p className="text-xs mt-1.5" style={{ color: "var(--text-3)" }}>
           {GST_HEALTH.filingStreak}-month filing streak · ₹
@@ -3029,20 +3040,41 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     <ChatWaterfall data={WATERFALL} title="P&L waterfall · Revenue to EBITDA" />
   ),
   "gst-recon": () => <ChatGstRecon period={RECONCILIATION.period} />,
-  "gst-health": () => (
+  "gst-health": () => {
+    const rating = GST_HEALTH.complianceRating;
+    const ratingColor =
+      rating === "A+" || rating === "A" ? "var(--green)"
+      : rating === "B"                   ? "var(--blue)"
+      : rating === "C"                   ? "var(--yellow)"
+      :                                    "var(--red)";
+    return (
     <div
       className="rounded-xl p-5"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="flex flex-col items-center mb-4">
-        <Gauge
-          value={GST_HEALTH.score}
-          min={0}
-          max={100}
-          thresholds={{ red: 50, yellow: 75 }}
-          size={180}
-          label="GST Health"
-        />
+        <div
+          className="flex flex-col items-center justify-center rounded-full"
+          style={{
+            width: 180,
+            height: 180,
+            background: `color-mix(in srgb, ${ratingColor} 14%, transparent)`,
+            border: `4px solid ${ratingColor}`,
+          }}
+        >
+          <span
+            className="text-6xl font-bold leading-none"
+            style={{ color: ratingColor, fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {rating}
+          </span>
+          <span className="text-[10px] uppercase tracking-wider mt-2" style={{ color: "var(--text-4)" }}>
+            Compliance rating
+          </span>
+          <span className="text-[9px] mt-0.5" style={{ color: "var(--text-4)" }}>
+            from INFINI
+          </span>
+        </div>
       </div>
       <div className="space-y-2">
         {[
@@ -3069,7 +3101,8 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
         ))}
       </div>
     </div>
-  ),
+    );
+  },
   // Top customers: migrated to ChartRenderer — switch between
   // bar / donut / treemap for top 10 customers by revenue.
   "top-customers": () => {

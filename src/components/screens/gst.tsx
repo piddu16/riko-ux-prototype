@@ -9,7 +9,6 @@ import {
   FileJson,
   Send,
   AlertTriangle,
-  Circle,
   ArrowRight,
   MessageCircle,
   Lock,
@@ -30,6 +29,8 @@ import {
   FILING_HISTORY,
   GST_HEALTH,
   BUILD_PHASES,
+  FILING_TRACKER,
+  FILING_STATUS_META,
 } from "@/lib/data";
 import { GstinSelector } from "@/components/ui/gst/gstin-selector";
 import { OtpModal } from "@/components/ui/gst/otp-modal";
@@ -76,56 +77,148 @@ const reconStatusLabel: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 /*  Circular ring for health score                                    */
 /* ------------------------------------------------------------------ */
-function HealthRing({ score, size = 96 }: { score: number; size?: number }) {
-  const strokeWidth = 8;
-  const r = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * r;
-  const progress = Math.min(score, 100) / 100;
-  const ringColor =
-    score >= 75 ? "var(--green)" : score >= 55 ? "var(--yellow)" : "var(--red)";
+/** Compliance rating chip — shows the letter grade INFINI's
+ *  GST Advanced API returns for this GSTIN. No composite score
+ *  calculation in Riko; we surface the upstream value verbatim. */
+function ComplianceRatingBadge({
+  rating,
+  size = 96,
+}: {
+  rating: "A+" | "A" | "B" | "C" | "D" | "E";
+  size?: number;
+}) {
+  const color =
+    rating === "A+" || rating === "A" ? "var(--green)"
+    : rating === "B"                   ? "var(--blue)"
+    : rating === "C"                   ? "var(--yellow)"
+    :                                    "var(--red)";
 
   return (
-    <div className="flex-shrink-0 relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke="var(--border)"
-          strokeWidth={strokeWidth}
-        />
-        <motion.circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={ringColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          initial={{ strokeDashoffset: circumference }}
-          whileInView={{ strokeDashoffset: circumference * (1 - progress) }}
-          viewport={{ once: true }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span
-          className="text-2xl font-bold leading-none tabular-nums"
-          style={{
-            color: "var(--text-1)",
-            fontFamily: "'Space Grotesk', sans-serif",
-          }}
-        >
-          {score}
-        </span>
-        <span className="text-[9px] mt-0.5" style={{ color: "var(--text-4)" }}>
-          / 100
-        </span>
-      </div>
+    <div
+      className="flex-shrink-0 flex flex-col items-center justify-center rounded-full"
+      style={{
+        width: size,
+        height: size,
+        background: `color-mix(in srgb, ${color} 14%, transparent)`,
+        border: `3px solid ${color}`,
+      }}
+    >
+      <span
+        className="text-4xl font-bold leading-none"
+        style={{
+          color,
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        {rating}
+      </span>
+      <span className="text-[8px] uppercase tracking-wider mt-1" style={{ color: "var(--text-4)" }}>
+        rating
+      </span>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Return Filing Tracker — Suvit-inspired 12-month compliance grid   */
+/*  Each cell = one month × one return type, status icon reflects     */
+/*  INFINI filing history (GSP GST Return Filing API).                */
+/* ------------------------------------------------------------------ */
+function FilingTrackerCard() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.4, delay: 0.08 }}
+      className="rounded-xl p-4 mb-5"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div>
+          <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+            Return Filing Tracker
+          </p>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
+            Last 12 months · on-time, late, pending at a glance
+          </p>
+        </div>
+        {/* Legend */}
+        <div className="flex items-center gap-3 text-[10px]" style={{ color: "var(--text-3)" }}>
+          {(["on-time", "late", "not-filed"] as const).map((s) => {
+            const meta = FILING_STATUS_META[s];
+            return (
+              <span key={s} className="inline-flex items-center gap-1">
+                <span
+                  className="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold"
+                  style={{
+                    background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
+                    color: meta.color,
+                  }}
+                >
+                  {meta.icon}
+                </span>
+                {meta.label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Grid: 2 rows (GSTR-1, GSTR-3B) × 12 columns (months). On mobile it scrolls horizontally. */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-[11px] tabular-nums" style={{ minWidth: 640 }}>
+          <thead>
+            <tr>
+              <th
+                className="px-2 py-1.5 text-left font-semibold uppercase tracking-wider sticky left-0 z-10"
+                style={{ color: "var(--text-4)", background: "var(--bg-surface)" }}
+              >
+                Return
+              </th>
+              {FILING_TRACKER.map((m) => (
+                <th
+                  key={m.monthIso}
+                  className="px-1 py-1.5 text-center font-medium"
+                  style={{ color: "var(--text-4)", minWidth: 44 }}
+                >
+                  {m.month}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(["gstr1", "gstr3b"] as const).map((ret) => (
+              <tr key={ret} style={{ borderTop: "1px solid var(--border)" }}>
+                <td
+                  className="px-2 py-1.5 font-semibold sticky left-0"
+                  style={{ color: "var(--text-1)", background: "var(--bg-surface)" }}
+                >
+                  {ret === "gstr1" ? "GSTR-1" : "GSTR-3B"}
+                </td>
+                {FILING_TRACKER.map((m) => {
+                  const status = m[ret];
+                  const meta = FILING_STATUS_META[status];
+                  return (
+                    <td key={m.monthIso} className="px-1 py-1.5 text-center" title={`${ret === "gstr1" ? "GSTR-1" : "GSTR-3B"} · ${m.month} · ${meta.label}`}>
+                      <span
+                        className="inline-flex items-center justify-center w-6 h-6 rounded text-[12px] font-bold"
+                        style={{
+                          background: `color-mix(in srgb, ${meta.color} 14%, transparent)`,
+                          color: meta.color,
+                        }}
+                      >
+                        {meta.icon}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </motion.div>
   );
 }
 
@@ -593,13 +686,13 @@ export function GstScreen() {
       >
         <div className="flex items-center gap-5 flex-wrap">
           <div className="flex items-center gap-4 flex-shrink-0">
-            <HealthRing score={GST_HEALTH.score} />
+            <ComplianceRatingBadge rating={GST_HEALTH.complianceRating} />
             <div>
               <p
                 className="text-[10px] uppercase tracking-wider font-bold"
                 style={{ color: "var(--text-4)" }}
               >
-                GST Health
+                Compliance rating
               </p>
               <p
                 className="text-sm font-bold"
@@ -611,7 +704,7 @@ export function GstScreen() {
                 className="text-[11px] mt-0.5"
                 style={{ color: "var(--text-3)" }}
               >
-                Based on 12-month filing record
+                From INFINI GST Advanced API · per GSTIN
               </p>
             </div>
           </div>
@@ -711,6 +804,15 @@ export function GstScreen() {
           </button>
         </div>
       </motion.div>
+
+      {/* ================================================== */}
+      {/*  4.5 Return Filing Tracker (12 months × GSTR-1/3B) */}
+      {/*      Pattern borrowed from Suvit's GST Dashboard   */}
+      {/*      — gives CAs a one-glance read on "am I compliant */}
+      {/*      this FY?". Every cell status is derivable from   */}
+      {/*      INFINI's GSP GST Return Filing history.          */}
+      {/* ================================================== */}
+      <FilingTrackerCard />
 
       {/* ================================================== */}
       {/*  5. Active Workflow Tabs                           */}

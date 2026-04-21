@@ -375,382 +375,229 @@ export const CA_FIRM = {
   registrationNo: "FRN 012345W",
   principal: "CA Rajesh Sharma",
   clientCount: 18,
-  address: "812 Lodha Supremus, Mumbai 400013",
-  panelSize: "Mid-sized · 6 team members",
-};
-
-/** Firm-level metrics for the "This month" snapshot hero. */
-export const CA_FIRM_METRICS_THIS_MONTH = {
-  hoursLogged: 187,
-  hoursLoggedLastMonth: 164,
-  billed: 2_85_000, // ₹
-  billedLastMonth: 2_40_000,
-  collected: 2_10_000,
-  collectedLastMonth: 2_28_000,
-  misDelivered: 9,
-  misTotal: 18,
-  gstFiled: 12,
-  gstTotal: 18,
-  tdsFiled: 14,
-  tdsTotal: 18,
-  filingStreakDays: 47, // days without a missed deadline
 };
 
 export type ClientStatus = "critical" | "warning" | "healthy";
-export type ComplianceGrade = "A+" | "A" | "B" | "C" | "D";
-export type ChurnRisk = "none" | "low" | "medium" | "high";
-export type ClientOnboardStatus = "active" | "kyc-pending" | "sync-setup" | "first-mis-pending";
 
+/** Next-action framing — derived from the client's `issues[]` + `status`.
+ *  Not a new data field in the product; just a UX rephrasing of what's
+ *  already there. Priority is derived from status (critical → urgent,
+ *  warning → high, healthy → medium). */
 export interface ClientNextAction {
-  verb: string;       // "File" / "Call" / "Review" / "Escalate" / "Remind"
+  verb: string;       // "File" / "Call" / "Review" / "Pay" / "Draft"
   detail: string;     // "GSTR-3B for Bandra Soap"
   deadline?: string;  // ISO date
-  priority: "urgent" | "high" | "medium";
 }
 
 export interface Client {
   id: number;
   name: string;
   industry: string;
+  /** Derived client-side from `industry` string — used for the industry
+   *  filter dropdown + revenue-mix donut. Not a product-side field. */
   industryGroup: "Manufacturing" | "Retail" | "D2C" | "Services" | "FMCG" | "Trading" | "Healthcare" | "Food" | "Other";
-  location: string;
   revenue: string;
   revenueValue: number;        // numeric for sorting
   revenueYoY: number;          // delta fraction: 0.12 = +12%, -0.18 = -18%
-  revenueTrend: number[];      // 12-month rev series (normalised 0–100 for sparkline)
+  revenueTrend: number[];      // 12-month rev series for sparkline (Tally-derivable)
   netPL: string;
   healthScore: number;
   status: ClientStatus;
-  complianceScore: number;     // 0–100
-  complianceGrade: ComplianceGrade;
   issues: string[];
   nextAction: ClientNextAction;
   misStatus: "Pending" | "In progress" | "Delivered";
   lastSync: string;
-  lastSyncVouchers: number;    // how many new vouchers since last sync
-  ownerLastLogin: string;      // "2d ago", "6w ago"
   contact: string;
   gstin?: string;
-  assignedTo: string;          // team member id
-  tags: string[];              // ["Priority", "FY26", "Referred"]
-  monthlyHours: number;        // hrs logged this month
-  monthlyBilled: number;       // ₹ billed this month
-  /** Per-filing coverage this month. Only surfaces filings Riko
-   *  actually supports via API — GST (GSTR-1 / 2B / 3B / 9), TDS,
-   *  bank recon. State taxes, FSSAI, e-way bills, etc. are
-   *  explicitly out of scope for automated coverage. */
-  complianceCoverage: {
-    gstr1: boolean;
-    gstr3b: boolean;
-    tds: boolean;
-    bankRecon: boolean;  // Bank reconciliation done for the month
-  };
-  churnRisk: ChurnRisk;
-  onboarding?: ClientOnboardStatus;
-  notes?: string[];
 }
 
 /* ── 18-client portfolio — full shape ── */
 export const CLIENTS: Client[] = [
   {
     id: 31, name: "Bandra Soap Pvt Ltd", industry: "D2C Skincare", industryGroup: "D2C",
-    location: "Mumbai", revenue: "9.25Cr", revenueValue: 9.25e7, revenueYoY: -0.18,
+    revenue: "9.25Cr", revenueValue: 9.25e7, revenueYoY: -0.18,
     revenueTrend: [68, 72, 78, 82, 76, 70, 66, 62, 58, 54, 50, 48],
-    netPL: "-2.24Cr", healthScore: 48, status: "critical", complianceScore: 62, complianceGrade: "C",
+    netPL: "-2.24Cr", healthScore: 48, status: "critical",
     issues: ["Runway 0.3mo", "GSTR-3B for March overdue (1d)", "₹4.6L excess ITC"],
-    nextAction: { verb: "Call", detail: "Yogesh re: runway + overdue GSTR-3B", deadline: "2026-04-22", priority: "urgent" },
-    misStatus: "Pending", lastSync: "2h ago", lastSyncVouchers: 48, ownerLastLogin: "Today",
+    nextAction: { verb: "Call", detail: "Yogesh re: runway + overdue GSTR-3B", deadline: "2026-04-22" },
+    misStatus: "Pending", lastSync: "2h ago",
     contact: "+91 98765 43210", gstin: "27AABCB1234F1Z5",
-    assignedTo: "u-rajesh", tags: ["Priority", "FY25 close"],
-    monthlyHours: 18.5, monthlyBilled: 42000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, bankRecon: false },
-    churnRisk: "low",
   },
   {
     id: 91, name: "Surat Textiles Pvt Ltd", industry: "Manufacturing · Surat", industryGroup: "Manufacturing",
-    location: "Surat", revenue: "18.4Cr", revenueValue: 18.4e7, revenueYoY: -0.08,
+    revenue: "18.4Cr", revenueValue: 18.4e7, revenueYoY: -0.08,
     revenueTrend: [95, 98, 92, 88, 85, 82, 78, 75, 72, 68, 62, 58],
-    netPL: "-1.12Cr", healthScore: 54, status: "critical", complianceScore: 58, complianceGrade: "C",
+    netPL: "-1.12Cr", healthScore: 54, status: "critical",
     issues: ["Burn rate ₹24L/mo", "GSTR-1 for March overdue (10d)"],
-    nextAction: { verb: "File", detail: "GSTR-1 for March · 10 days overdue", deadline: "2026-04-11", priority: "urgent" },
-    misStatus: "Pending", lastSync: "4h ago", lastSyncVouchers: 112, ownerLastLogin: "3d ago",
+    nextAction: { verb: "File", detail: "GSTR-1 for March · 10 days overdue", deadline: "2026-04-11" },
+    misStatus: "Pending", lastSync: "4h ago",
     contact: "+91 98765 99001", gstin: "24AABCS5678G1Z2",
-    assignedTo: "u-priya", tags: ["FY25 close"],
-    monthlyHours: 22.0, monthlyBilled: 48000,
-    complianceCoverage: { gstr1: false, gstr3b: true, tds: true, bankRecon: false },
-    churnRisk: "medium",
   },
   {
     id: 42, name: "Kothari Traders", industry: "Retail · Ahmedabad", industryGroup: "Retail",
-    location: "Ahmedabad", revenue: "4.12Cr", revenueValue: 4.12e7, revenueYoY: 0.11,
+    revenue: "4.12Cr", revenueValue: 4.12e7, revenueYoY: 0.11,
     revenueTrend: [62, 64, 66, 68, 72, 70, 74, 72, 76, 78, 80, 82],
-    netPL: "+38.2L", healthScore: 76, status: "warning", complianceScore: 84, complianceGrade: "A",
+    netPL: "+38.2L", healthScore: 76, status: "warning",
     issues: ["MIS due in 3 days", "TDS payment pending"],
-    nextAction: { verb: "Draft", detail: "MIS report for March", deadline: "2026-04-23", priority: "high" },
-    misStatus: "In progress", lastSync: "5h ago", lastSyncVouchers: 21, ownerLastLogin: "1d ago",
+    nextAction: { verb: "Draft", detail: "MIS report for March", deadline: "2026-04-23" },
+    misStatus: "In progress", lastSync: "5h ago",
     contact: "+91 98765 11223", gstin: "24AAACK2345H1Z7",
-    assignedTo: "u-rajesh", tags: [],
-    monthlyHours: 12.5, monthlyBilled: 28000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: false, bankRecon: true },
-    churnRisk: "none",
   },
   {
     id: 63, name: "Mumbai Distributors", industry: "FMCG · Mumbai", industryGroup: "FMCG",
-    location: "Mumbai", revenue: "7.65Cr", revenueValue: 7.65e7, revenueYoY: 0.06,
+    revenue: "7.65Cr", revenueValue: 7.65e7, revenueYoY: 0.06,
     revenueTrend: [70, 72, 74, 72, 76, 78, 76, 80, 78, 82, 80, 84],
-    netPL: "+52.3L", healthScore: 71, status: "warning", complianceScore: 78, complianceGrade: "B",
+    netPL: "+52.3L", healthScore: 71, status: "warning",
     issues: ["Advance Tax Q4 due Apr 15", "High debtor days (67)"],
-    nextAction: { verb: "Pay", detail: "Advance Tax Q4 (3 days left)", deadline: "2026-04-23", priority: "high" },
-    misStatus: "Pending", lastSync: "3h ago", lastSyncVouchers: 34, ownerLastLogin: "Today",
+    nextAction: { verb: "Pay", detail: "Advance Tax Q4 (3 days left)", deadline: "2026-04-23" },
+    misStatus: "Pending", lastSync: "3h ago",
     contact: "+91 98765 55667", gstin: "27AABCM9876L1Z1",
-    assignedTo: "u-vikram", tags: ["Priority"],
-    monthlyHours: 15.0, monthlyBilled: 32000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: false },
-    churnRisk: "none",
   },
   {
     id: 57, name: "Patel Industries", industry: "Manufacturing · Pune", industryGroup: "Manufacturing",
-    location: "Pune", revenue: "12.8Cr", revenueValue: 12.8e7, revenueYoY: 0.15,
+    revenue: "12.8Cr", revenueValue: 12.8e7, revenueYoY: 0.15,
     revenueTrend: [78, 80, 82, 84, 86, 88, 86, 90, 88, 92, 94, 96],
-    netPL: "+1.42Cr", healthScore: 88, status: "healthy", complianceScore: 94, complianceGrade: "A+",
+    netPL: "+1.42Cr", healthScore: 88, status: "healthy",
     issues: [],
-    nextAction: { verb: "Review", detail: "Q4 board deck with owner", priority: "medium" },
-    misStatus: "Delivered", lastSync: "1h ago", lastSyncVouchers: 17, ownerLastLogin: "Today",
+    nextAction: { verb: "Review", detail: "Q4 board deck with owner" },
+    misStatus: "Delivered", lastSync: "1h ago",
     contact: "+91 98765 33445", gstin: "27AABCP4455K1Z3",
-    assignedTo: "u-priya", tags: ["Priority"],
-    monthlyHours: 14.0, monthlyBilled: 38000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
-    churnRisk: "none",
   },
   {
     id: 78, name: "Sai Enterprises", industry: "Services · Bangalore", industryGroup: "Services",
-    location: "Bangalore", revenue: "2.34Cr", revenueValue: 2.34e7, revenueYoY: 0.22,
+    revenue: "2.34Cr", revenueValue: 2.34e7, revenueYoY: 0.22,
     revenueTrend: [55, 58, 62, 66, 70, 74, 76, 80, 82, 86, 88, 90],
-    netPL: "+18.7L", healthScore: 82, status: "healthy", complianceScore: 90, complianceGrade: "A+",
+    netPL: "+18.7L", healthScore: 82, status: "healthy",
     issues: [],
-    nextAction: { verb: "Review", detail: "FY25 closing P&L with owner", deadline: "2026-04-30", priority: "medium" },
-    misStatus: "Delivered", lastSync: "30m ago", lastSyncVouchers: 8, ownerLastLogin: "Today",
+    nextAction: { verb: "Review", detail: "FY25 closing P&L with owner", deadline: "2026-04-30" },
+    misStatus: "Delivered", lastSync: "30m ago",
     contact: "+91 98765 77889", gstin: "29AABCS2222B1Z5",
-    assignedTo: "u-vikram", tags: ["Growth"],
-    monthlyHours: 8.0, monthlyBilled: 18000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
-    churnRisk: "none",
   },
   {
     id: 102, name: "Krishna Foods Pvt Ltd", industry: "Food · Mumbai", industryGroup: "Food",
-    location: "Mumbai", revenue: "6.82Cr", revenueValue: 6.82e7, revenueYoY: 0.04,
+    revenue: "6.82Cr", revenueValue: 6.82e7, revenueYoY: 0.04,
     revenueTrend: [72, 74, 72, 76, 74, 78, 76, 80, 78, 82, 80, 84],
-    netPL: "+28.4L", healthScore: 74, status: "warning", complianceScore: 80, complianceGrade: "A",
+    netPL: "+28.4L", healthScore: 74, status: "warning",
     issues: ["GSTR-3B for March overdue (1d)", "Bank recon pending for March"],
-    nextAction: { verb: "File", detail: "GSTR-3B for March · overdue", deadline: "2026-04-20", priority: "urgent" },
-    misStatus: "In progress", lastSync: "6h ago", lastSyncVouchers: 22, ownerLastLogin: "2d ago",
+    nextAction: { verb: "File", detail: "GSTR-3B for March · overdue", deadline: "2026-04-20" },
+    misStatus: "In progress", lastSync: "6h ago",
     contact: "+91 98765 88220", gstin: "27AABCK3456F1Z9",
-    assignedTo: "u-rajesh", tags: [],
-    monthlyHours: 11.0, monthlyBilled: 26000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: true, bankRecon: true },
-    churnRisk: "none",
   },
   {
     id: 115, name: "Gupta Hardware Co", industry: "Trading · Delhi", industryGroup: "Trading",
-    location: "Delhi", revenue: "5.48Cr", revenueValue: 5.48e7, revenueYoY: -0.03,
+    revenue: "5.48Cr", revenueValue: 5.48e7, revenueYoY: -0.03,
     revenueTrend: [80, 78, 76, 74, 76, 72, 70, 68, 72, 70, 68, 66],
-    netPL: "+12.8L", healthScore: 68, status: "warning", complianceScore: 72, complianceGrade: "B",
+    netPL: "+12.8L", healthScore: 68, status: "warning",
     issues: ["Mar GSTR-2B mismatch ₹1.8L unresolved", "Stock write-off pending"],
-    nextAction: { verb: "Reconcile", detail: "Mar GSTR-2B mismatch before May cycle", deadline: "2026-05-14", priority: "high" },
-    misStatus: "Pending", lastSync: "8h ago", lastSyncVouchers: 15, ownerLastLogin: "5d ago",
+    nextAction: { verb: "Reconcile", detail: "Mar GSTR-2B mismatch before May cycle", deadline: "2026-05-14" },
+    misStatus: "Pending", lastSync: "8h ago",
     contact: "+91 98765 22001", gstin: "07AABCG4567M1Z1",
-    assignedTo: "u-priya", tags: [],
-    monthlyHours: 9.5, monthlyBilled: 22000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, bankRecon: false },
-    churnRisk: "low",
   },
   {
     id: 128, name: "Reliance Retail - Bandra", industry: "Retail · Mumbai", industryGroup: "Retail",
-    location: "Mumbai", revenue: "24.6Cr", revenueValue: 24.6e7, revenueYoY: 0.09,
+    revenue: "24.6Cr", revenueValue: 24.6e7, revenueYoY: 0.09,
     revenueTrend: [82, 84, 85, 86, 88, 88, 90, 92, 90, 94, 92, 96],
-    netPL: "+1.88Cr", healthScore: 86, status: "healthy", complianceScore: 92, complianceGrade: "A+",
+    netPL: "+1.88Cr", healthScore: 86, status: "healthy",
     issues: [],
-    nextAction: { verb: "Finalize", detail: "FY25 closing entries + P&L", deadline: "2026-04-30", priority: "medium" },
-    misStatus: "Delivered", lastSync: "45m ago", lastSyncVouchers: 142, ownerLastLogin: "Today",
+    nextAction: { verb: "Finalize", detail: "FY25 closing entries + P&L", deadline: "2026-04-30" },
+    misStatus: "Delivered", lastSync: "45m ago",
     contact: "+91 98765 11111", gstin: "27AABCR5432L1Z4",
-    assignedTo: "u-rajesh", tags: ["Priority", "FY25 close"],
-    monthlyHours: 28.0, monthlyBilled: 75000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
-    churnRisk: "none",
   },
   {
     id: 141, name: "Joshi Pharma Traders", industry: "Healthcare · Pune", industryGroup: "Healthcare",
-    location: "Pune", revenue: "3.88Cr", revenueValue: 3.88e7, revenueYoY: 0.18,
+    revenue: "3.88Cr", revenueValue: 3.88e7, revenueYoY: 0.18,
     revenueTrend: [60, 62, 64, 68, 70, 72, 76, 78, 82, 84, 86, 88],
-    netPL: "+42.1L", healthScore: 79, status: "warning", complianceScore: 86, complianceGrade: "A",
+    netPL: "+42.1L", healthScore: 79, status: "warning",
     issues: ["Debtors aging 60d+"],
-    nextAction: { verb: "Review", detail: "Debtors aging & collection plan", deadline: "2026-04-28", priority: "medium" },
-    misStatus: "Delivered", lastSync: "2h ago", lastSyncVouchers: 31, ownerLastLogin: "1d ago",
+    nextAction: { verb: "Review", detail: "Debtors aging & collection plan", deadline: "2026-04-28" },
+    misStatus: "Delivered", lastSync: "2h ago",
     contact: "+91 98765 33311", gstin: "27AABCJ6789N1Z2",
-    assignedTo: "u-priya", tags: ["Growth"],
-    monthlyHours: 10.5, monthlyBilled: 24000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: false },
-    churnRisk: "none",
   },
   {
     id: 155, name: "Sri Balaji Exports", industry: "Trading · Chennai", industryGroup: "Trading",
-    location: "Chennai", revenue: "11.2Cr", revenueValue: 11.2e7, revenueYoY: 0.21,
+    revenue: "11.2Cr", revenueValue: 11.2e7, revenueYoY: 0.21,
     revenueTrend: [65, 68, 72, 74, 78, 82, 84, 86, 88, 92, 94, 98],
-    netPL: "+88.6L", healthScore: 81, status: "healthy", complianceScore: 88, complianceGrade: "A",
+    netPL: "+88.6L", healthScore: 81, status: "healthy",
     issues: [],
-    nextAction: { verb: "Review", detail: "FY25 draft with owner", deadline: "2026-04-28", priority: "medium" },
-    misStatus: "In progress", lastSync: "1h ago", lastSyncVouchers: 45, ownerLastLogin: "Today",
+    nextAction: { verb: "Review", detail: "FY25 draft with owner", deadline: "2026-04-28" },
+    misStatus: "In progress", lastSync: "1h ago",
     contact: "+91 98765 66522", gstin: "33AABCS9876P1Z8",
-    assignedTo: "u-vikram", tags: ["Growth"],
-    monthlyHours: 13.0, monthlyBilled: 34000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
-    churnRisk: "none",
   },
   {
     id: 167, name: "Agarwal Tractors LLP", industry: "Manufacturing · Indore", industryGroup: "Manufacturing",
-    location: "Indore", revenue: "14.5Cr", revenueValue: 14.5e7, revenueYoY: -0.12,
+    revenue: "14.5Cr", revenueValue: 14.5e7, revenueYoY: -0.12,
     revenueTrend: [88, 86, 84, 82, 80, 78, 76, 74, 72, 70, 68, 66],
-    netPL: "-48.2L", healthScore: 58, status: "critical", complianceScore: 68, complianceGrade: "B",
+    netPL: "-48.2L", healthScore: 58, status: "critical",
     issues: ["Debtors 95d+", "Advance Tax shortfall"],
-    nextAction: { verb: "Escalate", detail: "Advance Tax shortfall to owner", deadline: "2026-04-24", priority: "urgent" },
-    misStatus: "Pending", lastSync: "12h ago", lastSyncVouchers: 58, ownerLastLogin: "6d ago",
+    nextAction: { verb: "Escalate", detail: "Advance Tax shortfall to owner", deadline: "2026-04-24" },
+    misStatus: "Pending", lastSync: "12h ago",
     contact: "+91 98765 40403", gstin: "23AABCA1122Q1Z9",
-    assignedTo: "u-rajesh", tags: ["FY25 close"],
-    monthlyHours: 16.0, monthlyBilled: 38000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: false, bankRecon: false },
-    churnRisk: "medium",
   },
   {
     id: 182, name: "Green Leaf Organics", industry: "D2C · Bangalore", industryGroup: "D2C",
-    location: "Bangalore", revenue: "1.64Cr", revenueValue: 1.64e7, revenueYoY: 0.35,
+    revenue: "1.64Cr", revenueValue: 1.64e7, revenueYoY: 0.35,
     revenueTrend: [40, 44, 48, 52, 58, 62, 66, 70, 74, 78, 82, 86],
-    netPL: "+4.2L", healthScore: 72, status: "warning", complianceScore: 82, complianceGrade: "A",
+    netPL: "+4.2L", healthScore: 72, status: "warning",
     issues: ["New SKU batch pending valuation"],
-    nextAction: { verb: "Value", detail: "New SKU batch (36 items)", priority: "medium" },
-    misStatus: "Delivered", lastSync: "15m ago", lastSyncVouchers: 12, ownerLastLogin: "Today",
+    nextAction: { verb: "Value", detail: "New SKU batch (36 items)" },
+    misStatus: "Delivered", lastSync: "15m ago",
     contact: "+91 98765 70707", gstin: "29AABCG7788R1Z3",
-    assignedTo: "u-vikram", tags: ["Growth", "FY26"],
-    monthlyHours: 7.0, monthlyBilled: 16000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
-    churnRisk: "none",
-    onboarding: "active",
   },
   {
     id: 196, name: "Arora Logistics Pvt Ltd", industry: "Services · Gurgaon", industryGroup: "Services",
-    location: "Gurgaon", revenue: "8.9Cr", revenueValue: 8.9e7, revenueYoY: 0.07,
+    revenue: "8.9Cr", revenueValue: 8.9e7, revenueYoY: 0.07,
     revenueTrend: [75, 76, 78, 76, 80, 78, 82, 80, 84, 82, 86, 84],
-    netPL: "+62.4L", healthScore: 75, status: "warning", complianceScore: 80, complianceGrade: "A",
+    netPL: "+62.4L", healthScore: 75, status: "warning",
     issues: ["Vendor advance ₹2.1L un-adjusted"],
-    nextAction: { verb: "Adjust", detail: "Vendor advance ₹2.1L entry", priority: "medium" },
-    misStatus: "In progress", lastSync: "4h ago", lastSyncVouchers: 38, ownerLastLogin: "2d ago",
+    nextAction: { verb: "Adjust", detail: "Vendor advance ₹2.1L entry" },
+    misStatus: "In progress", lastSync: "4h ago",
     contact: "+91 98765 88877", gstin: "06AABCA3344S1Z5",
-    assignedTo: "u-priya", tags: [],
-    monthlyHours: 11.5, monthlyBilled: 27000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: false },
-    churnRisk: "none",
   },
   {
     id: 208, name: "Mehta Jewels & Co", industry: "Retail · Jaipur", industryGroup: "Retail",
-    location: "Jaipur", revenue: "6.3Cr", revenueValue: 6.3e7, revenueYoY: -0.02,
+    revenue: "6.3Cr", revenueValue: 6.3e7, revenueYoY: -0.02,
     revenueTrend: [78, 76, 74, 76, 74, 72, 74, 72, 70, 72, 70, 68],
-    netPL: "+22.8L", healthScore: 69, status: "warning", complianceScore: 74, complianceGrade: "B",
+    netPL: "+22.8L", healthScore: 69, status: "warning",
     issues: ["GSTR-3B for March overdue (1d)", "Closing stock valuation pending"],
-    nextAction: { verb: "File", detail: "GSTR-3B for March · overdue", deadline: "2026-04-20", priority: "urgent" },
-    misStatus: "Pending", lastSync: "7h ago", lastSyncVouchers: 19, ownerLastLogin: "4d ago",
+    nextAction: { verb: "File", detail: "GSTR-3B for March · overdue", deadline: "2026-04-20" },
+    misStatus: "Pending", lastSync: "7h ago",
     contact: "+91 98765 55544", gstin: "08AABCM5566T1Z8",
-    assignedTo: "u-rajesh", tags: [],
-    monthlyHours: 9.0, monthlyBilled: 21000,
-    complianceCoverage: { gstr1: true, gstr3b: false, tds: false, bankRecon: true },
-    churnRisk: "low",
   },
   {
     id: 221, name: "Nexus Electronics Pvt Ltd", industry: "Trading · Hyderabad", industryGroup: "Trading",
-    location: "Hyderabad", revenue: "16.8Cr", revenueValue: 16.8e7, revenueYoY: 0.14,
+    revenue: "16.8Cr", revenueValue: 16.8e7, revenueYoY: 0.14,
     revenueTrend: [72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94],
-    netPL: "+1.12Cr", healthScore: 84, status: "healthy", complianceScore: 90, complianceGrade: "A+",
+    netPL: "+1.12Cr", healthScore: 84, status: "healthy",
     issues: [],
-    nextAction: { verb: "File", detail: "GSTR-9 annual return prep", deadline: "2026-05-15", priority: "medium" },
-    misStatus: "Delivered", lastSync: "1h ago", lastSyncVouchers: 52, ownerLastLogin: "Today",
+    nextAction: { verb: "File", detail: "GSTR-9 annual return prep", deadline: "2026-05-15" },
+    misStatus: "Delivered", lastSync: "1h ago",
     contact: "+91 98765 99988", gstin: "36AABCN7788U1Z2",
-    assignedTo: "u-priya", tags: ["Priority"],
-    monthlyHours: 15.5, monthlyBilled: 42000,
-    complianceCoverage: { gstr1: true, gstr3b: true, tds: true, bankRecon: true },
-    churnRisk: "none",
   },
   {
     id: 234, name: "Bhatia Exports", industry: "Trading · Ludhiana", industryGroup: "Trading",
-    location: "Ludhiana", revenue: "4.9Cr", revenueValue: 4.9e7, revenueYoY: -0.24,
+    revenue: "4.9Cr", revenueValue: 4.9e7, revenueYoY: -0.24,
     revenueTrend: [90, 88, 84, 80, 76, 72, 68, 64, 60, 56, 52, 48],
-    netPL: "-18.4L", healthScore: 52, status: "critical", complianceScore: 56, complianceGrade: "D",
+    netPL: "-18.4L", healthScore: 52, status: "critical",
     issues: ["Sync stopped 18d ago", "3 unfiled returns", "Owner unreachable"],
-    nextAction: { verb: "Escalate", detail: "Sync stopped 18d — contact owner", priority: "urgent" },
-    misStatus: "Pending", lastSync: "18d ago", lastSyncVouchers: 0, ownerLastLogin: "6w ago",
+    nextAction: { verb: "Escalate", detail: "Sync stopped 18d — contact owner" },
+    misStatus: "Pending", lastSync: "18d ago",
     contact: "+91 98765 11100", gstin: "03AABCB8899V1Z6",
-    assignedTo: "u-vikram", tags: ["FY25 close"],
-    monthlyHours: 3.0, monthlyBilled: 8000,
-    complianceCoverage: { gstr1: false, gstr3b: false, tds: false, bankRecon: false },
-    churnRisk: "high",
   },
   {
     id: 247, name: "Om Infra Builders", industry: "Services · Ahmedabad", industryGroup: "Services",
-    location: "Ahmedabad", revenue: "0.0Cr", revenueValue: 0, revenueYoY: 0,
+    revenue: "0.0Cr", revenueValue: 0, revenueYoY: 0,
     revenueTrend: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    netPL: "+0", healthScore: 0, status: "warning", complianceScore: 0, complianceGrade: "C",
+    netPL: "+0", healthScore: 0, status: "warning",
     issues: ["Onboarding — Tally sync not set up"],
-    nextAction: { verb: "Onboard", detail: "Tally sync setup call", deadline: "2026-04-28", priority: "high" },
-    misStatus: "Pending", lastSync: "Never", lastSyncVouchers: 0, ownerLastLogin: "Never",
+    nextAction: { verb: "Onboard", detail: "Tally sync setup call", deadline: "2026-04-28" },
+    misStatus: "Pending", lastSync: "Never",
     contact: "+91 98765 22233", gstin: "24AABCO9900W1Z9",
-    assignedTo: "u-rajesh", tags: ["Onboarding", "FY26"],
-    monthlyHours: 2.0, monthlyBilled: 0,
-    complianceCoverage: { gstr1: false, gstr3b: false, tds: false, bankRecon: false },
-    churnRisk: "none",
-    onboarding: "sync-setup",
   },
 ];
 
-/* ── CA Firm team roster ── */
-export interface CaTeamMember {
-  id: string;
-  name: string;
-  avatar: string;
-  role: "partner" | "senior" | "associate" | "articled";
-  color: string;
-  /** Approximate hours capacity per month. */
-  capacityHours: number;
-}
-
-export const CA_TEAM: CaTeamMember[] = [
-  { id: "u-rajesh", name: "CA Rajesh Sharma", avatar: "R", role: "partner",    color: "var(--purple)", capacityHours: 180 },
-  { id: "u-priya",  name: "CA Priya Mehta",   avatar: "P", role: "senior",     color: "var(--blue)",   capacityHours: 180 },
-  { id: "u-vikram", name: "Vikram Bhatt",     avatar: "V", role: "associate",  color: "var(--green)",  capacityHours: 160 },
-  { id: "u-anita",  name: "Anita Desai",      avatar: "A", role: "associate",  color: "var(--orange)", capacityHours: 160 },
-  { id: "u-sameer", name: "Sameer Rao",       avatar: "S", role: "articled",   color: "var(--yellow)", capacityHours: 140 },
-];
-
-export function getTeamMember(id: string): CaTeamMember | undefined {
-  return CA_TEAM.find((t) => t.id === id);
-}
-
-/** Workload breakdown per team member — derived from CLIENTS.assignedTo +
- *  monthlyHours. Powers the workload sidebar. */
-export function computeWorkload() {
-  return CA_TEAM.map((t) => {
-    const assigned = CLIENTS.filter((c) => c.assignedTo === t.id);
-    const hours = assigned.reduce((s, c) => s + c.monthlyHours, 0);
-    const pending = assigned.filter((c) => c.misStatus === "Pending").length;
-    const billed = assigned.reduce((s, c) => s + c.monthlyBilled, 0);
-    return {
-      member: t,
-      clientCount: assigned.length,
-      hours,
-      pending,
-      billed,
-      utilization: hours / t.capacityHours,
-    };
-  });
-}
-
-/** Industry-group revenue mix for the donut. */
+/** Industry-group revenue mix for the donut. Derived entirely from
+ *  the existing CLIENTS data (industryGroup is a client-side bucket
+ *  on top of the free-text `industry` field, not a new backend field). */
 export function computeIndustryMix() {
   const mix = new Map<string, number>();
   for (const c of CLIENTS) {
@@ -854,23 +701,6 @@ export function computeComplianceCalendar(): ComplianceDeadline[] {
   }
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
-
-/** Compliance grade → color. */
-export const COMPLIANCE_GRADE_COLOR: Record<ComplianceGrade, string> = {
-  "A+": "var(--green)",
-  "A":  "var(--green)",
-  "B":  "var(--blue)",
-  "C":  "var(--yellow)",
-  "D":  "var(--red)",
-};
-
-/** Churn risk → color. */
-export const CHURN_RISK_META: Record<ChurnRisk, { color: string; label: string }> = {
-  none:   { color: "var(--green)",  label: "Stable" },
-  low:    { color: "var(--blue)",   label: "Low risk" },
-  medium: { color: "var(--yellow)", label: "At risk" },
-  high:   { color: "var(--red)",    label: "High risk" },
-};
 
 /* ============================================================
    COMPLIANCE CALENDAR — Indian regulatory due dates
@@ -1130,13 +960,67 @@ export const FILING_HISTORY = [
   { id: "f5", period: "Dec 2025", type: "GSTR-3B", status: "filed", filedAt: "20 Jan 2026, 8:45 PM", ackNo: "AA271225998877R", signatory: "Yogesh Patel", cashPaid: 0, itcUsed: 1020000 },
 ];
 
+/** GST compliance metrics — every field is grounded in a real
+ *  INFINI API response (not a made-up composite score).
+ *
+ *  - complianceRating: from INFINI `GST Advanced` API (per GSTIN)
+ *  - filingStreak / avgDaysBeforeDue / missedDeadlines12m: derived
+ *    from INFINI `GSP GST Return Filing` history
+ *  - itcMatchRate: derived from GSTR-2B reconciliation (matched / total)
+ *  - excessItcUnclaimed: derived from comparing 2B ITC available
+ *    vs ITC claimed in filed GSTR-3Bs
+ *
+ *  Reference: Riko_GST_Agent_Plan_for_Team.pdf §2 "APIs Riko Needs"
+ */
 export const GST_HEALTH = {
-  score: 72, // 0-100
-  filingStreak: 18, // months in a row
+  /** From INFINI GST Advanced API — returned directly, not a composite. */
+  complianceRating: "A" as "A+" | "A" | "B" | "C" | "D" | "E",
+  filingStreak: 18, // months in a row, derived from filing history
   avgDaysBeforeDue: 3.2,
   missedDeadlines12m: 0,
-  itcMatchRate: 87, // %
-  excessItcUnclaimed: 461000, // ₹4.61L
+  itcMatchRate: 87, // %, derived from 2B recon output
+  excessItcUnclaimed: 461000, // ₹4.61L, derived from 2B vs 3B diff
+};
+
+/** Return filing tracker — last 12 months of GSTR-1 and GSTR-3B
+ *  status per month. Adopted from Suvit's dashboard UX
+ *  (help.suvit.io/articles/gst-dashboard). Gives CAs a one-glance
+ *  read on "am I compliant this FY?". All data derived from the
+ *  INFINI `GSP GST Return Filing` + `GSTR Compliance Filing Details`
+ *  APIs — no new backend work needed. */
+export type FilingCellStatus = "on-time" | "late" | "not-filed" | "processing" | "na";
+
+export interface FilingTrackerMonth {
+  month: string; // "Apr '25"
+  monthIso: string; // "2025-04"
+  gstr1: FilingCellStatus;
+  gstr3b: FilingCellStatus;
+}
+
+/** 12 months rolling (May 2025 → Apr 2026). Apr 2026 filings are in
+ *  progress: GSTR-1 due 11 May, GSTR-3B due 20 May — both still
+ *  pending for the current month. */
+export const FILING_TRACKER: FilingTrackerMonth[] = [
+  { month: "May '25", monthIso: "2025-05", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Jun '25", monthIso: "2025-06", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Jul '25", monthIso: "2025-07", gstr1: "late",      gstr3b: "on-time"   },
+  { month: "Aug '25", monthIso: "2025-08", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Sep '25", monthIso: "2025-09", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Oct '25", monthIso: "2025-10", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Nov '25", monthIso: "2025-11", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Dec '25", monthIso: "2025-12", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Jan '26", monthIso: "2026-01", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Feb '26", monthIso: "2026-02", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Mar '26", monthIso: "2026-03", gstr1: "on-time",   gstr3b: "on-time"   },
+  { month: "Apr '26", monthIso: "2026-04", gstr1: "not-filed", gstr3b: "not-filed" }, // current month, due May 11 / May 20
+];
+
+export const FILING_STATUS_META: Record<FilingCellStatus, { icon: string; label: string; color: string }> = {
+  "on-time":   { icon: "✓",  label: "On time",    color: "var(--green)"  },
+  "late":      { icon: "🕓", label: "Late",       color: "var(--orange)" },
+  "not-filed": { icon: "—",  label: "Not filed",  color: "var(--text-4)" },
+  "processing":{ icon: "↻",  label: "Processing", color: "var(--blue)"   },
+  "na":        { icon: "—",  label: "N/A",        color: "var(--text-4)" },
 };
 
 export const GST_WORKFLOWS = [
