@@ -84,34 +84,48 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/*  1. Alert Strip                                          */}
         {/* -------------------------------------------------------- */}
         <motion.div {...sectionAnim} className="overflow-x-auto -mx-4 px-4">
-          <div className="flex gap-2 whitespace-nowrap pb-1">
+          <div className="flex gap-1.5 whitespace-nowrap pb-1">
             {ALERTS.map((a, i) => {
               const c = alertColorMap[a.type] ?? "var(--text-3)";
               return (
                 <span
                   key={i}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md flex-shrink-0 tabular-nums"
                   style={{
-                    background: `color-mix(in srgb, ${c} 12%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${c} 20%, transparent)`,
-                    color: c,
+                    background: "transparent",
+                    border: "1px solid var(--border)",
+                    color: "var(--text-2)",
                   }}
                 >
-                  <span>{a.icon}</span>
+                  <span
+                    className="inline-block flex-shrink-0"
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: 999,
+                      background: c,
+                    }}
+                    aria-hidden
+                  />
                   {a.message}
                 </span>
               );
             })}
-            {/* Desktop-only health badge */}
+            {/* Desktop-only health */}
             <span
-              className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md flex-shrink-0"
+              className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md flex-shrink-0 tabular-nums"
               style={{
-                background: "color-mix(in srgb, var(--yellow) 12%, transparent)",
-                border: "1px solid color-mix(in srgb, var(--yellow) 20%, transparent)",
-                color: "var(--yellow)",
+                background: "transparent",
+                border: "1px solid var(--border)",
+                color: "var(--text-2)",
               }}
             >
-              Financial Health: 48/100
+              <span
+                className="inline-block flex-shrink-0"
+                style={{ width: 6, height: 6, borderRadius: 999, background: "var(--yellow)" }}
+                aria-hidden
+              />
+              Health 48/100
             </span>
           </div>
         </motion.div>
@@ -136,7 +150,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -241,7 +255,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="hidden md:block rounded-xl p-4"
+          className="hidden md:block rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -358,7 +372,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -466,7 +480,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="hidden md:block rounded-xl p-4"
+          className="hidden md:block rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -534,7 +548,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -596,7 +610,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="hidden md:block rounded-xl p-4"
+          className="hidden md:block rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -696,7 +710,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -784,7 +798,7 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -924,7 +938,7 @@ function CashFlowForecastSection() {
   return (
     <motion.div
       {...sectionAnim}
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",

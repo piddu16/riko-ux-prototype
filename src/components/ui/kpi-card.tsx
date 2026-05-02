@@ -62,33 +62,54 @@ export function KpiCard({
   const isSuffix = unit === "%";
   const { display, ref: countRef } = useCountUp(String(value));
 
+  // Treat anything red/yellow/orange as a severity dot worth surfacing.
+  const showDot =
+    accentColor === "var(--red)" ||
+    accentColor === "var(--yellow)" ||
+    accentColor === "var(--orange)";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="relative rounded-xl overflow-hidden"
+      className="relative rounded-md overflow-hidden"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
       }}
     >
-      {/* Top accent stripe */}
-      <div className="h-0.5" style={{ background: accentColor }} />
-
       <div className="p-4">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-2">
+              {showDot && (
+                <span
+                  className="inline-block flex-shrink-0"
+                  aria-hidden
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: 999,
+                    background: accentColor,
+                  }}
+                />
+              )}
+              <p
+                className="text-[10px] uppercase tracking-wider font-medium"
+                style={{ color: "var(--text-4)" }}
+              >
+                {title}
+              </p>
+            </div>
             <p
-              className="text-[10px] uppercase tracking-wider font-medium mb-2"
-              style={{ color: "var(--text-4)" }}
-            >
-              {title}
-            </p>
-            <p
-              className="text-2xl font-bold leading-none tabular-nums"
-              style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+              className="text-2xl font-semibold leading-none tabular-nums"
+              style={{
+                color: "var(--text-1)",
+                fontFamily: "'Space Grotesk', sans-serif",
+                letterSpacing: "-0.02em",
+              }}
             >
               {isPrefix && <span className="text-base font-medium mr-0.5">{unit}</span>}
               <span ref={countRef}>{display}</span>
@@ -97,27 +118,26 @@ export function KpiCard({
           </div>
 
           {sparkData && sparkData.length > 1 && (
-            <div className="ml-3 flex-shrink-0">
+            <div className="flex-shrink-0">
               <Sparkline data={sparkData} color={accentColor} width={58} height={20} />
             </div>
           )}
         </div>
 
         {(trend !== undefined || sub) && (
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2.5 flex items-center gap-2 text-xs">
             {trend !== undefined && (
               <span
-                className="text-xs font-semibold px-1.5 py-0.5 rounded tabular-nums"
+                className="font-medium tabular-nums"
                 style={{
                   color: trend >= 0 ? "var(--green)" : "var(--red)",
-                  background: trend >= 0 ? "var(--green-bg)" : "var(--red-bg)",
                 }}
               >
                 {trend >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(trend).toFixed(1)}%
               </span>
             )}
             {sub && (
-              <span className="text-xs" style={{ color: "var(--text-4)" }}>
+              <span style={{ color: "var(--text-4)" }}>
                 {sub}
               </span>
             )}

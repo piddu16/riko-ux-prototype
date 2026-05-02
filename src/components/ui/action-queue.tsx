@@ -1,23 +1,21 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n-context";
 import { THIS_WEEK_ACTIONS } from "@/lib/data";
-import { Pill } from "./pill";
 
-/* ------------------------------------------------------------------ */
-/*  Priority → colour map                                              */
-/* ------------------------------------------------------------------ */
+/* Severity → colour */
 const priorityColorMap: Record<string, string> = {
   urgent: "var(--red)",
   high: "var(--orange)",
-  medium: "var(--blue)",
+  medium: "var(--text-3)",
 };
 
 const priorityLabelMap: Record<string, string> = {
-  urgent: "Urgent",
-  high: "High",
-  medium: "Medium",
+  urgent: "URGENT",
+  high: "HIGH",
+  medium: "MEDIUM",
 };
 
 export function ActionQueue() {
@@ -29,122 +27,125 @@ export function ActionQueue() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className="rounded-xl p-4"
+      className="rounded-md overflow-hidden"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
       }}
     >
-      {/* Header ------------------------------------------------------ */}
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-start gap-2.5 min-w-0">
-          <span className="text-xl leading-none mt-0.5" aria-hidden>
-            📋
-          </span>
-          <div className="min-w-0">
-            <h3
-              className="text-sm font-semibold leading-tight"
-              style={{ color: "var(--text-1)" }}
-            >
-              {t.thisWeek}
-            </h3>
-            <p
-              className="text-xs mt-0.5"
-              style={{ color: "var(--text-3)" }}
-            >
-              {t.actionQueue}
-            </p>
-          </div>
+      {/* Header: hairline-separated, no card-in-card */}
+      <div
+        className="flex items-baseline justify-between gap-3 px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border)" }}
+      >
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h3
+            className="text-sm font-semibold leading-tight tracking-tight"
+            style={{ color: "var(--text-1)" }}
+          >
+            {t.thisWeek}
+          </h3>
+          <p
+            className="text-xs"
+            style={{ color: "var(--text-4)" }}
+          >
+            {t.actionQueue}
+          </p>
         </div>
-        <Pill color="var(--blue)">{THIS_WEEK_ACTIONS.length} actions</Pill>
+        <span
+          className="text-[10px] uppercase tracking-wider font-medium tabular-nums flex-shrink-0"
+          style={{ color: "var(--text-4)" }}
+        >
+          {THIS_WEEK_ACTIONS.length} actions
+        </span>
       </div>
 
-      {/* Actions list ----------------------------------------------- */}
-      <div className="flex flex-col gap-2">
+      {/* Rows: separator-only, no per-row chrome */}
+      <div>
         {THIS_WEEK_ACTIONS.map((action, i) => {
           const pColor = priorityColorMap[action.priority] ?? "var(--text-3)";
-          const isUrgent = action.priority === "urgent";
+          const isFirst = i === 0;
 
           return (
             <motion.div
               key={action.id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.35, delay: i * 0.05, ease: "easeOut" }}
-              className="group flex flex-col md:flex-row md:items-center gap-3 rounded-lg p-3 transition-colors cursor-pointer"
+              transition={{ duration: 0.3, delay: i * 0.04, ease: "easeOut" }}
+              className="group flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors"
               style={{
-                background: "var(--bg-secondary)",
-                borderLeft: isUrgent ? `3px solid var(--red)` : "3px solid transparent",
+                borderTop: isFirst ? "none" : "1px solid var(--border)",
+                background: "transparent",
               }}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.background = "var(--bg-hover)")
               }
               onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "var(--bg-secondary)")
+                (e.currentTarget.style.background = "transparent")
               }
             >
-              {/* Left: icon circle ------------------------------------ */}
-              <div
-                className="flex items-center justify-center rounded-full flex-shrink-0 self-start md:self-center"
-                style={{
-                  width: 40,
-                  height: 40,
-                  background: `color-mix(in srgb, ${pColor} 18%, transparent)`,
-                  border: `1px solid color-mix(in srgb, ${pColor} 30%, transparent)`,
-                }}
+              {/* Severity dot — replaces the colored icon-square */}
+              <span
+                className="flex-shrink-0 mt-1.5"
                 aria-hidden
-              >
-                <span className="text-lg leading-none">{action.icon}</span>
-              </div>
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  background: pColor,
+                }}
+              />
 
-              {/* Middle: title + context ----------------------------- */}
+              {/* Title + context column */}
               <div className="flex-1 min-w-0">
-                <p
-                  className="font-semibold text-sm leading-snug"
-                  style={{ color: "var(--text-1)" }}
-                >
-                  {action.title}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider tabular-nums"
+                    style={{ color: pColor }}
+                  >
+                    {priorityLabelMap[action.priority]}
+                  </span>
+                  <p
+                    className="font-semibold text-sm leading-snug"
+                    style={{ color: "var(--text-1)" }}
+                  >
+                    {action.title}
+                  </p>
+                </div>
                 <p
                   className="text-xs mt-0.5 leading-snug"
                   style={{ color: "var(--text-3)" }}
                 >
                   {action.context}
                 </p>
-              </div>
-
-              {/* Right: priority + CTA + impact ---------------------- */}
-              <div className="flex flex-col items-start md:items-end gap-1.5 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <Pill color={pColor}>{priorityLabelMap[action.priority]}</Pill>
-                  <button
-                    type="button"
-                    className="text-xs font-semibold px-2.5 py-1 rounded-md transition-colors whitespace-nowrap"
-                    style={{
-                      color: "var(--green)",
-                      background: "transparent",
-                      border: "1px solid var(--green)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background =
-                        "color-mix(in srgb, var(--green) 14%, transparent)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {action.cta}
-                  </button>
-                </div>
-                <span
-                  className="text-[10px] font-semibold tabular-nums"
+                <p
+                  className="text-[11px] mt-1 tabular-nums font-medium"
                   style={{ color: "var(--green)" }}
                 >
                   {action.impact}
-                </span>
+                </p>
               </div>
+
+              {/* CTA — text-button with chevron, no outline */}
+              <button
+                type="button"
+                className="flex items-center gap-0.5 text-xs font-medium px-1 py-1 transition-colors flex-shrink-0 self-start"
+                style={{
+                  color: "var(--text-2)",
+                  background: "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "var(--text-1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "var(--text-2)";
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {action.cta}
+                <ChevronRight size={12} className="opacity-60 group-hover:opacity-100 transition-opacity" />
+              </button>
             </motion.div>
           );
         })}
