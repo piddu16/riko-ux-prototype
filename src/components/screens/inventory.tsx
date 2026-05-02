@@ -362,13 +362,7 @@ export function InventoryScreen() {
                     <VarianceCell item={item} />
                   </td>
                   <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ background: st.color }}
-                      />
-                      <Pill color={st.color}>{st.label}</Pill>
-                    </div>
+                    <Pill color={st.color}>{st.label}</Pill>
                   </td>
                 </tr>
               );
@@ -400,11 +394,7 @@ export function InventoryScreen() {
                     {item.sku}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: st.color }}
-                  />
+                <div className="flex-shrink-0">
                   <Pill color={st.color}>{st.label}</Pill>
                 </div>
               </div>
@@ -964,30 +954,24 @@ function VarianceCell({ item }: { item: typeof INVENTORY[number] }) {
       </span>
     );
   }
-  // Matched (within 2%)
+  // Matched (within 2%) — bare ✓ glyph in green, no fill
   if (Math.abs(item.variancePct ?? 0) < 0.02) {
     return (
       <span
-        className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded"
-        style={{
-          background: "color-mix(in srgb, var(--green) 14%, transparent)",
-          color: "var(--green)",
-        }}
+        className="text-[12px] font-semibold leading-none"
+        style={{ color: "var(--green)" }}
         title={`Matched on ${item.physicalCountDate}`}
       >
         ✓
       </span>
     );
   }
-  // Variance exists
+  // Variance exists — signed number in semantic colour, no fill
   const negative = (item.varianceQty ?? 0) < 0;
   return (
     <span
-      className="inline-flex items-center gap-0.5 text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded"
-      style={{
-        background: `color-mix(in srgb, ${negative ? "var(--red)" : "var(--blue)"} 14%, transparent)`,
-        color: negative ? "var(--red)" : "var(--blue)",
-      }}
+      className="text-[11px] font-semibold tabular-nums"
+      style={{ color: negative ? "var(--red)" : "var(--blue)" }}
       title={`${(item.variancePct ?? 0) > 0 ? "+" : ""}${((item.variancePct ?? 0) * 100).toFixed(1)}% · counted ${item.physicalCountDate}`}
     >
       {item.varianceQty! > 0 ? "+" : ""}{item.varianceQty}
