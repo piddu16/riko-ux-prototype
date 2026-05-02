@@ -85,34 +85,33 @@ export function ComplianceCalendar() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ duration: 0.35, delay: i * 0.04, ease: "easeOut" }}
-              className="group flex items-stretch gap-3 rounded-lg overflow-hidden cursor-pointer transition-all hover:translate-x-0.5"
+              className="group flex items-stretch gap-3 rounded-md overflow-hidden cursor-pointer transition-all hover:translate-x-0.5"
               style={{
-                background: `color-mix(in srgb, ${color} 6%, transparent)`,
-                borderLeft: `3px solid ${color}`,
-                border: `1px solid color-mix(in srgb, ${color} 18%, transparent)`,
-                borderLeftWidth: 3,
+                background: "var(--bg-surface)",
+                borderLeft: `2px solid ${color}`,
+                borderTop: "1px solid var(--border)",
+                borderRight: "1px solid var(--border)",
+                borderBottom: "1px solid var(--border)",
               }}
             >
               {/* Date badge */}
               <div
                 className="flex flex-col items-center justify-center py-2.5 px-3 flex-shrink-0"
-                style={{
-                  background: `color-mix(in srgb, ${color} 14%, transparent)`,
-                  minWidth: 64,
-                }}
+                style={{ minWidth: 64 }}
               >
                 <span
-                  className="text-lg font-bold leading-none tabular-nums"
+                  className="text-lg font-semibold leading-none tabular-nums"
                   style={{
-                    color,
+                    color: "var(--text-1)",
                     fontFamily: "'Space Grotesk', sans-serif",
+                    letterSpacing: "-0.02em",
                   }}
                 >
                   {day}
                 </span>
                 <span
                   className="text-[10px] uppercase font-semibold tracking-wider mt-0.5"
-                  style={{ color }}
+                  style={{ color: "var(--text-4)" }}
                 >
                   {month}
                 </span>
@@ -149,20 +148,16 @@ export function ComplianceCalendar() {
               <div className="flex flex-col items-end justify-between py-2 pr-3 pl-1 flex-shrink-0 gap-1">
                 <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   <span
-                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                    style={{
-                      background: "color-mix(in srgb, var(--text-3) 15%, transparent)",
-                      color: "var(--text-2)",
-                    }}
+                    className="inline-flex items-center gap-1 text-[10px] font-medium tabular-nums"
+                    style={{ color: "var(--text-3)" }}
                   >
                     <Users size={10} />
                     {item.clients} {item.clients === 1 ? "client" : "clients"}
                   </span>
                   {item.amount && item.amount !== "\u2014" && (
                     <span
-                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
+                      className="text-[10px] font-semibold tabular-nums"
                       style={{
-                        background: `color-mix(in srgb, ${color} 14%, transparent)`,
                         color,
                         fontFamily: "'Space Grotesk', sans-serif",
                       }}

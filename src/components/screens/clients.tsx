@@ -351,25 +351,36 @@ function SummaryTile({
       transition={{ duration: 0.35 }}
       className="rounded-md overflow-hidden"
       style={{
-        background: tinted
-          ? `color-mix(in srgb, ${accent} 10%, var(--bg-surface))`
-          : "var(--bg-surface)",
-        border: `1px solid ${tinted ? `color-mix(in srgb, ${accent} 30%, var(--border))` : "var(--border)"}`,
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
       }}
     >
-      <div className="h-0.5" style={{ background: accent }} />
       <div className="p-4 flex items-start justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-wider font-medium mb-2" style={{ color: "var(--text-4)" }}>
-            {label}
-          </p>
-          <p className="text-2xl font-bold leading-none tabular-nums" style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <span
+              aria-hidden
+              className="inline-block flex-shrink-0"
+              style={{ width: 5, height: 5, borderRadius: 999, background: accent }}
+            />
+            <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+              {label}
+            </p>
+          </div>
+          <p
+            className="text-2xl font-semibold leading-none tabular-nums"
+            style={{
+              color: "var(--text-1)",
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: "-0.02em",
+            }}
+          >
             {value}
           </p>
         </div>
         <span
-          className="flex-shrink-0 rounded-lg p-1.5"
-          style={{ color: accent, background: `color-mix(in srgb, ${accent} 14%, transparent)` }}
+          className="flex-shrink-0"
+          style={{ color: "var(--text-4)" }}
         >
           {icon}
         </span>
