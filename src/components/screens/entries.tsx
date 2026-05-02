@@ -24,7 +24,9 @@ import {
   AlertCircle,
   ChevronRight,
   Search,
+  UserCircle2,
 } from "lucide-react";
+import { ROLES } from "@/lib/rbac";
 import {
   ENTRIES,
   ENTRY_STATE_META,
@@ -315,6 +317,27 @@ export function EntriesScreen() {
 }
 
 /* ── Single entry row — click to drill into EntryDetail ────── */
+/** Resolves the current actor + verb for an entry — i.e. the person whose
+ *  action moved it to its current state. The drafter for draft/pending,
+ *  the poster for posted, the rejector for rejected, the approver for
+ *  approved. Falls back to the creator. */
+function actorForEntry(entry: Entry): { verb: string; actor: string; roleName: string } {
+  const roleName = (role: string) => ROLES[role as keyof typeof ROLES]?.name ?? role;
+  if (entry.state === "posted" && entry.postedBy) {
+    const evt = entry.history.find((h) => h.action.toLowerCase().includes("post"));
+    return { verb: "Posted by", actor: entry.postedBy, roleName: roleName(evt?.actorRole ?? "accounts") };
+  }
+  if (entry.state === "rejected" && entry.rejectedBy) {
+    const evt = entry.history.find((h) => h.action.toLowerCase().includes("reject"));
+    return { verb: "Rejected by", actor: entry.rejectedBy, roleName: roleName(evt?.actorRole ?? "accounts") };
+  }
+  if (entry.state === "approved") {
+    const evt = entry.history.find((h) => h.action.toLowerCase().includes("approv"));
+    if (evt) return { verb: "Approved by", actor: evt.actor, roleName: roleName(evt.actorRole) };
+  }
+  return { verb: "Drafted by", actor: entry.createdBy, roleName: roleName(entry.createdByRole) };
+}
+
 function EntryRow({
   entry,
   onClick,
@@ -327,6 +350,7 @@ function EntryRow({
   const stateMeta = ENTRY_STATE_META[entry.state];
   const typeLabel = ENTRY_TYPE_LABELS[entry.type];
   const sourceLabel = ENTRY_SOURCE_LABELS[entry.source];
+  const actor = actorForEntry(entry);
 
   // Display date in compact form
   const displayDate = new Date(entry.date).toLocaleDateString("en-IN", {
@@ -387,6 +411,15 @@ function EntryRow({
           style={{ color: "var(--text-3)" }}
         >
           {entry.particulars}
+        </p>
+        <p
+          className="text-[10px] truncate mt-0.5 flex items-center gap-1"
+          style={{ color: "var(--text-4)" }}
+        >
+          <UserCircle2 size={10} className="flex-shrink-0 opacity-70" />
+          {actor.verb} {actor.actor}
+          <span style={{ opacity: 0.6 }}>·</span>
+          <span>{actor.roleName}</span>
         </p>
       </div>
 
