@@ -169,7 +169,7 @@ export function ClientsScreen() {
           <span
             className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0"
             style={{
-              background: "color-mix(in srgb, var(--green) 15%, transparent)",
+              background: "var(--bg-hover)",
               color: "var(--green)",
               border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
             }}
@@ -227,8 +227,8 @@ export function ClientsScreen() {
                     onClick={() => setView(v)}
                     className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-md cursor-pointer transition-colors capitalize"
                     style={{
-                      background: active ? "color-mix(in srgb, var(--green) 15%, transparent)" : "transparent",
-                      color: active ? "var(--green)" : "var(--text-3)",
+                      background: active ? "var(--bg-hover)" : "transparent",
+                      color: active ? "var(--text-1)" : "var(--text-3)",
                     }}
                   >
                     <Icon size={12} />
@@ -1037,7 +1037,7 @@ function BulkActionBar({
         background: hasSelection
           ? "color-mix(in srgb, var(--green) 8%, var(--bg-surface))"
           : "var(--bg-surface)",
-        border: `1px solid ${hasSelection ? "color-mix(in srgb, var(--green) 35%, transparent)" : "var(--border)"}`,
+        border: `1px solid ${hasSelection ? "var(--text-3)" : "var(--border)"}`,
         boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
         backdropFilter: "blur(8px)",
       }}

@@ -370,22 +370,33 @@ export default function OutstandingsScreen() {
                 {agingDetailed.map((a) => (
                   <div
                     key={a.label}
-                    className="rounded-lg p-3 relative overflow-hidden"
+                    className="rounded-md p-3"
                     style={{
-                      background: `color-mix(in srgb, ${a.color} 8%, var(--bg-secondary))`,
-                      borderLeft: `3px solid ${a.border}`,
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border)",
                     }}
                   >
-                    <p className="text-[10px] font-medium mb-1" style={{ color: "var(--text-4)" }}>
-                      {a.label}
-                    </p>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span
+                        aria-hidden
+                        className="inline-block flex-shrink-0"
+                        style={{ width: 5, height: 5, borderRadius: 999, background: a.color }}
+                      />
+                      <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
+                        {a.label}
+                      </p>
+                    </div>
                     <p
-                      className="text-lg font-bold tabular-nums"
-                      style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+                      className="text-lg font-semibold tabular-nums"
+                      style={{
+                        color: "var(--text-1)",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        letterSpacing: "-0.02em",
+                      }}
                     >
                       {"\u20B9"}{a.amount}
                     </p>
-                    <p className="text-[10px] font-semibold mt-0.5" style={{ color: a.color }}>
+                    <p className="text-[10px] font-medium mt-0.5 tabular-nums" style={{ color: "var(--text-3)" }}>
                       {a.pct}% of total
                     </p>
                   </div>
@@ -406,10 +417,10 @@ export default function OutstandingsScreen() {
                       className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full cursor-pointer transition-colors"
                       style={{
                         background: active
-                          ? "color-mix(in srgb, var(--green) 15%, transparent)"
+                          ? "var(--bg-hover)"
                           : "var(--bg-surface)",
-                        color: active ? "var(--green)" : "var(--text-3)",
-                        border: `1px solid ${active ? "color-mix(in srgb, var(--green) 35%, transparent)" : "var(--border)"}`,
+                        color: active ? "var(--text-1)" : "var(--text-3)",
+                        border: `1px solid ${active ? "var(--text-3)" : "var(--border)"}`,
                       }}
                     >
                       {f.label}
@@ -451,7 +462,7 @@ export default function OutstandingsScreen() {
                   onClick={() => setDensity(d)}
                   className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
                   style={{
-                    background: density === d ? "color-mix(in srgb, var(--green) 15%, transparent)" : "transparent",
+                    background: density === d ? "var(--bg-hover)" : "transparent",
                     color: density === d ? "var(--green)" : "var(--text-4)",
                     border: `1px solid ${density === d ? "color-mix(in srgb, var(--green) 30%, transparent)" : "var(--border)"}`,
                   }}
@@ -1180,7 +1191,7 @@ export default function OutstandingsScreen() {
                   onClick={() => setDensity(d)}
                   className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
                   style={{
-                    background: density === d ? "color-mix(in srgb, var(--green) 15%, transparent)" : "transparent",
+                    background: density === d ? "var(--bg-hover)" : "transparent",
                     color: density === d ? "var(--green)" : "var(--text-4)",
                     border: `1px solid ${density === d ? "color-mix(in srgb, var(--green) 30%, transparent)" : "var(--border)"}`,
                   }}
@@ -1370,7 +1381,7 @@ export default function OutstandingsScreen() {
                   <div className="flex gap-2">
                     <button
                       className="text-[11px] font-semibold px-3 py-1.5 rounded-md"
-                      style={{ color: "var(--green)", background: "color-mix(in srgb, var(--green) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)" }}
+                      style={{ color: "var(--green)", background: "var(--bg-hover)", border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)" }}
                     >
                       💳 Pay {payableSelected.size}
                     </button>

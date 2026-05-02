@@ -125,7 +125,7 @@ function nodeStyle(kind: NodeKind): {
     case "total":
       return {
         bg: "color-mix(in srgb, var(--green) 12%, var(--bg-surface))",
-        border: "color-mix(in srgb, var(--green) 35%, transparent)",
+        border: "var(--text-3)",
         valueColor: "var(--green)",
       };
     case "deduction":

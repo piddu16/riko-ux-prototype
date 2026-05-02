@@ -210,10 +210,10 @@ export function ChatGstRecon({
               className="text-[11px] font-semibold px-3 py-1.5 min-h-[32px] rounded-full cursor-pointer transition-colors"
               style={{
                 background: active
-                  ? "color-mix(in srgb, var(--green) 15%, transparent)"
+                  ? "var(--bg-hover)"
                   : "var(--bg-surface)",
-                color: active ? "var(--green)" : "var(--text-3)",
-                border: `1px solid ${active ? "color-mix(in srgb, var(--green) 35%, transparent)" : "var(--border)"}`,
+                color: active ? "var(--text-1)" : "var(--text-3)",
+                border: `1px solid ${active ? "var(--text-3)" : "var(--border)"}`,
               }}
             >
               {f.label} · {f.count}
@@ -320,7 +320,7 @@ export function ChatGstRecon({
                     <span
                       className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md flex items-center gap-1"
                       style={{
-                        background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                        background: "var(--bg-hover)",
                         color: "var(--green)",
                       }}
                     >

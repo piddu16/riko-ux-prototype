@@ -210,7 +210,7 @@ export function Party360Drawer({ open, onClose, partyName }: Party360DrawerProps
                     onClick={() => setTab(t.id)}
                     className="flex-1 py-2.5 text-xs font-semibold cursor-pointer transition-colors relative"
                     style={{
-                      color: active ? "var(--green)" : "var(--text-3)",
+                      color: active ? "var(--text-1)" : "var(--text-3)",
                       background: active
                         ? "color-mix(in srgb, var(--green) 8%, transparent)"
                         : "transparent",
@@ -810,7 +810,7 @@ function AiReminderCard({
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: "color-mix(in srgb, var(--green) 15%, transparent)" }}
+              style={{ background: "var(--bg-hover)" }}
             >
               <MessageCircle size={14} style={{ color: "var(--green)" }} />
             </div>

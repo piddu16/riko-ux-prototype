@@ -444,7 +444,7 @@ function PhaseCard({ phase, label, status, weeks, items, blocker }: PhaseCardPro
       style={{
         width: 220,
         background: "var(--bg-surface)",
-        border: `1px solid color-mix(in srgb, ${color} 20%, var(--border))`,
+        border: "1px solid var(--border)",
       }}
     >
       <div className="flex items-center justify-between mb-2">
@@ -455,22 +455,24 @@ function PhaseCard({ phase, label, status, weeks, items, blocker }: PhaseCardPro
           {phase}
         </span>
         <span
-          className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-          style={{
-            background: `color-mix(in srgb, ${color} 15%, transparent)`,
-            color,
-          }}
+          className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider tabular-nums"
+          style={{ color }}
         >
+          <span
+            aria-hidden
+            className="inline-block flex-shrink-0"
+            style={{ width: 5, height: 5, borderRadius: 999, background: color }}
+          />
           {phaseLabel[status]}
         </span>
       </div>
       <p
-        className="text-sm font-bold mb-1"
+        className="text-sm font-semibold mb-1"
         style={{ color: "var(--text-1)" }}
       >
         {label}
       </p>
-      <p className="text-[10px] mb-2" style={{ color: "var(--text-4)" }}>
+      <p className="text-[10px] mb-2 tabular-nums" style={{ color: "var(--text-4)" }}>
         Weeks {weeks}
       </p>
       <ul className="flex flex-col gap-0.5">
@@ -493,7 +495,7 @@ function PhaseCard({ phase, label, status, weeks, items, blocker }: PhaseCardPro
           className="text-[10px] mt-2 pt-2 leading-relaxed"
           style={{
             color: "var(--red)",
-            borderTop: "1px solid color-mix(in srgb, var(--red) 18%, transparent)",
+            borderTop: "1px solid var(--border)",
           }}
         >
           {blocker}
@@ -842,7 +844,7 @@ export function GstScreen() {
               onClick={() => setActiveTab(t.key)}
               className="text-xs font-semibold px-4 py-2.5 transition-colors cursor-pointer whitespace-nowrap relative"
               style={{
-                color: active ? "var(--green)" : "var(--text-3)",
+                color: active ? "var(--text-1)" : "var(--text-3)",
                 background: "transparent",
               }}
               onMouseEnter={(e) => {
@@ -992,8 +994,8 @@ export function GstScreen() {
                     onClick={() => setReconView(v)}
                     className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer transition-colors"
                     style={{
-                      background: active ? "color-mix(in srgb, var(--green) 15%, transparent)" : "transparent",
-                      color: active ? "var(--green)" : "var(--text-3)",
+                      background: active ? "var(--bg-hover)" : "transparent",
+                      color: active ? "var(--text-1)" : "var(--text-3)",
                     }}
                   >
                     {label}
@@ -1921,7 +1923,7 @@ export function GstScreen() {
                           className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
                           style={{
                             background:
-                              "color-mix(in srgb, var(--green) 15%, transparent)",
+                              "var(--bg-hover)",
                             color: "var(--green)",
                           }}
                         >

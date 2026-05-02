@@ -174,7 +174,7 @@ function StepDot({ label, active, done }: { label: string; active: boolean; done
           background: done
             ? "var(--green)"
             : active
-            ? "color-mix(in srgb, var(--green) 15%, transparent)"
+            ? "var(--bg-hover)"
             : "var(--bg-hover)",
           color: done ? "#fff" : active ? "var(--green)" : "var(--text-4)",
           border: active ? "1px solid var(--green)" : "1px solid var(--border)",

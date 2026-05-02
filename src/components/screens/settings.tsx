@@ -140,7 +140,7 @@ export function SettingsScreen() {
                 onClick={() => setActiveTab(id)}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-t-lg cursor-pointer transition-colors flex-shrink-0 whitespace-nowrap relative"
                 style={{
-                  color: active ? "var(--green)" : "var(--text-3)",
+                  color: active ? "var(--text-1)" : "var(--text-3)",
                   background: active
                     ? "color-mix(in srgb, var(--green) 10%, transparent)"
                     : "transparent",
@@ -330,7 +330,7 @@ function ProfileTab() {
               style={{
                 width: 32,
                 height: 32,
-                background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                background: "var(--bg-hover)",
                 color: "var(--green)",
               }}
             >
@@ -561,7 +561,7 @@ function BillingTab() {
                     <span
                       className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
                       style={{
-                        background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                        background: "var(--bg-hover)",
                         border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
                         color: "var(--green)",
                       }}
@@ -1243,7 +1243,7 @@ function TeamTab() {
         style={{
           background:
             "linear-gradient(135deg, color-mix(in srgb, var(--green) 8%, var(--bg-surface)) 0%, var(--bg-surface) 100%)",
-          border: "1px solid color-mix(in srgb, var(--green) 35%, transparent)",
+          border: "1px solid var(--text-3)",
         }}
       >
         <div className="h-0.5" style={{ background: "var(--green)" }} />
@@ -1254,7 +1254,7 @@ function TeamTab() {
               style={{
                 width: 28,
                 height: 28,
-                background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                background: "var(--bg-hover)",
                 color: "var(--green)",
               }}
             >
@@ -1730,7 +1730,7 @@ function TeamTab() {
             style={{
               bottom: 88,
               background: "var(--bg-surface)",
-              border: "1px solid color-mix(in srgb, var(--green) 35%, transparent)",
+              border: "1px solid var(--text-3)",
               boxShadow: "0 20px 40px rgba(0,0,0,0.45)",
             }}
             role="status"
@@ -1967,7 +1967,7 @@ function BulkInviteModal({ open, onClose, onSent }: BulkInviteModalProps) {
                   style={{
                     width: 32,
                     height: 32,
-                    background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                    background: "var(--bg-hover)",
                     color: "var(--green)",
                   }}
                 >
@@ -2029,7 +2029,7 @@ function BulkInviteModal({ open, onClose, onSent }: BulkInviteModalProps) {
                       style={{
                         width: 48,
                         height: 48,
-                        background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                        background: "var(--bg-hover)",
                         color: "var(--green)",
                       }}
                     >
@@ -2149,7 +2149,7 @@ function BulkInviteModal({ open, onClose, onSent }: BulkInviteModalProps) {
                                 <span
                                   className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
                                   style={{
-                                    background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                                    background: "var(--bg-hover)",
                                     color: "var(--green)",
                                   }}
                                 >

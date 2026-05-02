@@ -802,17 +802,27 @@ function KpiCard({
       className="rounded-md overflow-hidden"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
-      <div className="h-0.5" style={{ background: color }} />
       <div className="p-3">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span
+            aria-hidden
+            className="inline-block flex-shrink-0"
+            style={{ width: 5, height: 5, borderRadius: 999, background: color }}
+          />
+          <p
+            className="text-[10px] uppercase tracking-wider font-medium"
+            style={{ color: "var(--text-4)" }}
+          >
+            {label}
+          </p>
+        </div>
         <p
-          className="text-[10px] uppercase tracking-wider font-medium mb-1"
-          style={{ color: "var(--text-4)" }}
-        >
-          {label}
-        </p>
-        <p
-          className="text-xl font-bold tabular-nums"
-          style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+          className="text-xl font-semibold tabular-nums"
+          style={{
+            color: "var(--text-1)",
+            fontFamily: "'Space Grotesk', sans-serif",
+            letterSpacing: "-0.02em",
+          }}
         >
           {value}
         </p>
@@ -844,25 +854,27 @@ function GodownPill({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 text-[11px] font-semibold px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+      className="flex items-center gap-2 text-[11px] font-medium px-3 py-1.5 rounded-md cursor-pointer transition-colors"
       style={{
-        background: active ? "color-mix(in srgb, var(--green) 15%, transparent)" : "var(--bg-surface)",
-        color: active ? "var(--green)" : "var(--text-3)",
-        border: `1px solid ${active ? "color-mix(in srgb, var(--green) 35%, transparent)" : "var(--border)"}`,
+        background: active ? "var(--bg-surface)" : "transparent",
+        color: active ? "var(--text-1)" : "var(--text-3)",
+        border: `1px solid ${active ? "var(--text-3)" : "var(--border)"}`,
       }}
     >
       {dotColor && (
         <span
-          className="w-2 h-2 rounded-full flex-shrink-0"
+          className="flex-shrink-0"
           style={{
+            width: 6,
+            height: 6,
+            borderRadius: 999,
             background: dotColor,
-            boxShadow: `0 0 0 3px color-mix(in srgb, ${dotColor} 20%, transparent)`,
           }}
           aria-hidden
         />
       )}
       <span>{label}</span>
-      <span className="hidden md:inline text-[9px] font-medium" style={{ color: active ? "var(--green)" : "var(--text-4)", opacity: 0.8 }}>
+      <span className="hidden md:inline text-[10px]" style={{ color: "var(--text-4)" }}>
         · {sub}
       </span>
     </button>

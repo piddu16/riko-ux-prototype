@@ -340,7 +340,7 @@ function UserBubble({
       <div
         className="max-w-[80%] rounded-lg rounded-br-md text-sm overflow-hidden"
         style={{
-          background: "color-mix(in srgb, var(--green) 15%, transparent)",
+          background: "var(--bg-hover)",
           color: "var(--text-1)",
         }}
       >
@@ -665,7 +665,7 @@ function ExchangeReceivables({ onFollowup }: { onFollowup: (q: string) => void }
               <button
                 className="text-[10px] font-semibold px-2 py-1 rounded-md flex-shrink-0 cursor-pointer"
                 style={{
-                  background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                  background: "var(--bg-hover)",
                   color: "var(--green)",
                   border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
                 }}
@@ -1997,7 +1997,7 @@ function ExchangeCreateEntry({ onFollowup }: { onFollowup: (q: string) => void }
           <span
             className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
             style={{
-              background: "color-mix(in srgb, var(--green) 15%, transparent)",
+              background: "var(--bg-hover)",
               color: "var(--green)",
             }}
           >
@@ -2105,7 +2105,7 @@ function UploadDraftedPill({ label }: { label: string }) {
     <span
       className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
       style={{
-        background: "color-mix(in srgb, var(--green) 15%, transparent)",
+        background: "var(--bg-hover)",
         color: "var(--green)",
       }}
     >

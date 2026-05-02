@@ -199,7 +199,7 @@ export function EntriesScreen() {
               onClick={() => setActiveTab(t.key)}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 whitespace-nowrap cursor-pointer transition-colors"
               style={{
-                color: active ? "var(--green)" : "var(--text-3)",
+                color: active ? "var(--text-1)" : "var(--text-3)",
                 borderBottom: active ? "2px solid var(--green)" : "2px solid transparent",
                 marginBottom: "-1px",
               }}
@@ -211,7 +211,7 @@ export function EntriesScreen() {
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums"
                   style={{
                     background: active
-                      ? "color-mix(in srgb, var(--green) 15%, transparent)"
+                      ? "var(--bg-hover)"
                       : "var(--bg-hover)",
                     color: active ? "var(--green)" : "var(--text-4)",
                   }}

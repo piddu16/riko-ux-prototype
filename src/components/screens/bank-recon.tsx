@@ -448,16 +448,16 @@ export function BankReconScreen() {
                               onClick={() => handleCreateMatchingEntry(l.description)}
                               className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer transition-colors whitespace-nowrap flex-shrink-0 flex items-center gap-1"
                               style={{
-                                background: "color-mix(in srgb, var(--green) 15%, transparent)",
+                                background: "var(--bg-hover)",
                                 color: "var(--green)",
-                                border: "1px solid color-mix(in srgb, var(--green) 35%, transparent)",
+                                border: "1px solid var(--text-3)",
                               }}
                               onMouseEnter={(e) => {
                                 (e.currentTarget as HTMLElement).style.background = "var(--green)";
                                 (e.currentTarget as HTMLElement).style.color = "#fff";
                               }}
                               onMouseLeave={(e) => {
-                                (e.currentTarget as HTMLElement).style.background = "color-mix(in srgb, var(--green) 15%, transparent)";
+                                (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
                                 (e.currentTarget as HTMLElement).style.color = "var(--green)";
                               }}
                               title="Drafts a matching Receipt/Payment voucher in the Entries queue"
@@ -607,7 +607,7 @@ export function BankReconScreen() {
                         style={{
                           background: l.status === "mismatch"
                             ? "color-mix(in srgb, var(--yellow) 15%, transparent)"
-                            : "color-mix(in srgb, var(--green) 15%, transparent)",
+                            : "var(--bg-hover)",
                           color: l.status === "mismatch" ? "var(--yellow)" : "var(--green)",
                           border: `1px solid color-mix(in srgb, ${l.status === "mismatch" ? "var(--yellow)" : "var(--green)"} 35%, transparent)`,
                         }}

@@ -199,7 +199,7 @@ export function DaybookScreen() {
               style={{
                 background:
                   activeRange === r
-                    ? "color-mix(in srgb, var(--green) 15%, transparent)"
+                    ? "var(--bg-hover)"
                     : "var(--bg-surface)",
                 color: activeRange === r ? "var(--green)" : "var(--text-3)",
                 border: `1px solid ${activeRange === r ? "color-mix(in srgb, var(--green) 40%, transparent)" : "var(--border)"}`,
