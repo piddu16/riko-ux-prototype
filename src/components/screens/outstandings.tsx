@@ -425,10 +425,9 @@ export default function OutstandingsScreen() {
                     >
                       {f.label}
                       <span
-                        className="text-[10px] px-1 rounded-md tabular-nums"
+                        className="text-[10px] tabular-nums"
                         style={{
-                          background: active ? "var(--green)" : "var(--bg-hover)",
-                          color: active ? "#fff" : "var(--text-4)",
+                          color: active ? "var(--text-3)" : "var(--text-4)",
                           minWidth: 18,
                           textAlign: "center",
                         }}
@@ -441,11 +440,19 @@ export default function OutstandingsScreen() {
               </div>
               <button
                 onClick={() => setBulkImportOpen(true)}
-                className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-md cursor-pointer transition-colors"
                 style={{
-                  background: "color-mix(in srgb, var(--blue) 10%, transparent)",
-                  color: "var(--blue)",
-                  border: "1px solid color-mix(in srgb, var(--blue) 30%, transparent)",
+                  background: "transparent",
+                  color: "var(--text-2)",
+                  border: "1px solid var(--border)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-hover)";
+                  e.currentTarget.style.color = "var(--text-1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--text-2)";
                 }}
                 title="Bulk-import contact info via CSV"
               >
@@ -463,8 +470,8 @@ export default function OutstandingsScreen() {
                   className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
                   style={{
                     background: density === d ? "var(--bg-hover)" : "transparent",
-                    color: density === d ? "var(--green)" : "var(--text-4)",
-                    border: `1px solid ${density === d ? "color-mix(in srgb, var(--green) 30%, transparent)" : "var(--border)"}`,
+                    color: density === d ? "var(--text-1)" : "var(--text-4)",
+                    border: `1px solid ${density === d ? "var(--text-3)" : "var(--border)"}`,
                   }}
                 >
                   {d}
@@ -597,10 +604,15 @@ export default function OutstandingsScreen() {
                             const ag = agingColor5(r.days);
                             return (
                               <span
-                                className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-md tabular-nums"
-                                style={{ background: ag.bg, color: ag.fg }}
+                                className="inline-flex items-center gap-1.5 text-[11px] font-semibold tabular-nums"
+                                style={{ color: ag.fg }}
                                 title={ag.label}
                               >
+                                <span
+                                  aria-hidden
+                                  className="inline-block flex-shrink-0"
+                                  style={{ width: 5, height: 5, borderRadius: 999, background: ag.fg }}
+                                />
                                 {r.days.toLocaleString()}
                               </span>
                             );
@@ -634,18 +646,28 @@ export default function OutstandingsScreen() {
 
                         <td className={`${DENSITY_PY[density]} px-3 text-center`}>
                           <button
-                            className="text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition-all cursor-pointer"
                             style={{
-                              color: "var(--green)",
-                              background: "color-mix(in srgb, var(--green) 12%, transparent)",
-                              opacity: isHovered || isSelected ? 1 : 0.4,
+                              color: "var(--text-2)",
+                              background: "transparent",
+                              border: "1px solid var(--border)",
+                              opacity: isHovered || isSelected ? 1 : 0.6,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "var(--bg-hover)";
+                              e.currentTarget.style.color = "var(--text-1)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                              e.currentTarget.style.color = "var(--text-2)";
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
                               setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days });
                             }}
                           >
-                            📲 Remind
+                            <MessageSquareIcon size={11} />
+                            Remind
                           </button>
                         </td>
                       </motion.tr>
@@ -1192,8 +1214,8 @@ export default function OutstandingsScreen() {
                   className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
                   style={{
                     background: density === d ? "var(--bg-hover)" : "transparent",
-                    color: density === d ? "var(--green)" : "var(--text-4)",
-                    border: `1px solid ${density === d ? "color-mix(in srgb, var(--green) 30%, transparent)" : "var(--border)"}`,
+                    color: density === d ? "var(--text-1)" : "var(--text-4)",
+                    border: `1px solid ${density === d ? "var(--text-3)" : "var(--border)"}`,
                   }}
                 >
                   {d}
