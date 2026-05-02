@@ -94,7 +94,7 @@ export function ChatGstRecon({
     <div className="space-y-3 my-1">
       {/* Header card — summary with health */}
       <div
-        className="rounded-xl p-4"
+        className="rounded-md p-4"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -224,7 +224,7 @@ export function ChatGstRecon({
 
       {/* Line items */}
       <div
-        className="rounded-xl overflow-hidden"
+        className="rounded-md overflow-hidden"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <AnimatePresence initial={false}>

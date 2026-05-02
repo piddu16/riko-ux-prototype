@@ -120,7 +120,7 @@ export function OcrUpload({ onClose }: { onClose: () => void }) {
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => inputRef.current?.click()}
-            className="rounded-2xl p-10 text-center cursor-pointer transition-colors"
+            className="rounded-lg p-10 text-center cursor-pointer transition-colors"
             style={{
               background: dragOver
                 ? "color-mix(in srgb, var(--green) 10%, transparent)"
@@ -139,7 +139,7 @@ export function OcrUpload({ onClose }: { onClose: () => void }) {
               }}
             />
             <div
-              className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+              className="w-14 h-14 rounded-lg mx-auto mb-3 flex items-center justify-center"
               style={{
                 background: "color-mix(in srgb, var(--green) 12%, transparent)",
               }}
@@ -194,7 +194,7 @@ export function OcrUpload({ onClose }: { onClose: () => void }) {
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl p-8 text-center"
+          className="rounded-lg p-8 text-center"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <motion.div
@@ -242,7 +242,7 @@ export function OcrUpload({ onClose }: { onClose: () => void }) {
         >
           {/* Extraction summary */}
           <div
-            className="flex items-start gap-3 px-4 py-3 rounded-xl"
+            className="flex items-start gap-3 px-4 py-3 rounded-md"
             style={{
               background: "color-mix(in srgb, var(--green) 8%, transparent)",
               border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
@@ -261,7 +261,7 @@ export function OcrUpload({ onClose }: { onClose: () => void }) {
 
           {/* Fields grid */}
           <div
-            className="rounded-2xl p-5"
+            className="rounded-lg p-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <h2 className="text-sm font-bold mb-3" style={{ color: "var(--text-1)" }}>
@@ -396,7 +396,7 @@ export function OcrUpload({ onClose }: { onClose: () => void }) {
         <motion.div
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl p-10 text-center"
+          className="rounded-lg p-10 text-center"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <div
@@ -528,7 +528,7 @@ function Feature({
 }) {
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="mb-2">{icon}</div>

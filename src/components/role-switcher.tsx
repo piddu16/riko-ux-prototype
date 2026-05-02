@@ -77,7 +77,7 @@ export function RoleSwitcher() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.16, ease: "easeOut" }}
-            className="absolute right-0 mt-2 w-80 rounded-xl overflow-hidden"
+            className="absolute right-0 mt-2 w-80 rounded-md overflow-hidden"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",

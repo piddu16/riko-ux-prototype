@@ -101,7 +101,7 @@ export function GstinSelector({ selected, onChange }: GstinSelectorProps) {
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
             role="listbox"
-            className="absolute right-0 top-full mt-1.5 rounded-xl overflow-hidden z-50"
+            className="absolute right-0 top-full mt-1.5 rounded-md overflow-hidden z-50"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",

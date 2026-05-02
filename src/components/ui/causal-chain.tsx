@@ -253,7 +253,7 @@ function CausalChainDesktop({ onAsk }: { onAsk?: (q: string) => void }) {
             viewport={{ once: true }}
             transition={{ duration: 0.3, delay: 0.1 + i * 0.05 }}
             whileHover={clickable ? { scale: 1.03 } : undefined}
-            className="absolute rounded-xl px-3 py-2 text-left transition-shadow"
+            className="absolute rounded-md px-3 py-2 text-left transition-shadow"
             style={{
               left: `${leftPct}%`,
               top: `${topPct}%`,
@@ -470,7 +470,7 @@ function CausalChainMobile({ onAsk }: { onAsk?: (q: string) => void }) {
 export function CausalChain({ onAsk }: { onAsk?: (q: string) => void }) {
   return (
     <div
-      className="rounded-xl p-4 md:p-5"
+      className="rounded-md p-4 md:p-5"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",

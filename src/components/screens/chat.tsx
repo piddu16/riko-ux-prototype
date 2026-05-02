@@ -77,7 +77,7 @@ const DeadStockTreemap = dynamic(
     ssr: false,
     loading: () => (
       <div
-        className="rounded-xl animate-pulse"
+        className="rounded-md animate-pulse"
         style={{
           height: 480,
           background: "color-mix(in srgb, var(--bg-hover) 50%, transparent)",
@@ -338,7 +338,7 @@ function UserBubble({
       className="flex justify-end mb-3"
     >
       <div
-        className="max-w-[80%] rounded-2xl rounded-br-md text-sm overflow-hidden"
+        className="max-w-[80%] rounded-lg rounded-br-md text-sm overflow-hidden"
         style={{
           background: "color-mix(in srgb, var(--green) 15%, transparent)",
           color: "var(--text-1)",
@@ -540,7 +540,7 @@ function ExchangeCurrentRatio({ onFollowup }: { onFollowup: (q: string) => void 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-3 mb-2 flex-wrap">
@@ -618,7 +618,7 @@ function ExchangeReceivables({ onFollowup }: { onFollowup: (q: string) => void }
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between mb-3 gap-3">
@@ -717,7 +717,7 @@ function ExchangePayables({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center justify-between mb-3 gap-3">
@@ -810,7 +810,7 @@ function ExchangeMIS({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -853,7 +853,7 @@ function ExchangeRevenueTrend({ onFollowup }: { onFollowup: (q: string) => void 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
@@ -916,7 +916,7 @@ function ExchangeCashFlow({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
@@ -937,7 +937,7 @@ function ExchangeCashFlow({ onFollowup }: { onFollowup: (q: string) => void }) {
       </div>
 
       <div
-        className="rounded-xl p-4 my-2"
+        className="rounded-md p-4 my-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-xs font-bold mb-2" style={{ color: "var(--text-1)" }}>
@@ -1001,7 +1001,7 @@ function ExchangeRunway({ onFollowup }: { onFollowup: (q: string) => void }) {
     <RikoMsg>
       {/* Mobile: full hero with gauge + KPI grid */}
       <div
-        className="md:hidden rounded-xl p-4 mb-2"
+        className="md:hidden rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-4">
@@ -1033,7 +1033,7 @@ function ExchangeRunway({ onFollowup }: { onFollowup: (q: string) => void }) {
 
       {/* Desktop: compact summary (gauge + KPIs live in Result panel) */}
       <div
-        className="hidden md:block rounded-xl p-4 mb-2"
+        className="hidden md:block rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
@@ -1076,7 +1076,7 @@ function ExchangeExpenses({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-sm font-bold mb-1" style={{ color: "var(--text-1)" }}>
@@ -1139,7 +1139,7 @@ function ExchangeWaterfall({ onFollowup }: { onFollowup: (q: string) => void }) 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
@@ -1176,7 +1176,7 @@ function ExchangeGstRecon({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
@@ -1216,7 +1216,7 @@ function ExchangeGstHealth({ onFollowup }: { onFollowup: (q: string) => void }) 
     <RikoMsg>
       {/* Mobile: compliance rating badge + 4-row metric list */}
       <div
-        className="md:hidden rounded-xl p-4 mb-2"
+        className="md:hidden rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-4">
@@ -1285,7 +1285,7 @@ function ExchangeGstHealth({ onFollowup }: { onFollowup: (q: string) => void }) 
 
       {/* Desktop: compact summary */}
       <div
-        className="hidden md:block rounded-xl p-4 mb-2"
+        className="hidden md:block rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
@@ -1329,7 +1329,7 @@ function ExchangeTopCustomers({ onFollowup }: { onFollowup: (q: string) => void 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
@@ -1386,7 +1386,7 @@ function ExchangeHealthScore({ onFollowup }: { onFollowup: (q: string) => void }
     <RikoMsg>
       {/* Mobile: full gauge + 4 dimension bars */}
       <div
-        className="md:hidden rounded-xl p-4 mb-2"
+        className="md:hidden rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-4 mb-3">
@@ -1430,7 +1430,7 @@ function ExchangeHealthScore({ onFollowup }: { onFollowup: (q: string) => void }
 
       {/* Desktop: compact summary (full gauge + bars in Result panel) */}
       <div
-        className="hidden md:block rounded-xl p-4 mb-2"
+        className="hidden md:block rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-[11px] uppercase tracking-wider font-medium" style={{ color: "var(--text-4)" }}>
@@ -1474,7 +1474,7 @@ function ExchangeDeadStock({ onFollowup }: { onFollowup: (q: string) => void }) 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
@@ -1543,7 +1543,7 @@ function ExchangeReturns({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
@@ -1608,7 +1608,7 @@ function ExchangeCohortRetention({ onFollowup }: { onFollowup: (q: string) => vo
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1648,7 +1648,7 @@ function ExchangeMoneyFlow({ onFollowup }: { onFollowup: (q: string) => void }) 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
@@ -1681,7 +1681,7 @@ function ExchangeCustomerLtv({ onFollowup }: { onFollowup: (q: string) => void }
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1724,7 +1724,7 @@ function ExchangeCyclicTransactions({ onFollowup }: { onFollowup: (q: string) =>
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1766,7 +1766,7 @@ function ExchangeRelatedParty({ onFollowup }: { onFollowup: (q: string) => void 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1805,7 +1805,7 @@ function ExchangeRecurringRevenue({ onFollowup }: { onFollowup: (q: string) => v
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1849,7 +1849,7 @@ function ExchangeHsnWise({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1891,7 +1891,7 @@ function ExchangeStateWise({ onFollowup }: { onFollowup: (q: string) => void }) 
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1931,7 +1931,7 @@ function ExchangeFilingDelay({ onFollowup }: { onFollowup: (q: string) => void }
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -1987,7 +1987,7 @@ function ExchangeCreateEntry({ onFollowup }: { onFollowup: (q: string) => void }
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{
           background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
           border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
@@ -2169,7 +2169,7 @@ function ExchangeUploadBill({ onFollowup }: { onFollowup: (q: string) => void })
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{
           background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
           border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
@@ -2253,7 +2253,7 @@ function ExchangeUploadInvoice({ onFollowup }: { onFollowup: (q: string) => void
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{
           background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
           border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
@@ -2335,7 +2335,7 @@ function ExchangeUploadBankRecon({ onFollowup }: { onFollowup: (q: string) => vo
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{
           background: "color-mix(in srgb, var(--blue) 8%, var(--bg-surface))",
           border: "1px solid color-mix(in srgb, var(--blue) 25%, transparent)",
@@ -2484,7 +2484,7 @@ function ExchangeUploadBatch({
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{
           background: "color-mix(in srgb, var(--green) 8%, var(--bg-surface))",
           border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
@@ -2613,7 +2613,7 @@ function ExchangeUnknown({ onFollowup }: { onFollowup: (q: string) => void }) {
   return (
     <RikoMsg>
       <div
-        className="rounded-xl p-4 mb-2"
+        className="rounded-md p-4 mb-2"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-1)" }}>
@@ -2900,7 +2900,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
   },
   mis: () => (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{ background: "#fff", border: "1px solid var(--border)" }}
     >
       <div className="p-6" style={{ color: "#0F172A" }}>
@@ -2977,7 +2977,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     const days = Math.round(months * 30);
     return (
       <div
-        className="rounded-xl p-5"
+        className="rounded-md p-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex flex-col items-center mb-4">
@@ -3048,7 +3048,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
       :                                    "var(--red)";
     return (
     <div
-      className="rounded-xl p-5"
+      className="rounded-md p-5"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="flex flex-col items-center mb-4">
@@ -3426,7 +3426,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     return (
       <div className="space-y-3">
         <div
-          className="rounded-xl p-5"
+          className="rounded-md p-5"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -3465,7 +3465,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
         </div>
 
         <div
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <p
@@ -3511,7 +3511,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
         </div>
 
         <div
-          className="rounded-xl p-4 flex items-center gap-3"
+          className="rounded-md p-4 flex items-center gap-3"
           style={{
             background: "color-mix(in srgb, var(--yellow) 10%, transparent)",
             border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
@@ -3549,7 +3549,7 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
   "upload-batch-inventory": () => <UploadBatchResult kind="batch-inventory" />,
   unknown: () => (
     <div
-      className="rounded-xl p-5 text-center"
+      className="rounded-md p-5 text-center"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <Sparkles
@@ -3590,7 +3590,7 @@ function UploadResultHero({
 }) {
   return (
     <div
-      className="rounded-xl p-5"
+      className="rounded-md p-5"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
@@ -3625,7 +3625,7 @@ function LedgerCascadeTable({
 }) {
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <p
@@ -3682,7 +3682,7 @@ function UploadBillResult() {
       />
       <LedgerCascadeTable impacts={b.ledgerImpact} />
       <div
-        className="rounded-xl p-4"
+        className="rounded-md p-4"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p
@@ -3735,7 +3735,7 @@ function UploadInvoiceResult() {
       />
       <LedgerCascadeTable impacts={inv.ledgerImpact} />
       <div
-        className="rounded-xl p-4"
+        className="rounded-md p-4"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p
@@ -3784,7 +3784,7 @@ function UploadBankReconResult() {
 
       {/* Per-line table */}
       <div
-        className="rounded-xl overflow-hidden"
+        className="rounded-md overflow-hidden"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
@@ -3859,7 +3859,7 @@ function UploadBatchResult({ kind }: { kind: UploadKind }) {
 
       {/* Column mapping card */}
       <div
-        className="rounded-xl p-4"
+        className="rounded-md p-4"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p
@@ -3887,7 +3887,7 @@ function UploadBatchResult({ kind }: { kind: UploadKind }) {
 
       {/* Full row preview */}
       <div
-        className="rounded-xl overflow-hidden"
+        className="rounded-md overflow-hidden"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border)" }}>
@@ -4101,7 +4101,7 @@ function InputBar({
       )}
 
       <div
-        className="flex items-center gap-2 rounded-xl px-2 py-1.5"
+        className="flex items-center gap-2 rounded-md px-2 py-1.5"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
@@ -4633,7 +4633,7 @@ export function ChatScreen({
               {PROMPT_CATEGORIES.map((cat) => (
                 <div
                   key={cat.title}
-                  className="rounded-xl p-4"
+                  className="rounded-md p-4"
                   style={{
                     background: "var(--bg-surface)",
                     border: "1px solid var(--border)",

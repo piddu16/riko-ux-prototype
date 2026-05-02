@@ -292,7 +292,7 @@ export function InventoryScreen() {
 
       {/* ── Desktop table ── */}
       <div
-        className="hidden sm:block rounded-xl overflow-hidden"
+        className="hidden sm:block rounded-md overflow-hidden"
         style={{ border: "1px solid var(--border)" }}
       >
         <table className="w-full text-xs">
@@ -388,7 +388,7 @@ export function InventoryScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.3, delay: idx * 0.03 }}
-              className="rounded-xl p-3"
+              className="rounded-md p-3"
               style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
             >
               <div className="flex items-start justify-between mb-2">
@@ -456,7 +456,7 @@ export function InventoryScreen() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.4 }}
-          className="rounded-xl p-4 mb-4"
+          className="rounded-md p-4 mb-4"
           style={{
             background: "color-mix(in srgb, var(--yellow) 8%, var(--bg-surface))",
             border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
@@ -508,7 +508,7 @@ export function InventoryScreen() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.35, delay: i * 0.06 }}
-                className="rounded-xl overflow-hidden"
+                className="rounded-md overflow-hidden"
                 style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
               >
                 <div className="h-0.5" style={{ background: col }} />
@@ -548,7 +548,7 @@ export function InventoryScreen() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.35, delay: 0.1 }}
-          className="rounded-xl overflow-hidden mb-4"
+          className="rounded-md overflow-hidden mb-4"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           {/* Desktop table */}
@@ -752,7 +752,7 @@ export function InventoryScreen() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: 0.35, delay: 0.2 }}
-          className="rounded-xl px-4 py-3 text-xs leading-relaxed"
+          className="rounded-md px-4 py-3 text-xs leading-relaxed"
           style={{
             background: "color-mix(in srgb, var(--green) 10%, transparent)",
             border: "1px solid color-mix(in srgb, var(--green) 25%, transparent)",
@@ -799,7 +799,7 @@ function KpiCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.35 }}
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="h-0.5" style={{ background: color }} />
@@ -881,7 +881,7 @@ function SnapshotCard({ snapshot }: { snapshot: typeof STOCK_SNAPSHOTS[number] }
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.3 }}
-      className="rounded-xl p-3"
+      className="rounded-md p-3"
       style={{
         background: isCurrent ? "color-mix(in srgb, var(--green) 6%, var(--bg-surface))" : "var(--bg-surface)",
         border: isCurrent

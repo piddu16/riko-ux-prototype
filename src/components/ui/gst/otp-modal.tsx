@@ -90,7 +90,7 @@ function ModalBody({ onClose, purpose, mobile, onSubmit }: ModalBodyProps) {
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 4 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="w-full max-w-md rounded-xl overflow-hidden"
+      className="w-full max-w-md rounded-md overflow-hidden"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",

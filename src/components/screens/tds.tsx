@@ -167,7 +167,7 @@ export function TdsScreen() {
               return (
                 <div
                   key={card.label}
-                  className="rounded-xl overflow-hidden"
+                  className="rounded-md overflow-hidden"
                   style={{
                     background: card.urgent
                       ? "color-mix(in srgb, var(--red) 10%, var(--bg-surface))"
@@ -231,7 +231,7 @@ export function TdsScreen() {
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl overflow-hidden"
+          className="rounded-md overflow-hidden"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -429,7 +429,7 @@ export function TdsScreen() {
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl overflow-hidden"
+          className="rounded-md overflow-hidden"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",

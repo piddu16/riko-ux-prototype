@@ -275,7 +275,7 @@ export function Party360Drawer({ open, onClose, partyName }: Party360DrawerProps
 
                   {/* Credit rating */}
                   <div
-                    className="rounded-xl p-4"
+                    className="rounded-md p-4"
                     style={{
                       background: "var(--bg-secondary)",
                       border: "1px solid var(--border)",
@@ -332,7 +332,7 @@ export function Party360Drawer({ open, onClose, partyName }: Party360DrawerProps
                     Last {partyTransactions.length} transactions
                   </p>
                   <div
-                    className="rounded-xl overflow-hidden"
+                    className="rounded-md overflow-hidden"
                     style={{ border: "1px solid var(--border)" }}
                   >
                     <table className="w-full text-xs">
@@ -411,7 +411,7 @@ export function Party360Drawer({ open, onClose, partyName }: Party360DrawerProps
               {tab === "history" && (
                 <div className="p-5 flex flex-col gap-4">
                   <div
-                    className="rounded-xl p-4"
+                    className="rounded-md p-4"
                     style={{
                       background: "var(--bg-secondary)",
                       border: "1px solid var(--border)",
@@ -449,7 +449,7 @@ export function Party360Drawer({ open, onClose, partyName }: Party360DrawerProps
                   </div>
 
                   <div
-                    className="rounded-xl p-4"
+                    className="rounded-md p-4"
                     style={{
                       background: "color-mix(in srgb, var(--green) 6%, var(--bg-secondary))",
                       border: "1px solid color-mix(in srgb, var(--green) 25%, var(--border))",
@@ -492,7 +492,7 @@ function SummaryTile({
 }) {
   return (
     <div
-      className="rounded-xl p-3"
+      className="rounded-md p-3"
       style={{
         background: "var(--bg-secondary)",
         border: "1px solid var(--border)",
@@ -564,7 +564,7 @@ function ContactInfoRow({ partyName }: { partyName: string }) {
   if (contact.source === "none" && !editing) {
     return (
       <div
-        className="rounded-xl p-4 flex items-start justify-between gap-3"
+        className="rounded-md p-4 flex items-start justify-between gap-3"
         style={{
           background: "color-mix(in srgb, var(--yellow) 8%, var(--bg-secondary))",
           border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
@@ -604,7 +604,7 @@ function ContactInfoRow({ partyName }: { partyName: string }) {
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{
         background: "var(--bg-secondary)",
         border: "1px solid var(--border)",
@@ -770,7 +770,7 @@ function AiReminderCard({
       : "Add a mobile number above to enable reminders";
     return (
       <div
-        className="rounded-xl p-4 flex items-center gap-3"
+        className="rounded-md p-4 flex items-center gap-3"
         style={{
           background: "var(--bg-secondary)",
           border: "1px solid var(--border)",
@@ -801,7 +801,7 @@ function AiReminderCard({
     return (
       <>
         <div
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{
             background: "var(--bg-secondary)",
             border: "1px solid var(--border)",
@@ -852,7 +852,7 @@ function AiReminderCard({
   return (
     <>
       <div
-        className="rounded-xl p-4"
+        className="rounded-md p-4"
         style={{
           background: "color-mix(in srgb, var(--green) 5%, var(--bg-secondary))",
           border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
@@ -1130,7 +1130,7 @@ function Toast({ text }: { text: string }) {
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 20, opacity: 0 }}
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[95] px-4 py-2 rounded-xl text-[12px] font-semibold"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[95] px-4 py-2 rounded-md text-[12px] font-semibold"
       style={{
         background: "var(--text-1)",
         color: "var(--bg-primary)",
@@ -1163,7 +1163,7 @@ function ReminderHistorySection({ partyName }: { partyName: string }) {
   if (history.length === 0) {
     return (
       <div
-        className="rounded-xl p-4 text-center"
+        className="rounded-md p-4 text-center"
         style={{
           background: "var(--bg-secondary)",
           border: "1px dashed var(--border)",
@@ -1179,7 +1179,7 @@ function ReminderHistorySection({ partyName }: { partyName: string }) {
   return (
     <>
       <div
-        className="rounded-xl p-4"
+        className="rounded-md p-4"
         style={{
           background: "var(--bg-secondary)",
           border: "1px solid var(--border)",
@@ -1275,7 +1275,7 @@ function ReminderHistorySection({ partyName }: { partyName: string }) {
               className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none"
             >
               <div
-                className="w-full max-w-lg rounded-2xl overflow-hidden flex flex-col pointer-events-auto"
+                className="w-full max-w-lg rounded-lg overflow-hidden flex flex-col pointer-events-auto"
                 style={{
                   background: "var(--bg-surface)",
                   border: "1px solid var(--border)",

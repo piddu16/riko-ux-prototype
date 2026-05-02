@@ -285,7 +285,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4 }}
-              className="rounded-xl p-4"
+              className="rounded-md p-4"
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border)",
@@ -360,7 +360,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="hidden md:block rounded-xl p-4"
+              className="hidden md:block rounded-md p-4"
               style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
             >
               <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
@@ -463,7 +463,7 @@ export default function OutstandingsScreen() {
 
             {/* Data Table (desktop) / Card List (mobile) */}
             <div
-              className="rounded-xl overflow-hidden relative"
+              className="rounded-md overflow-hidden relative"
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border)",
@@ -766,7 +766,7 @@ export default function OutstandingsScreen() {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
-                    className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl text-[12px] font-semibold"
+                    className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-md text-[12px] font-semibold"
                     style={{
                       background: "var(--text-1)",
                       color: "var(--bg-primary)",
@@ -906,7 +906,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="hidden md:block rounded-xl p-4"
+              className="hidden md:block rounded-md p-4"
               style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
             >
               <p className="text-xs font-semibold mb-1" style={{ color: "var(--text-2)" }}>
@@ -948,7 +948,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4, delay: 0.15 }}
-              className="hidden md:block rounded-xl p-4"
+              className="hidden md:block rounded-md p-4"
               style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
             >
               <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
@@ -1020,7 +1020,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4 }}
-              className="rounded-xl px-4 py-3 text-xs leading-relaxed"
+              className="rounded-md px-4 py-3 text-xs leading-relaxed"
               style={{
                 background:
                   "color-mix(in srgb, var(--red) 10%, transparent)",
@@ -1048,7 +1048,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4 }}
-              className="rounded-xl p-4"
+              className="rounded-md p-4"
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border)",
@@ -1138,7 +1138,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4, delay: 0.1 }}
-              className="hidden md:block rounded-xl p-4"
+              className="hidden md:block rounded-md p-4"
               style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
             >
               <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
@@ -1192,7 +1192,7 @@ export default function OutstandingsScreen() {
 
             {/* Payables table (desktop) / cards (mobile) */}
             <div
-              className="rounded-xl overflow-hidden relative"
+              className="rounded-md overflow-hidden relative"
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border)",
@@ -1484,7 +1484,7 @@ export default function OutstandingsScreen() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: 0.4 }}
-              className="rounded-xl px-4 py-3 text-xs leading-relaxed"
+              className="rounded-md px-4 py-3 text-xs leading-relaxed"
               style={{
                 background: "color-mix(in srgb, var(--red) 12%, transparent)",
                 border: "1px solid color-mix(in srgb, var(--red) 25%, transparent)",

@@ -170,7 +170,7 @@ export function DaybookScreen() {
             // we dispatch a CustomEvent picked up by page.tsx listener.
             window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "entries" }));
           }}
-          className="flex items-center gap-2.5 px-3.5 py-2.5 mb-4 rounded-xl cursor-pointer transition-opacity hover:opacity-90"
+          className="flex items-center gap-2.5 px-3.5 py-2.5 mb-4 rounded-md cursor-pointer transition-opacity hover:opacity-90"
           style={{
             background: "color-mix(in srgb, var(--yellow) 8%, transparent)",
             border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
@@ -227,7 +227,7 @@ export function DaybookScreen() {
 
       {/* Summary row */}
       <div
-        className="flex flex-wrap gap-4 rounded-xl px-4 py-3 mb-4 text-xs font-medium"
+        className="flex flex-wrap gap-4 rounded-md px-4 py-3 mb-4 text-xs font-medium"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <span style={{ color: "var(--text-3)" }}>
@@ -300,7 +300,7 @@ export function DaybookScreen() {
         ].map((card) => (
           <div
             key={card.label}
-            className="rounded-xl overflow-hidden"
+            className="rounded-md overflow-hidden"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <div className="h-1" style={{ background: card.accent }} />
@@ -325,7 +325,7 @@ export function DaybookScreen() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="hidden md:block rounded-xl p-4 mb-4"
+        className="hidden md:block rounded-md p-4 mb-4"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
@@ -367,7 +367,7 @@ export function DaybookScreen() {
 
       {/* ── Desktop table ── */}
       <div
-        className="hidden sm:block rounded-xl overflow-hidden"
+        className="hidden sm:block rounded-md overflow-hidden"
         style={{ border: "1px solid var(--border)" }}
       >
         <table className="w-full text-xs">

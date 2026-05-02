@@ -239,7 +239,7 @@ export function BankReconScreen() {
           {summaryCards.map((card) => (
             <div
               key={card.label}
-              className="rounded-xl overflow-hidden"
+              className="rounded-md overflow-hidden"
               style={{
                 background: card.urgent
                   ? "color-mix(in srgb, var(--red) 8%, var(--bg-surface))"
@@ -280,7 +280,7 @@ export function BankReconScreen() {
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl overflow-hidden"
+          className="rounded-md overflow-hidden"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -635,7 +635,7 @@ export function BankReconScreen() {
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
-          className="rounded-xl"
+          className="rounded-md"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -663,7 +663,7 @@ export function BankReconScreen() {
                 e.preventDefault();
                 setDragging(false);
               }}
-              className="flex flex-col items-center justify-center gap-2 py-8 px-4 rounded-xl text-center cursor-pointer transition-colors"
+              className="flex flex-col items-center justify-center gap-2 py-8 px-4 rounded-md text-center cursor-pointer transition-colors"
               style={{
                 background: dragging
                   ? "color-mix(in srgb, var(--orange) 8%, var(--bg-secondary))"

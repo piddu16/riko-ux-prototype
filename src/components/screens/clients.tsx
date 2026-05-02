@@ -308,7 +308,7 @@ export function ClientsScreen() {
 
         {filtered.length === 0 && (
           <div
-            className="rounded-xl p-8 text-center"
+            className="rounded-md p-8 text-center"
             style={{ background: "var(--bg-surface)", border: "1px dashed var(--border)" }}
           >
             <p className="text-sm font-medium" style={{ color: "var(--text-3)" }}>
@@ -349,7 +349,7 @@ function SummaryTile({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.35 }}
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{
         background: tinted
           ? `color-mix(in srgb, ${accent} 10%, var(--bg-surface))`
@@ -394,7 +394,7 @@ function ComplianceStrip({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.35 }}
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="flex items-center justify-between mb-3">
@@ -482,7 +482,7 @@ function IndustryMixCard({ mix }: { mix: ReturnType<typeof computeIndustryMix> }
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <p className="text-[10px] uppercase tracking-wider font-bold mb-3" style={{ color: "var(--text-4)" }}>
@@ -634,7 +634,7 @@ function ClientCard({
       viewport={{ once: true, amount: 0.1 }}
       transition={{ duration: 0.35, delay: Math.min(index * 0.03, 0.3) }}
       whileHover={{ y: -2 }}
-      className="relative rounded-xl overflow-hidden cursor-pointer transition-shadow hover:shadow-xl"
+      className="relative rounded-md overflow-hidden cursor-pointer transition-shadow hover:shadow-xl"
       style={{
         background: "var(--bg-surface)",
         border: `1px solid ${isSelected ? "color-mix(in srgb, var(--green) 40%, transparent)" : "var(--border)"}`,
@@ -838,7 +838,7 @@ function ClientTable({
 }) {
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="overflow-x-auto">
@@ -975,7 +975,7 @@ function ClientCalendarView({
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <p className="text-sm font-bold mb-3" style={{ color: "var(--text-1)" }}>
@@ -1032,7 +1032,7 @@ function BulkActionBar({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.4 }}
-      className="sticky bottom-4 rounded-xl p-3 md:p-4"
+      className="sticky bottom-4 rounded-md p-3 md:p-4"
       style={{
         background: hasSelection
           ? "color-mix(in srgb, var(--green) 8%, var(--bg-surface))"

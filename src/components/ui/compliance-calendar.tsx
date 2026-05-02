@@ -25,7 +25,7 @@ const severityIcon: Record<string, React.ReactNode> = {
 export function ComplianceCalendar() {
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",

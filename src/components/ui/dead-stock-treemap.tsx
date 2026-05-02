@@ -211,7 +211,7 @@ export function DeadStockTreemap({ height = 420, onAsk }: DeadStockTreemapProps)
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">

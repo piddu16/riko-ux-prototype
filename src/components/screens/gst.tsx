@@ -137,7 +137,7 @@ function FilingTrackerCard() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.4, delay: 0.08 }}
-      className="rounded-xl p-4 mb-5"
+      className="rounded-md p-4 mb-5"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -252,7 +252,7 @@ function TriageCard({
 
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{
         background: "var(--bg-surface)",
         border: `1px solid color-mix(in srgb, ${borderColor} 35%, var(--border))`,
@@ -440,7 +440,7 @@ function PhaseCard({ phase, label, status, weeks, items, blocker }: PhaseCardPro
   const color = phaseColor[status];
   return (
     <div
-      className="rounded-xl p-3 flex-shrink-0"
+      className="rounded-md p-3 flex-shrink-0"
       style={{
         width: 220,
         background: "var(--bg-surface)",
@@ -633,7 +633,7 @@ export function GstScreen() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.35, delay: 0.05 }}
-        className="rounded-xl px-4 py-2.5 mb-5 flex flex-wrap items-center justify-between gap-3"
+        className="rounded-md px-4 py-2.5 mb-5 flex flex-wrap items-center justify-between gap-3"
         style={{
           background: "color-mix(in srgb, var(--blue) 8%, var(--bg-surface))",
           border: "1px solid color-mix(in srgb, var(--blue) 25%, var(--border))",
@@ -686,7 +686,7 @@ export function GstScreen() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.2 }}
         transition={{ duration: 0.4, delay: 0.05 }}
-        className="rounded-xl p-4 mb-5"
+        className="rounded-md p-4 mb-5"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
@@ -910,7 +910,7 @@ export function GstScreen() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="rounded-xl p-3 overflow-hidden"
+                className="rounded-md p-3 overflow-hidden"
                 style={{
                   background: "var(--bg-surface)",
                   border: `1px solid color-mix(in srgb, ${s.color} 25%, var(--border))`,
@@ -1050,7 +1050,7 @@ export function GstScreen() {
           {/* Invoice-level table (Invoice view only) */}
           {reconView === "invoice" && (
           <div
-            className="rounded-xl overflow-hidden"
+            className="rounded-md overflow-hidden"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -1265,7 +1265,7 @@ export function GstScreen() {
         >
           {/* Header card */}
           <div
-            className="rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"
+            className="rounded-md p-4 flex flex-wrap items-center justify-between gap-3"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -1304,7 +1304,7 @@ export function GstScreen() {
 
           {/* Progress stepper */}
           <div
-            className="rounded-xl p-4"
+            className="rounded-md p-4"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -1335,7 +1335,7 @@ export function GstScreen() {
 
           {/* Summary card */}
           <div
-            className="rounded-xl p-4"
+            className="rounded-md p-4"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -1517,7 +1517,7 @@ export function GstScreen() {
         >
           {/* Header card */}
           <div
-            className="rounded-xl p-4 flex flex-wrap items-center justify-between gap-3"
+            className="rounded-md p-4 flex flex-wrap items-center justify-between gap-3"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -1556,7 +1556,7 @@ export function GstScreen() {
 
           {/* Progress stepper */}
           <div
-            className="rounded-xl p-4"
+            className="rounded-md p-4"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -1588,7 +1588,7 @@ export function GstScreen() {
 
           {/* Tax calculation card */}
           <div
-            className="rounded-xl overflow-hidden"
+            className="rounded-md overflow-hidden"
             style={{
               background: "#fff",
               border: "1px solid #e5e7eb",
@@ -1832,7 +1832,7 @@ export function GstScreen() {
 
           {/* Table */}
           <div
-            className="rounded-xl overflow-hidden"
+            className="rounded-md overflow-hidden"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -2021,7 +2021,7 @@ function VendorReconTable({
 }) {
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="overflow-x-auto">
@@ -2131,7 +2131,7 @@ function MonthReconTable({
   // Current month (last entry) = benchmark for diff column
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       <div className="overflow-x-auto">

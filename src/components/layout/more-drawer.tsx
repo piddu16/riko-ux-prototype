@@ -120,7 +120,7 @@ export function MoreDrawer({ open, onClose, activeTab, onTabChange }: MoreDrawer
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.03 }}
-                    className="flex flex-col items-start p-3 rounded-xl cursor-pointer transition-colors"
+                    className="flex flex-col items-start p-3 rounded-md cursor-pointer transition-colors"
                     style={{
                       background: isActive
                         ? "color-mix(in srgb, var(--green) 12%, var(--bg-surface))"

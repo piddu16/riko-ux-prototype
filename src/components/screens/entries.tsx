@@ -165,7 +165,7 @@ export function EntriesScreen() {
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
           onClick={() => setActiveTab("pending")}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left cursor-pointer transition-opacity hover:opacity-90"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-left cursor-pointer transition-opacity hover:opacity-90"
           style={{
             background: "color-mix(in srgb, var(--yellow) 10%, transparent)",
             border: "1px solid color-mix(in srgb, var(--yellow) 30%, transparent)",
@@ -283,7 +283,7 @@ export function EntriesScreen() {
       <div className="space-y-2">
         {filteredEntries.length === 0 ? (
           <div
-            className="rounded-xl p-8 text-center"
+            className="rounded-md p-8 text-center"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <FileText size={24} className="mx-auto mb-2" style={{ color: "var(--text-4)" }} />
@@ -340,7 +340,7 @@ function EntryRow({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left cursor-pointer transition-colors hover:opacity-90"
+      className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-left cursor-pointer transition-colors hover:opacity-90"
       style={{
         background: "var(--bg-surface)",
         border: `1px solid ${canApprove ? "color-mix(in srgb, var(--yellow) 30%, transparent)" : "var(--border)"}`,

@@ -130,7 +130,7 @@ export function MessageTemplateModal({
             className="fixed inset-0 z-[90] flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="w-full max-w-2xl rounded-2xl overflow-hidden pointer-events-auto flex flex-col"
+              className="w-full max-w-2xl rounded-lg overflow-hidden pointer-events-auto flex flex-col"
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border)",
@@ -236,7 +236,7 @@ export function MessageTemplateModal({
                   Preview
                 </p>
                 <div
-                  className="rounded-xl p-4 text-[12px] whitespace-pre-wrap"
+                  className="rounded-md p-4 text-[12px] whitespace-pre-wrap"
                   style={{
                     background: "var(--bg-primary)",
                     border: "1px solid var(--border)",

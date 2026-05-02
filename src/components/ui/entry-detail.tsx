@@ -119,7 +119,7 @@ export function EntryDetail({
 
       {/* Summary card */}
       <div
-        className="rounded-2xl p-5"
+        className="rounded-lg p-5"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
@@ -291,7 +291,7 @@ export function EntryDetail({
 
       {/* Ledger impact */}
       <div
-        className="rounded-2xl p-5"
+        className="rounded-lg p-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -383,7 +383,7 @@ export function EntryDetail({
       {/* Line items (for sales/purchase) */}
       {entry.items && entry.items.length > 0 && (
         <div
-          className="rounded-2xl p-5"
+          className="rounded-lg p-5"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <h2 className="text-sm font-bold mb-3" style={{ color: "var(--text-1)" }}>
@@ -448,7 +448,7 @@ export function EntryDetail({
 
       {/* History / audit trail */}
       <div
-        className="rounded-2xl p-5"
+        className="rounded-lg p-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -512,7 +512,7 @@ export function EntryDetail({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto z-50 rounded-2xl p-5"
+              className="fixed inset-x-4 top-1/2 -translate-y-1/2 max-w-md mx-auto z-50 rounded-lg p-5"
               style={{
                 background: "var(--bg-secondary)",
                 border: "1px solid var(--border)",

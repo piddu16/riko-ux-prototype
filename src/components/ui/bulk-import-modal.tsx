@@ -83,7 +83,7 @@ export function BulkImportModal({ open, onClose }: { open: boolean; onClose: () 
             className="fixed inset-0 z-[80] flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="w-full max-w-xl rounded-2xl overflow-hidden pointer-events-auto"
+              className="w-full max-w-xl rounded-lg overflow-hidden pointer-events-auto"
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border)",
@@ -207,7 +207,7 @@ function StepTemplate({ onContinue }: { onContinue: () => void }) {
       </div>
 
       <div
-        className="rounded-xl p-4 flex items-start gap-3"
+        className="rounded-md p-4 flex items-start gap-3"
         style={{
           background: "color-mix(in srgb, var(--blue) 8%, transparent)",
           border: "1px solid color-mix(in srgb, var(--blue) 20%, transparent)",
@@ -274,7 +274,7 @@ function StepUpload({
           if (f) onPickFile(f);
         }}
         onClick={() => inputRef.current?.click()}
-        className="rounded-xl py-10 flex flex-col items-center justify-center cursor-pointer transition-colors"
+        className="rounded-md py-10 flex flex-col items-center justify-center cursor-pointer transition-colors"
         style={{
           background: dragOver ? "color-mix(in srgb, var(--green) 8%, transparent)" : "var(--bg-primary)",
           border: `2px dashed ${dragOver ? "var(--green)" : "var(--border)"}`,

@@ -271,7 +271,7 @@ export function SalesScreen() {
 
       {/* Tab bar */}
       <div
-        className="flex gap-1 rounded-xl p-1 mb-5"
+        className="flex gap-1 rounded-md p-1 mb-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         {TABS.map((t) => (
@@ -299,7 +299,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.35 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <p
@@ -327,7 +327,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.35, delay: 0.1 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <div className="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
@@ -366,7 +366,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.35, delay: 0.15 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
@@ -425,7 +425,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.35, delay: 0.17 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <div className="flex items-baseline justify-between gap-2 mb-4 flex-wrap">
@@ -503,7 +503,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.4, delay: 0.2 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             {/* Header row */}
@@ -692,7 +692,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.35 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-2)" }}>
@@ -877,7 +877,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.35, delay: 0.05 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <div className="flex items-baseline justify-between gap-2 mb-3">
@@ -897,7 +897,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.35, delay: 0.1 }}
-            className="rounded-xl p-4 mb-5"
+            className="rounded-md p-4 mb-5"
             style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
           >
             <div className="flex items-baseline justify-between gap-2 mb-3">
@@ -917,7 +917,7 @@ export function SalesScreen() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ duration: 0.35, delay: 0.15 }}
-            className="rounded-xl px-4 py-3 text-xs leading-relaxed"
+            className="rounded-md px-4 py-3 text-xs leading-relaxed"
             style={{
               background: "color-mix(in srgb, var(--yellow) 12%, transparent)",
               border: "1px solid color-mix(in srgb, var(--yellow) 25%, transparent)",
@@ -968,7 +968,7 @@ function ProductsTab() {
             TOP_SKUS_BY_REVENUE.reduce((s, r) => s + r.marginPct * r.revenue, 0) / totalRev;
           return (
             <>
-              <div className="rounded-xl p-3" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+              <div className="rounded-md p-3" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
                 <p className="text-[10px] uppercase tracking-wider font-medium mb-1" style={{ color: "var(--text-4)" }}>
                   Active SKUs
                 </p>
@@ -979,7 +979,7 @@ function ProductsTab() {
                   with sales FY25
                 </p>
               </div>
-              <div className="rounded-xl p-3" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+              <div className="rounded-md p-3" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
                 <p className="text-[10px] uppercase tracking-wider font-medium mb-1" style={{ color: "var(--text-4)" }}>
                   Units sold
                 </p>
@@ -990,7 +990,7 @@ function ProductsTab() {
                   SUM(sales qty)
                 </p>
               </div>
-              <div className="rounded-xl p-3" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
+              <div className="rounded-md p-3" style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}>
                 <p className="text-[10px] uppercase tracking-wider font-medium mb-1" style={{ color: "var(--text-4)" }}>
                   Avg margin
                 </p>
@@ -1018,7 +1018,7 @@ function ProductsTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.35, delay: 0.05 }}
-        className="rounded-xl p-4 mb-5"
+        className="rounded-md p-4 mb-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
@@ -1097,7 +1097,7 @@ function ProductsTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.35, delay: 0.1 }}
-        className="rounded-xl p-4 mb-5"
+        className="rounded-md p-4 mb-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
@@ -1144,7 +1144,7 @@ function ProductsTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.35, delay: 0.15 }}
-        className="rounded-xl p-4 mb-5"
+        className="rounded-md p-4 mb-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
@@ -1232,7 +1232,7 @@ function InsightsTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.35 }}
-        className="rounded-xl p-4 mb-5"
+        className="rounded-md p-4 mb-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
@@ -1320,7 +1320,7 @@ function InsightsTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.35, delay: 0.05 }}
-        className="rounded-xl p-4 mb-5"
+        className="rounded-md p-4 mb-5"
         style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
       >
         <div className="flex items-baseline justify-between gap-2 mb-3 flex-wrap">
@@ -1376,7 +1376,7 @@ function InsightsTab() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.35, delay: 0.1 }}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-2)" }}>
@@ -1411,7 +1411,7 @@ function InsightsTab() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.35, delay: 0.15 }}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-2)" }}>
@@ -1456,7 +1456,7 @@ function InsightsTab() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.35, delay: 0.2 }}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-2)" }}>
@@ -1488,7 +1488,7 @@ function InsightsTab() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.1 }}
           transition={{ duration: 0.35, delay: 0.25 }}
-          className="rounded-xl p-4"
+          className="rounded-md p-4"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
         >
           <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-2)" }}>

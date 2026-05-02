@@ -682,7 +682,7 @@ export function ReportsScreen() {
           return (
             <div
               key={report.id}
-              className="rounded-xl p-4 transition-all"
+              className="rounded-md p-4 transition-all"
               style={{
                 background: "var(--bg-surface)",
                 border: isActive
@@ -767,7 +767,7 @@ export function ReportsScreen() {
 
           {/* PDF-like preview card — forced light background */}
           <div
-            className="rounded-xl p-6 shadow-lg"
+            className="rounded-md p-6 shadow-lg"
             style={{
               background: "#ffffff",
               border: "1px solid #e5e7eb",
@@ -851,7 +851,7 @@ export function ReportsScreen() {
           </p>
         </div>
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-md overflow-hidden"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -912,7 +912,7 @@ export function ReportsScreen() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 rounded-xl shadow-2xl"
+            className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50 rounded-md shadow-2xl"
             style={{
               background: "var(--bg-secondary)",
               border: "1px solid var(--border)",

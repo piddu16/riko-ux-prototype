@@ -203,7 +203,7 @@ function SectionCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.1 }}
       transition={{ duration: 0.4 }}
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
@@ -437,7 +437,7 @@ function BillingTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.4 }}
-        className="rounded-xl overflow-hidden"
+        className="rounded-md overflow-hidden"
         style={{
           background:
             "linear-gradient(135deg, color-mix(in srgb, var(--purple) 10%, var(--bg-surface)) 0%, var(--bg-surface) 100%)",
@@ -666,7 +666,7 @@ function IntegrationsTab() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ duration: 0.35, delay: i * 0.04 }}
-              className="rounded-xl p-4 flex flex-col gap-3"
+              className="rounded-md p-4 flex flex-col gap-3"
               style={{
                 background: intg.connected
                   ? `color-mix(in srgb, ${intg.color} 8%, var(--bg-secondary))`
@@ -1239,7 +1239,7 @@ function TeamTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.2 }}
         transition={{ duration: 0.4 }}
-        className="rounded-xl overflow-hidden"
+        className="rounded-md overflow-hidden"
         style={{
           background:
             "linear-gradient(135deg, color-mix(in srgb, var(--green) 8%, var(--bg-surface)) 0%, var(--bg-surface) 100%)",
@@ -1424,7 +1424,7 @@ function TeamTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.4 }}
-        className="rounded-xl overflow-hidden"
+        className="rounded-md overflow-hidden"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
@@ -1497,7 +1497,7 @@ function TeamTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.4 }}
-        className="rounded-xl p-5"
+        className="rounded-md p-5"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
@@ -1542,7 +1542,7 @@ function TeamTab() {
                 viewport={{ once: true, amount: 0.2 }}
                 transition={{ duration: 0.35 }}
                 whileHover={{ y: -2 }}
-                className="rounded-xl p-3 flex flex-col gap-2 transition-shadow hover:shadow-lg"
+                className="rounded-md p-3 flex flex-col gap-2 transition-shadow hover:shadow-lg"
                 style={{
                   background:
                     "color-mix(in srgb, var(--bg-secondary) 80%, transparent)",
@@ -1609,7 +1609,7 @@ function TeamTab() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.1 }}
         transition={{ duration: 0.4 }}
-        className="rounded-xl overflow-hidden"
+        className="rounded-md overflow-hidden"
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
@@ -1777,7 +1777,7 @@ function TeamTab() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 4 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className="w-full max-w-md rounded-xl overflow-hidden"
+              className="w-full max-w-md rounded-md overflow-hidden"
               style={{
                 background: "var(--bg-surface)",
                 border: "1px solid var(--border)",
@@ -1945,7 +1945,7 @@ function BulkInviteModal({ open, onClose, onSent }: BulkInviteModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 4 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="w-full max-w-2xl rounded-xl overflow-hidden flex flex-col"
+            className="w-full max-w-2xl rounded-md overflow-hidden flex flex-col"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border)",
@@ -2011,7 +2011,7 @@ function BulkInviteModal({ open, onClose, onSent }: BulkInviteModalProps) {
                   <button
                     type="button"
                     onClick={() => setDropped(true)}
-                    className="w-full rounded-xl flex flex-col items-center justify-center py-10 px-4 cursor-pointer transition-colors"
+                    className="w-full rounded-md flex flex-col items-center justify-center py-10 px-4 cursor-pointer transition-colors"
                     style={{
                       background: "var(--bg-secondary)",
                       border: "2px dashed color-mix(in srgb, var(--green) 35%, var(--border))",
@@ -2239,7 +2239,7 @@ function StatCard({ title, value, icon, accent, extra }: StatCardProps) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
@@ -3004,7 +3004,7 @@ function RemindersTab() {
       {/* Sticky sub-nav (desktop) */}
       <aside className="hidden lg:block flex-shrink-0" style={{ width: 180 }}>
         <nav
-          className="sticky top-5 rounded-xl p-2 flex flex-col gap-0.5"
+          className="sticky top-5 rounded-md p-2 flex flex-col gap-0.5"
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
@@ -3083,7 +3083,7 @@ function RemindersTab() {
 
         {/* Save bar */}
         <div
-          className="sticky bottom-0 flex items-center justify-between gap-3 py-3 px-4 rounded-xl mt-2"
+          className="sticky bottom-0 flex items-center justify-between gap-3 py-3 px-4 rounded-md mt-2"
           style={{
             background: "color-mix(in srgb, var(--bg-surface) 92%, transparent)",
             backdropFilter: "blur(8px)",
@@ -3188,7 +3188,7 @@ function LiveTile({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.3 }}
-      className="rounded-xl p-4 flex flex-col gap-2"
+      className="rounded-md p-4 flex flex-col gap-2"
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
@@ -3284,7 +3284,7 @@ function TemplateCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.25 }}
-      className="rounded-xl p-4 flex flex-col gap-3"
+      className="rounded-md p-4 flex flex-col gap-3"
       style={{
         background: "var(--bg-secondary)",
         border: `1px solid ${meta.color}40`,
@@ -3567,7 +3567,7 @@ function ExclusionList({
 }) {
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
     >
       <div className="flex items-center justify-between mb-1">
@@ -3975,7 +3975,7 @@ function ChannelAccordion({
   const [open, setOpen] = useState(!!defaultOpen);
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-md overflow-hidden"
       style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
     >
       <button
@@ -4156,7 +4156,7 @@ function AnalyticsSection() {
             Daily sends by tier
           </p>
           <div
-            className="rounded-xl p-3 flex items-end gap-1"
+            className="rounded-md p-3 flex items-end gap-1"
             style={{ background: "var(--bg-hover)", border: "1px solid var(--border)", minHeight: 140 }}
           >
             {a.dailySends.map((d) => {

@@ -100,7 +100,7 @@ export function ChatBarChart({
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       {title && (
@@ -323,7 +323,7 @@ export function ChatLineChart({
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       {title && (
@@ -464,7 +464,7 @@ export function ChatDonut({
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       {title && (
@@ -504,7 +504,7 @@ export function ChatStackedBar({
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       {title && (
@@ -604,7 +604,7 @@ export function ChatWaterfall({
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       {title && (
@@ -714,7 +714,7 @@ export function ChatForecastChart({
 
   return (
     <div
-      className="rounded-xl p-4"
+      className="rounded-md p-4"
       style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
     >
       {title && (
