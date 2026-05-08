@@ -3739,12 +3739,18 @@ export function computeAvgTimeToPayDays(): number | null {
   return totalDays / paid.length;
 }
 
-/** Top reply-rate channel — drives the "Reply rate" tile's subtitle. */
+/** Top reply-rate channel for AUTOMATION — drives the "Reply rate"
+ *  tile's subtitle. WhatsApp is excluded because automation doesn't
+ *  route through it (manual sends only via WAMe in Outstanding).
+ *  Quoting WhatsApp's reply rate here would mislead users into
+ *  thinking they could lean on WA for chase-cadence wins. */
 export function bestReplyChannel(): { channel: ReminderChannel; pct: number } {
   const map = REMINDER_ANALYTICS_30D.replyRateByChannel;
-  let best: ReminderChannel = "whatsapp";
+  const AUTO_CHANNELS: ReminderChannel[] = ["email", "sms"];
+  let best: ReminderChannel = "email";
   let bestPct = 0;
-  for (const [ch, pct] of Object.entries(map) as Array<[ReminderChannel, number]>) {
+  for (const ch of AUTO_CHANNELS) {
+    const pct = map[ch];
     if (pct > bestPct) { best = ch; bestPct = pct; }
   }
   return { channel: best, pct: bestPct };
@@ -3971,7 +3977,11 @@ export function buildReminderMonitor(
       nextAt,
       triggerReason,
       status,
-      channels: settings?.channels ?? ["whatsapp"],
+      // Fallback to email — automation doesn't route through WhatsApp.
+      // Parties without REMINDER_SETTINGS still appear in the Monitor
+      // (e.g. Website Debtors with no contact), so a sensible auto
+      // channel default keeps the dot column honest.
+      channels: settings?.channels ?? ["email"],
       lastSentLabel: lastRemindedLabel(r.name),
       openRate,
       attributedPayment: history.some((h) => !!h.attributedPaymentAmount),

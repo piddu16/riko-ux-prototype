@@ -3653,30 +3653,42 @@ function DefaultsSection({
               rules={rules}
               update={update}
             />
-            {/* WhatsApp shown disabled — explains why it's not in the auto picker */}
-            <div
-              className="rounded-md px-3 py-2 flex items-center gap-2 cursor-not-allowed"
+            {/* WhatsApp chip — clickable, jumps to Outstanding so users
+                 can actually GO to the manual surface in one click instead
+                 of reading prose about where it lives. */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "outstanding" }))}
+              className="rounded-md px-3 py-2 flex items-center gap-2 cursor-pointer transition-colors"
               style={{
                 background: "var(--bg-primary)",
                 border: "1px dashed var(--border)",
-                opacity: 0.6,
               }}
-              title="WhatsApp reminders are manual — use the Remind button in Outstanding"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderStyle = "solid";
+                e.currentTarget.style.borderColor = "var(--orange)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderStyle = "dashed";
+                e.currentTarget.style.borderColor = "var(--border)";
+              }}
+              title="Go to Outstanding — send WhatsApp reminders manually from each party row"
             >
-              <MessageCircle size={13} style={{ color: "var(--text-4)" }} />
-              <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-3)" }}>
+              <MessageCircle size={13} style={{ color: "var(--text-3)" }} />
+              <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-2)" }}>
                 WhatsApp
               </span>
               <span
-                className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded flex items-center gap-1"
                 style={{
                   background: "color-mix(in srgb, var(--orange) 14%, transparent)",
                   color: "var(--orange)",
                 }}
               >
                 Manual only
+                <ArrowRight size={10} />
               </span>
-            </div>
+            </button>
           </div>
           <p className="text-[10px] mt-1.5" style={{ color: "var(--text-4)" }}>
             <span aria-hidden>↳</span> WhatsApp via WAMe (wa.me deep-link) — sent from{" "}
