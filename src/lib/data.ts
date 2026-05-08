@@ -3064,7 +3064,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Mehra Trading Co",
     enabled: true,
     frequencyDays: 7,
-    channels: ["whatsapp", "email"],
+    channels: ["email", "sms"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 2,
@@ -3075,7 +3075,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "FreshKart Wholesale Pvt Ltd",
     enabled: true,
     frequencyDays: 7,
-    channels: ["whatsapp"],
+    channels: ["email"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 0,
@@ -3086,7 +3086,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Pune Pharmacy Distributors",
     enabled: true,
     frequencyDays: 14,
-    channels: ["whatsapp", "email"],
+    channels: ["email", "sms"],
     tone: "firm",
     maxReminders: 5,
     sendsSoFar: 4,
@@ -3097,7 +3097,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Surat Apparel Hub",
     enabled: true,
     frequencyDays: 7,
-    channels: ["whatsapp"],
+    channels: ["email"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 1,
@@ -3109,7 +3109,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Nykaa E-Retail Pvt Ltd",
     enabled: true,
     frequencyDays: 7,
-    channels: ["whatsapp", "email"],
+    channels: ["email", "sms"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 4,
@@ -3120,7 +3120,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "One97 Communications (Paytm)",
     enabled: true,
     frequencyDays: 14,
-    channels: ["whatsapp"],
+    channels: ["email"],
     tone: "firm",
     maxReminders: 5,
     sendsSoFar: 3,
@@ -3140,7 +3140,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Bigfoot/Shiprocket",
     enabled: true,
     frequencyDays: 7,
-    channels: ["whatsapp", "email"],
+    channels: ["email", "sms"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 2,
@@ -3150,7 +3150,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Prodsol Biotech Pvt Ltd",
     enabled: false, // opted out — respect STOP reply
     frequencyDays: 7,
-    channels: ["whatsapp"],
+    channels: ["email"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 2,
@@ -3159,7 +3159,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Buy More (Counfreedise)",
     enabled: true,
     frequencyDays: 14,
-    channels: ["whatsapp"],
+    channels: ["email"],
     tone: "standard",
     maxReminders: 4,
     sendsSoFar: 1,
@@ -3169,7 +3169,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "Nykaa E-Retail (2)",
     enabled: true,
     frequencyDays: 7,
-    channels: ["whatsapp"],
+    channels: ["email"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 2,
@@ -3179,7 +3179,7 @@ export const REMINDER_SETTINGS: ReminderSettings[] = [
     partyName: "NYKAA Mumbai 2",
     enabled: true,
     frequencyDays: 7,
-    channels: ["whatsapp"],
+    channels: ["email"],
     tone: "auto",
     maxReminders: 5,
     sendsSoFar: 1,
@@ -3439,18 +3439,31 @@ export interface ReminderAutomationRules {
   partialPaymentThreshold: number;
 
   // ── WABA approval status per tone ─────────────────────────────
-  /** Per-tone approval state at MSG91 / Meta. Automated WA sends
+  /** Per-tone approval state at Meta (via WAMe). Automated WA sends
    *  require "approved" templates; others fall back to email. */
   wabaApproved: boolean;
   wabaApprovalByTone: Record<ReminderTone, "approved" | "pending" | "rejected">;
 
   // ── Channel-specific health ───────────────────────────────────
-  /** MSG91 credit balance in rupees. Drops as reminders send. */
+  // WAMe — WhatsApp Business API provider, separate from MSG91 to
+  // dodge high-volume ban risk on MSG91's WhatsApp BSP.
+  /** WAMe credit balance. Drops as WhatsApp messages send. */
+  wameCredits: number;
+  /** Cost per WhatsApp message via WAMe (template rate). */
+  wameCostPerMessage: number;
+  /** WAMe daily cap to keep ban risk low — auto-throttle hits this. */
+  wameDailyCap: number;
+  /** Phone number ID registered with WAMe → Meta WABA. */
+  wameSenderNumber: string;
+
+  // MSG91 — handles email + SMS only (NOT WhatsApp).
+  /** MSG91 credit balance — covers email + SMS pool. */
   msg91Credits: number;
-  /** Cost per WA message in rupees (MSG91 utility template rate). */
+  /** Cost per email/SMS via MSG91. */
   msg91CostPerMessage: number;
   /** SMS cost per message (DLT + carrier). */
   smsCostPerMessage: number;
+
   /** Display name attached to outbound emails. */
   emailFromAddress: string;
   emailReplyTo: string;
@@ -3506,7 +3519,13 @@ export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
     final: "pending",
   },
   // Channel health
-  msg91Credits: 14_20, // credits, not rupees — 1 credit ≈ ₹0.20
+  // WAMe — WhatsApp only, kept small + throttled to dodge bans
+  wameCredits: 980,                  // 980 messages remaining
+  wameCostPerMessage: 0.45,          // utility template rate via WAMe (slightly higher than MSG91)
+  wameDailyCap: 250,                 // self-imposed cap; well below WAMe's per-tier limits
+  wameSenderNumber: "+91 98765 43210",
+  // MSG91 — email + SMS pool (NOT WhatsApp)
+  msg91Credits: 1_420,
   msg91CostPerMessage: 0.2,
   smsCostPerMessage: 0.18,
   emailFromAddress: "yogesh@bandrasoap.in",
@@ -3828,11 +3847,14 @@ export interface TemplateApprovalMeta {
   pendingRevisionBody?: string;
 }
 
-/** Per-channel reviewer + SLA — same across templates. */
-export const TEMPLATE_REVIEWERS: Record<ReminderChannel, { reviewer: string; sla: string }> = {
-  whatsapp: { reviewer: "Meta WABA (via MSG91)", sla: "24–48 hours" },
-  email:    { reviewer: "Resend domain auth",    sla: "Instant (already verified)" },
-  sms:      { reviewer: "TRAI DLT registry",     sla: "3–5 business days" },
+/** Per-channel reviewer + provider + SLA. WhatsApp routes through WAMe
+ *  (a WhatsApp Business API provider) — kept separate from MSG91 because
+ *  high-volume reminder sends through MSG91's WhatsApp BSP carry a real
+ *  ban risk. MSG91 handles email + SMS where deliverability is calmer. */
+export const TEMPLATE_REVIEWERS: Record<ReminderChannel, { reviewer: string; provider: string; sla: string }> = {
+  whatsapp: { reviewer: "Meta WABA",       provider: "WAMe",   sla: "24–48 hours" },
+  email:    { reviewer: "Resend",          provider: "MSG91",  sla: "Instant (domain verified)" },
+  sms:      { reviewer: "TRAI DLT",        provider: "MSG91",  sla: "3–5 business days" },
 };
 
 /** Map: `${tone}-${channel}` → approval meta. Seed mixes statuses so

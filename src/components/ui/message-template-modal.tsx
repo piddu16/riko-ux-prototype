@@ -249,7 +249,7 @@ export function MessageTemplateModal({
                 </div>
                 <p className="text-[10px] mt-2" style={{ color: "var(--text-4)" }}>
                   Variables filled from this party&apos;s ledger. FY suffix stripped from company
-                  name. Actual send routes through your WABA-approved template on MSG91.
+                  name. Actual send routes through your WABA-approved template on WAMe.
                 </p>
               </div>
 

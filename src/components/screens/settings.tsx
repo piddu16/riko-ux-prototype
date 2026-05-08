@@ -702,7 +702,8 @@ function IntegrationsTab() {
   const integrations = [
     { id: "tally", name: "Tally Prime", desc: "Auto-sync vouchers every 2 hours", connected: true, color: "var(--blue)", logo: "T" },
     { id: "infini", name: "INFINI GST", desc: "GSTR-1, 3B, 2B filing APIs", connected: true, color: "var(--green)", logo: "G" },
-    { id: "msg91", name: "MSG91 WhatsApp", desc: "Transactional WhatsApp messages", connected: true, color: "#25D366", logo: "W" },
+    { id: "wame", name: "WAMe (WhatsApp)", desc: "Meta WABA — purpose-built for WhatsApp throughput", connected: true, color: "#25D366", logo: "W" },
+    { id: "msg91", name: "MSG91 (Email + SMS)", desc: "Resend email + TRAI DLT SMS", connected: true, color: "var(--blue)", logo: "M" },
     { id: "razorpay", name: "Razorpay", desc: "Payment gateway settlements", connected: false, color: "var(--purple)", logo: "R" },
     { id: "zoho", name: "Zoho Books", desc: "Alternative to Tally sync", connected: false, color: "var(--red)", logo: "Z" },
     { id: "hdfc", name: "HDFC Bank API", desc: "Auto-pull bank statements", connected: false, color: "var(--orange)", logo: "H" },
@@ -3626,19 +3627,18 @@ function DefaultsSection({
           </DefaultRow>
         </CollapsibleAdvanced>
 
-        {/* D. Channels */}
+        {/* D. Channels — automation routes through MSG91 (Email + SMS only).
+              WhatsApp is intentionally excluded from automation: MSG91's
+              WhatsApp BSP carries ban risk at our send volumes, and WAMe
+              (our manual provider) doesn't expose a programmatic send API.
+              For WhatsApp reminders, use Outstanding's per-party "Remind"
+              button — that opens a wa.me deep-link with the message
+              pre-filled so the owner can paste-and-send. */}
         <DefaultRow
           label="Channels"
-          help="WhatsApp first, email backstop, SMS for final tier."
+          help="Automation goes Email + SMS. WhatsApp is sent manually from Outstanding."
         >
           <div className="flex flex-wrap gap-2">
-            <ChannelToggle
-              channel="whatsapp"
-              label="WhatsApp"
-              replyRate={REMINDER_ANALYTICS_30D.replyRateByChannel.whatsapp}
-              rules={rules}
-              update={update}
-            />
             <ChannelToggle
               channel="email"
               label="Email"
@@ -3653,7 +3653,36 @@ function DefaultsSection({
               rules={rules}
               update={update}
             />
+            {/* WhatsApp shown disabled — explains why it's not in the auto picker */}
+            <div
+              className="rounded-md px-3 py-2 flex items-center gap-2 cursor-not-allowed"
+              style={{
+                background: "var(--bg-primary)",
+                border: "1px dashed var(--border)",
+                opacity: 0.6,
+              }}
+              title="WhatsApp reminders are manual — use the Remind button in Outstanding"
+            >
+              <MessageCircle size={13} style={{ color: "var(--text-4)" }} />
+              <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-3)" }}>
+                WhatsApp
+              </span>
+              <span
+                className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                style={{
+                  background: "color-mix(in srgb, var(--orange) 14%, transparent)",
+                  color: "var(--orange)",
+                }}
+              >
+                Manual only
+              </span>
+            </div>
           </div>
+          <p className="text-[10px] mt-1.5" style={{ color: "var(--text-4)" }}>
+            <span aria-hidden>↳</span> WhatsApp via WAMe (wa.me deep-link) — sent from{" "}
+            <span style={{ color: "var(--text-3)", fontWeight: 600 }}>Outstanding → Remind</span>{" "}
+            on each party row.
+          </p>
         </DefaultRow>
 
         {/* E. Who gets the reminder — multi-contact-aware strategy */}
@@ -5084,7 +5113,7 @@ function LiveStateHero({ rules }: { rules: ReminderAutomationRules }) {
           {state.optedOut > 0 && <>, {state.optedOut} opted out</>}
         </span>
         <span style={{ color: "var(--text-4)" }}>·</span>
-        <span>
+        <span title="Email + SMS credits via MSG91 — automation channel pool">
           <strong style={{ color: "var(--text-2)" }}>{rules.msg91Credits.toLocaleString("en-IN")}</strong> credits
           {" "}(~{Math.round(rules.msg91Credits / Math.max(REMINDER_ANALYTICS_30D.creditsBurnRate, 1))}d runway)
         </span>
@@ -5169,9 +5198,14 @@ const TONE_META: Record<ReminderTone, { label: string; bucket: string; color: st
    Template approval — providers gate template content, not us.
 
    Why this UX is read-first:
-   - WhatsApp: every template needs Meta WABA approval (24-48h via MSG91)
-   - SMS:     headers + body need TRAI DLT approval (3-5 business days)
-   - Email:   instant once domain is verified, free-form OK
+   - WhatsApp: every template needs Meta WABA approval (24-48h via WAMe).
+                We use WAMe (not MSG91) for WhatsApp specifically — high-
+                volume reminder sends through MSG91's WhatsApp BSP carry
+                ban risk that WAMe is hardened against.
+   - SMS:     headers + body need TRAI DLT approval (3-5 business days),
+                routed through MSG91.
+   - Email:   instant once Resend domain is verified (also via MSG91),
+                free-form OK.
 
    So we don't let users freely edit text. They request a revision
    which routes to the provider's review queue. Riko shows status,
@@ -5200,16 +5234,19 @@ function TemplatesSection({
         }}
       >
         <span style={{ color: "var(--blue)", fontWeight: 700 }}>How approval works:</span>
-        {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => {
+        {(["email", "sms"] as ReminderChannel[]).map((ch) => {
           const r = TEMPLATE_REVIEWERS[ch];
-          const label = ch === "whatsapp" ? "WhatsApp" : ch === "email" ? "Email" : "SMS";
+          const label = ch === "email" ? "Email" : "SMS";
           return (
             <span key={ch} className="inline-flex items-center gap-1">
               <strong style={{ color: "var(--text-2)" }}>{label}:</strong>
-              {r.reviewer} · ETA {r.sla}
+              {r.reviewer} via {r.provider} · ETA {r.sla}
             </span>
           );
         })}
+        <span style={{ color: "var(--text-4)" }}>
+          · WhatsApp templates aren&apos;t shown here — manual sends are free-form.
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -5286,9 +5323,11 @@ function TemplateCard({
         {previewText}
       </p>
 
-      {/* 3-channel approval strip — one row per channel with status + action */}
+      {/* Channel approval strip — Email + SMS only. WhatsApp is excluded
+           because automation never sends through WhatsApp; manual sends
+           from Outstanding are free-form and don't need template approval. */}
       <div className="flex flex-col gap-1.5">
-        {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => (
+        {(["email", "sms"] as ReminderChannel[]).map((ch) => (
           <ChannelApprovalRow
             key={ch}
             tone={tone}
@@ -5544,23 +5583,24 @@ function TemplateRevisionModal({
                   <p>
                     {channel === "whatsapp" && (
                       <>
-                        WhatsApp Business templates must be approved by Meta via your WABA provider
-                        (MSG91). Riko submits the revision and waits — automated sends keep using the
-                        last approved version until Meta greenlights the change.
+                        WhatsApp Business templates must be approved by Meta. Riko sends WhatsApp
+                        through <strong>WAMe</strong> (not MSG91 — its WhatsApp BSP carries ban
+                        risk at our send volumes). Riko submits the revision and waits — automated
+                        sends keep using the last approved version until Meta greenlights the change.
                       </>
                     )}
                     {channel === "email" && (
                       <>
                         Email is the most flexible channel — once your sending domain is verified
-                        with Resend, content edits go live almost instantly. Still routed through
-                        Riko&apos;s template registry for audit.
+                        with Resend (routed through MSG91), content edits go live almost instantly.
+                        Still tracked through Riko&apos;s template registry for audit.
                       </>
                     )}
                     {channel === "sms" && (
                       <>
-                        SMS templates are gated by India&apos;s TRAI DLT registry. Both the header
-                        (BNDSOP) and the body content need DLT approval. Promotional language gets
-                        rejected — keep it transactional.
+                        SMS templates are gated by India&apos;s TRAI DLT registry and routed through
+                        MSG91. Both the header (BNDSOP) and the body content need DLT approval.
+                        Promotional language gets rejected — keep it transactional.
                       </>
                     )}
                   </p>
@@ -6169,34 +6209,54 @@ function ChannelsSection({
     >
       <div className="flex flex-col gap-3">
         <ChannelAccordion
-          label="WhatsApp (MSG91 · WABA)"
-          color="var(--green)"
+          label="WhatsApp (WAMe) — manual only"
+          color="var(--orange)"
           icon={<MessageCircle size={14} />}
-          defaultOpen
           summary={
             <div className="flex items-center gap-3 flex-wrap text-[11px]" style={{ color: "var(--text-3)" }}>
-              <StatusDot color="var(--green)" label="Connected" />
-              <span>
-                ₹{rules.msg91CostPerMessage.toFixed(2)} / msg
-              </span>
-              <span>
-                {rules.msg91Credits} credits left
-              </span>
+              <StatusDot color="var(--orange)" label="Manual channel" />
+              <span>Sent from Outstanding · Remind</span>
+              <span>{rules.wameSenderNumber}</span>
             </div>
           }
         >
-          <div className="grid grid-cols-2 gap-3">
-            <HealthTile label="Credits" value={String(rules.msg91Credits)} sub="Approx 5 mo @ current pace" />
-            <HealthTile label="Cost per message" value={`₹${rules.msg91CostPerMessage}`} sub="MSG91 utility template rate" />
-            <HealthTile label="Approved templates" value="3 of 4" sub="Final tier still pending Meta review" color="var(--yellow)" />
-            <HealthTile label="Daily cap (MSG91)" value="1,000 msg" sub="Platform limit · auto throttle" />
-          </div>
-          <button
-            className="self-start text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer mt-3"
-            style={{ background: "var(--bg-hover)", color: "var(--text-2)" }}
+          {/* WAMe is wa.me deep-link based — no programmatic API. The owner
+               clicks "Remind" on a party row in Outstanding, the WhatsApp
+               modal builds a wa.me/<phone>?text=... URL, opens WhatsApp
+               Web/Desktop with the message pre-filled, owner hits Send.
+               Not part of automation by design. */}
+          <p
+            className="text-[10.5px] leading-relaxed mb-3 rounded-md p-2.5"
+            style={{
+              background: "color-mix(in srgb, var(--orange) 6%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--orange) 22%, transparent)",
+              color: "var(--text-3)",
+            }}
           >
-            Open MSG91 dashboard →
-          </button>
+            <strong style={{ color: "var(--orange)" }}>Why WhatsApp isn&apos;t automated:</strong>{" "}
+            MSG91 offers a WhatsApp BSP, but high-volume reminder sends through it carry
+            a real ban risk. WAMe (wa.me deep-links) is paste-and-send only — no
+            programmatic API — so it lives on the manual side. Send WhatsApp reminders
+            from <strong style={{ color: "var(--text-2)" }}>Outstanding → Remind</strong>{" "}
+            on each party row. Email + SMS still route through MSG91 below.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <HealthTile label="Sender number" value={rules.wameSenderNumber} sub="Registered WAMe sender" />
+            <HealthTile label="Cost per send" value="Free" sub="wa.me deep-link · no per-message cost" />
+            <HealthTile label="Channel type" value="Manual" sub="Owner clicks Send in WhatsApp Web/Desktop" />
+            <HealthTile label="Sends this month" value="—" sub="Tracked via Outstanding remind history" />
+          </div>
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer"
+              style={{ background: "var(--bg-hover)", color: "var(--text-2)" }}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "outstanding" }));
+              }}
+            >
+              Go to Outstanding →
+            </button>
+          </div>
         </ChannelAccordion>
 
         <ChannelAccordion
