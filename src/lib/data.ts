@@ -3293,33 +3293,86 @@ export const REMINDER_LIST_FILTERS: Array<{
   { id: "reminded-this-week", label: "Reminded this week" },
 ];
 
-/* ── Bulk Contact Import — sample rows for the 4-step modal ── */
+/* ── Bulk Contact Import — long-format CSV ────────────────────────
+   One row per CONTACT, party_name as the join key. Scales to N
+   contacts per party (HubSpot/Pipedrive/Salesforce convention).
+   8 columns: party_name (locked) · contact_name · phone · email ·
+   designation · role · is_primary · receives_reminders. */
+
+export type BulkImportStatus =
+  | "matched"        // phone+email match an existing PartyContactPerson — no change
+  | "new-contact"    // new row for an existing party (additional contact captured)
+  | "will-update"    // existing contact's phone or email changed
+  | "name-mismatch"  // party name almost matches an existing party (fuzzy <95%)
+  | "skipped";       // no phone+email, OR party not in Riko, OR invalid role
 
 export interface BulkImportRow {
+  /** Party from RECEIVABLES — locked at template-download time so the
+   *  join key can't be typo'd. */
   partyName: string;
-  existingPhone?: string;
-  existingEmail?: string;
-  newPhone?: string;
-  newEmail?: string;
-  newContactPerson?: string;
-  /** Resolution status after match preview. */
-  status: "matched" | "will-update" | "name-mismatch" | "skipped";
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  designation?: string;
+  role?: ContactRole;
+  isPrimary?: boolean;
+  receivesReminders?: boolean;
+  status: BulkImportStatus;
+  /** Optional explanation shown in the preview (e.g. "Phone changed" or
+   *  "Closest: Bigfoot/Shiprocket (91% match)"). */
   note?: string;
 }
 
+/** Demo seed exercising every status the preview UI handles.
+ *  Mirrors the multi-contact shape on PARTY_CONTACTS — Mehra has 2
+ *  rows, Pune Pharmacy has 3 rows, etc. */
 export const BULK_IMPORT_SAMPLE: BulkImportRow[] = [
-  { partyName: "Nykaa E-Retail Pvt Ltd", existingPhone: "+91 98200 44112", existingEmail: "ar-mumbai@nykaa.com", newPhone: "+91 98200 44112", newEmail: "ar-mumbai@nykaa.com", newContactPerson: "Sakshi Rao", status: "matched" },
-  { partyName: "Website Debtors", newPhone: "", newEmail: "", status: "skipped", note: "No phone/email in row" },
-  { partyName: "LLC Olimpiya", existingPhone: "+7 495 123 45 67", newPhone: "+7 495 123 45 80", newEmail: "finance@olimpiya.ru", newContactPerson: "Anna Volkova", status: "will-update", note: "Phone + contact person changed" },
-  { partyName: "One97 Communications (Paytm)", existingPhone: "+91 99870 55102", newPhone: "+91 99870 55102", newEmail: "vendor-payments@paytm.com", status: "matched" },
-  { partyName: "Prodsol Biotech Pvt Ltd", existingPhone: "+91 98765 33221", newPhone: "+91 98765 33221", newEmail: "accounts@prodsol.in", status: "matched" },
-  { partyName: "Nykaa E-Retail (2)", existingPhone: "+91 98200 44112", newPhone: "+91 98200 44112", newEmail: "ar-mumbai@nykaa.com", status: "matched" },
-  { partyName: "Scale Global Debtors", newPhone: "+91 88220 44556", newEmail: "accounts@scaleglobal.in", newContactPerson: "Kiran Patel", status: "will-update", note: "First-time contact added" },
-  { partyName: "Buy More (Counfreedise)", existingPhone: "+91 87890 11220", newPhone: "+91 87890 11220", newEmail: "ar@counfreedise.com", status: "will-update", note: "Email added" },
-  { partyName: "NYKAA Mumbai 2", existingPhone: "+91 98200 44112", newPhone: "+91 98200 44112", status: "matched" },
-  { partyName: "BIGFOOT SHIPROCKET", existingPhone: "+91 90042 00111", newPhone: "+91 90042 00111", newEmail: "ar@shiprocket.com", status: "name-mismatch", note: "Closest: Bigfoot/Shiprocket (91% match)" },
-  { partyName: "Sales & Marketing Agencies", newPhone: "+91 99112 23344", status: "skipped", note: "Party not in Riko receivables master" },
+  // ── Mehra Trading Co — both contacts already in Riko, both match ──
+  { partyName: "Mehra Trading Co",            contactName: "Amit Mehra",   phone: "+91 98980 22334", email: "amit@mehratrading.com",     designation: "Founder",          role: "owner",      isPrimary: true,  receivesReminders: true, status: "matched" },
+  { partyName: "Mehra Trading Co",            contactName: "Sneha Mehra",  phone: "+91 98765 99887", email: "ops@mehratrading.com",      designation: "Accounts Manager", role: "accounting", isPrimary: false, receivesReminders: true, status: "matched" },
+
+  // ── FreshKart — Tally contact matches; user is adding a NEW founder row ──
+  { partyName: "FreshKart Wholesale Pvt Ltd", contactName: "Priya Mehta",  phone: "+91 98765 12345", email: "accounts@freshkart.in",     designation: "Senior Accountant", role: "accounting", isPrimary: true,  receivesReminders: true, status: "matched" },
+  { partyName: "FreshKart Wholesale Pvt Ltd", contactName: "Kunal Shah",   phone: "+91 99887 33445", email: "kunal@freshkart.in",        designation: "Founder",           role: "owner",      isPrimary: false, receivesReminders: true, status: "new-contact", note: "First owner contact captured for this party" },
+
+  // ── Pune Pharmacy — 3 existing rows, all match ──
+  { partyName: "Pune Pharmacy Distributors",  contactName: "Asha Joshi",   phone: "+91 98221 88990", email: "accounts@punepharmadistro.in", designation: "Proprietor",       role: "owner",      isPrimary: true,  receivesReminders: true, status: "matched" },
+  { partyName: "Pune Pharmacy Distributors",  contactName: "Rajesh Joshi", phone: "+91 98765 44550", email: "finance@punepharmadistro.in",  designation: "Finance Manager",   role: "finance",    isPrimary: false, receivesReminders: true, status: "matched" },
+  { partyName: "Pune Pharmacy Distributors",  contactName: "Manoj Patel",  phone: "+91 99887 11223", email: "",                              designation: "Warehouse In-Charge", role: "operations", isPrimary: false, receivesReminders: false, status: "matched" },
+
+  // ── Surat Apparel — existing finance contact matches ──
+  { partyName: "Surat Apparel Hub",           contactName: "Bhavin Patel", phone: "+91 99300 55667", email: "finance@suratapparel.in",   designation: "Finance Lead",     role: "finance",    isPrimary: true,  receivesReminders: true, status: "matched" },
+
+  // ── Nykaa E-Retail Pvt Ltd — existing matches; user is updating Sakshi's email ──
+  { partyName: "Nykaa E-Retail Pvt Ltd",      contactName: "Sakshi Rao",   phone: "+91 98200 44112", email: "sakshi.rao@nykaa.com",      designation: "AR Lead",          role: "accounting", isPrimary: true,  receivesReminders: true, status: "will-update", note: "Email changed (was ar-mumbai@nykaa.com)" },
+
+  // ── Website Debtors — aggregated ledger, blank row prompts user to fill ──
+  { partyName: "Website Debtors",                                                                                                                                                                                                                              status: "skipped",       note: "Aggregated ledger — no contact to import" },
+
+  // ── One97 / Paytm — existing match, user updating phone ──
+  { partyName: "One97 Communications (Paytm)", contactName: "Rahul Kohli", phone: "+91 99870 55103", email: "vendor-payments@paytm.com", designation: "Vendor Payments", role: "accounting", isPrimary: true,  receivesReminders: true, status: "will-update", note: "Phone changed (was +91 99870 55102)" },
+
+  // ── Scale Global Debtors — first-time contact captured ──
+  { partyName: "Scale Global Debtors",        contactName: "Kiran Patel",  phone: "+91 88220 44556", email: "accounts@scaleglobal.in",   designation: "Accounts Head",    role: "accounting", isPrimary: true,  receivesReminders: true, status: "new-contact", note: "First contact ever captured for this party" },
+
+  // ── BIGFOOT SHIPROCKET — fuzzy name match against "Bigfoot/Shiprocket" ──
+  { partyName: "BIGFOOT SHIPROCKET",          contactName: "Varun Bhalla", phone: "+91 90042 00111", email: "ar@shiprocket.com",         designation: "AR Manager",       role: "accounting", isPrimary: true,  receivesReminders: true, status: "name-mismatch",  note: "Closest match: Bigfoot/Shiprocket (91%) — confirm to merge" },
+
+  // ── Sales & Marketing Agencies — not in Riko's RECEIVABLES master ──
+  { partyName: "Sales & Marketing Agencies",  contactName: "—",            phone: "+91 99112 23344",                                                                       role: "accounting", isPrimary: true,  receivesReminders: true, status: "skipped",         note: "Party not in Riko receivables master" },
 ];
+
+/** Aggregate stats for the StepTemplate copy + StepPreview chips.
+ *  Computed from PARTY_CONTACTS so the modal text stays honest as
+ *  the data evolves. */
+export function computeBulkImportTemplateStats() {
+  const totalParties = RECEIVABLES.length;
+  const totalContacts = PARTY_CONTACTS.reduce((s, p) => s + p.contacts.length, 0);
+  const partiesWithContact = PARTY_CONTACTS.filter((p) => p.contacts.length > 0).length;
+  const blankRows = totalParties - partiesWithContact;
+  const totalRows = totalContacts + blankRows;
+  return { totalParties, totalContacts, partiesWithContact, blankRows, totalRows };
+}
 
 /** What event triggers a reminder. Surfaced as the primary radio
  *  in the Defaults card per the May 7 meeting MVP spec. */
