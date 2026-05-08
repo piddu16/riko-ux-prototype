@@ -3447,7 +3447,7 @@ function DefaultsSection({
         {/* A. Trigger — periodic reminder cadence (mutually exclusive) */}
         <DefaultRow
           label="When to chase overdue invoices"
-          help="Pick the cadence that fires a reminder for unpaid invoices. Per-event sends (invoice creation, payment receipt) live below — they're independent."
+          help="One cadence. Per-event sends are independent — see below."
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {REMINDER_TRIGGER_PRESETS.map((t) => {
@@ -3528,7 +3528,7 @@ function DefaultsSection({
               delivery" pattern called out in the May 7 meeting. */}
         <DefaultRow
           label="Per-event communications"
-          help="Lifecycle-event sends — independent of the cadence above. Both fire automatically when the matching voucher posts to Tally."
+          help="Fires on voucher events — separate from the cadence above."
         >
           <div className="flex flex-col gap-2">
             <PerEventToggle
@@ -3536,7 +3536,7 @@ function DefaultsSection({
               onToggle={() => update("sendOnInvoiceCreate", !rules.sendOnInvoiceCreate)}
               icon="📤"
               title="Send invoice + payment link on creation"
-              subtitle="Customer gets the invoice + a one-click pay link the moment it posts to Tally. Closes the loop before any reminder ever fires."
+              subtitle="Fires the moment the sales voucher posts to Tally."
               recommended
             />
             <PerEventToggle
@@ -3544,7 +3544,7 @@ function DefaultsSection({
               onToggle={() => update("sendOnPaymentReceived", !rules.sendOnPaymentReceived)}
               icon="🙏"
               title="Send thank-you on payment receipt"
-              subtitle="Acknowledge the payment within 30 minutes of the receipt voucher landing. Builds trust and reduces inbound “did you receive my payment?” calls."
+              subtitle="Acknowledges payment within 30 minutes of receipt voucher."
             />
           </div>
         </DefaultRow>
@@ -3552,96 +3552,84 @@ function DefaultsSection({
         {/* B. Follow-up cadence — May 8 mtg ask: make repeat schedule visible */}
         <DefaultRow
           label="Follow-up cadence"
-          help="After the first reminder, how often to chase the same party. The schedule preview below shows the actual send dates and tone for the next 5 reminders."
+          help="How often to repeat. See the schedule preview below."
         >
           <FollowUpCadenceControls rules={rules} update={update} />
         </DefaultRow>
 
-        {/* C. Payment terms ladder */}
-        <DefaultRow
-          label="Payment terms source"
-          help="Riko reads terms in this order. We rarely fall through to the default — most invoices have voucher-level terms."
-        >
-          <div className="flex items-stretch gap-1.5 flex-wrap">
-            <TermsLadderStep
-              n={1}
-              title="Voucher"
-              subtitle="Per-invoice override"
-              accent="var(--green)"
-            />
-            <TermsLadderArrow />
-            <TermsLadderStep
-              n={2}
-              title="Ledger"
-              subtitle="Party master default"
-              accent="var(--blue)"
-            />
-            <TermsLadderArrow />
-            <TermsLadderStep
-              n={3}
-              title={`${rules.paymentTermsFallbackDays}-day fallback`}
-              subtitle="If neither set"
-              accent="var(--text-4)"
-              editable={
-                <input
-                  type="number"
-                  min={7}
-                  max={120}
-                  value={rules.paymentTermsFallbackDays}
-                  onChange={(e) =>
-                    update(
-                      "paymentTermsFallbackDays",
-                      Math.max(7, Math.min(120, parseInt(e.target.value, 10) || 45)),
-                    )
-                  }
-                  className="w-12 text-[10.5px] font-semibold px-1.5 py-0.5 rounded tabular-nums text-right"
-                  style={{
-                    background: "var(--bg-primary)",
-                    color: "var(--text-1)",
-                    border: "1px solid var(--border)",
-                  }}
-                />
-              }
-            />
-          </div>
-        </DefaultRow>
-
-        {/* C. Template tone */}
-        <DefaultRow
-          label="Default tone"
-          help="Riko picks per overdue bucket when set to Auto. Override here to lock one tone across all parties."
-        >
-          <div className="flex flex-wrap gap-2">
-            {/* Auto chip */}
-            <ToneChip
-              active={rules.defaultTone === "auto"}
-              label="Auto (recommended)"
-              sub="Ladder by overdue days"
-              onClick={() => update("defaultTone", "auto")}
-            />
-            {REMINDER_TONE_PRESETS.map((p) => (
-              <ToneChip
-                key={p.id}
-                active={rules.defaultTone === p.id}
-                label={p.label}
-                sub={`${p.daysBucket} · ${p.blurb}`}
-                onClick={() => update("defaultTone", p.id)}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            className="text-[10.5px] font-semibold mt-2 cursor-pointer"
-            style={{ color: "var(--blue)" }}
+        {/* C. Tone + payment terms — collapsed by default. Configure-once
+              settings whose defaults (voucher → ledger → 45d, Auto tone)
+              are correct out-of-the-box. Hidden behind one expander to
+              cut Defaults from 6 rows to 4 in the default view. */}
+        <CollapsibleAdvanced label="Tone & payment terms" hint="Defaults are sensible — only open if you want to override">
+          {/* Payment terms ladder */}
+          <DefaultRow
+            label="Payment terms source"
+            help="Voucher → ledger → 45d default."
           >
-            Request a custom template →
-          </button>
-        </DefaultRow>
+            <div className="flex items-stretch gap-1.5 flex-wrap">
+              <TermsLadderStep n={1} title="Voucher" subtitle="Per-invoice override" accent="var(--green)" />
+              <TermsLadderArrow />
+              <TermsLadderStep n={2} title="Ledger" subtitle="Party master default" accent="var(--blue)" />
+              <TermsLadderArrow />
+              <TermsLadderStep
+                n={3}
+                title={`${rules.paymentTermsFallbackDays}-day fallback`}
+                subtitle="If neither set"
+                accent="var(--text-4)"
+                editable={
+                  <input
+                    type="number"
+                    min={7}
+                    max={120}
+                    value={rules.paymentTermsFallbackDays}
+                    onChange={(e) =>
+                      update(
+                        "paymentTermsFallbackDays",
+                        Math.max(7, Math.min(120, parseInt(e.target.value, 10) || 45)),
+                      )
+                    }
+                    className="w-12 text-[10.5px] font-semibold px-1.5 py-0.5 rounded tabular-nums text-right"
+                    style={{ background: "var(--bg-primary)", color: "var(--text-1)", border: "1px solid var(--border)" }}
+                  />
+                }
+              />
+            </div>
+          </DefaultRow>
+
+          {/* Tone picker */}
+          <DefaultRow label="Default tone" help="Auto picks by overdue days. Override to lock one tone.">
+            <div className="flex flex-wrap gap-2">
+              <ToneChip
+                active={rules.defaultTone === "auto"}
+                label="Auto (recommended)"
+                sub="Ladder by overdue days"
+                onClick={() => update("defaultTone", "auto")}
+              />
+              {REMINDER_TONE_PRESETS.map((p) => (
+                <ToneChip
+                  key={p.id}
+                  active={rules.defaultTone === p.id}
+                  label={p.label}
+                  sub={`${p.daysBucket} · ${p.blurb}`}
+                  onClick={() => update("defaultTone", p.id)}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              className="text-[10.5px] font-semibold mt-2 cursor-pointer"
+              style={{ color: "var(--blue)" }}
+            >
+              Request a custom template →
+            </button>
+          </DefaultRow>
+        </CollapsibleAdvanced>
 
         {/* D. Channels */}
         <DefaultRow
           label="Channels"
-          help="WhatsApp gets the highest reply rate. Email is the deliverability backstop. SMS reserved for final-tier."
+          help="WhatsApp first, email backstop, SMS for final tier."
         >
           <div className="flex flex-wrap gap-2">
             <ChannelToggle
@@ -3671,7 +3659,7 @@ function DefaultsSection({
         {/* E. Who gets the reminder — multi-contact-aware strategy */}
         <DefaultRow
           label="Who gets the reminder"
-          help="Default sends to the contact already imported from Tally. Add more contacts per party (founder, finance, etc.) and pick a broader strategy if you want to chase multiple people."
+          help="Defaults to the Tally contact. Add more for broader reach."
         >
           <RecipientStrategyPicker
             rules={rules}
@@ -3706,6 +3694,76 @@ function DefaultRow({
         )}
       </div>
       {children}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   CollapsibleAdvanced — inline expander for "configure-once" settings.
+   Used inside Defaults to hide tone + payment terms by default. The
+   defaults are sensible (Auto tone, voucher → ledger → 45d), so most
+   users don't need to see these controls during day-to-day adjustments.
+   ──────────────────────────────────────────────────────────────────── */
+function CollapsibleAdvanced({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className="rounded-md"
+      style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between px-3 py-2.5 cursor-pointer text-left"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <ChevronDown
+            size={12}
+            style={{
+              color: "var(--text-4)",
+              transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 200ms",
+              flexShrink: 0,
+            }}
+          />
+          <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-2)" }}>
+            {label}
+          </span>
+          {hint && (
+            <span className="text-[10.5px] hidden sm:inline" style={{ color: "var(--text-4)" }}>
+              · {hint}
+            </span>
+          )}
+        </div>
+        <span className="text-[10.5px] flex-shrink-0" style={{ color: "var(--text-4)" }}>
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            style={{ overflow: "hidden" }}
+          >
+            <div className="px-3 pb-3 flex flex-col gap-4" style={{ borderTop: "1px solid var(--border)" }}>
+              <div className="pt-3" />
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -4000,7 +4058,7 @@ function SchedulePreview({
       </div>
 
       {/* Desktop: horizontal timeline with dots positioned by day-offset */}
-      <div className="hidden sm:block relative" style={{ paddingTop: 8, paddingBottom: 36 }}>
+      <div className="hidden sm:block relative" style={{ paddingTop: 8, paddingBottom: 12 }}>
         {/* Base line */}
         <div
           style={{
@@ -4070,8 +4128,9 @@ function SchedulePreview({
               >
                 {s.dayOffset > 0 ? `+${s.dayOffset}d` : s.dayOffset === 0 ? "Day 0" : `${s.dayOffset}d`}
               </span>
-              {/* Dot */}
+              {/* Dot — color encodes tone, title surfaces it on hover */}
               <span
+                title={isEscalate ? "Escalate to manual review" : `${s.toneLabel} reminder`}
                 style={{
                   width: isEscalate ? 14 : 12,
                   height: isEscalate ? 14 : 12,
@@ -4086,19 +4145,10 @@ function SchedulePreview({
                   color: "#fff",
                   fontSize: 8,
                   fontWeight: 700,
+                  cursor: "help",
                 }}
               >
                 {isEscalate ? "!" : s.sequence}
-              </span>
-              {/* Tone label below */}
-              <span
-                className="text-[9px] uppercase tracking-wider font-semibold mt-1"
-                style={{
-                  color: isEscalate ? "var(--red)" : color,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {s.toneLabel}
               </span>
             </div>
           );
@@ -4460,20 +4510,7 @@ function RecipientStrategyPicker({
         </button>
       </div>
 
-      {/* Honest framing line */}
-      <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-4)" }}>
-        Tally typically gives you one contact per party (usually the accounting/billing person).
-        Capture additional contacts (founder, finance, purchase) via{" "}
-        <button
-          type="button"
-          onClick={onManageContacts}
-          className="cursor-pointer underline"
-          style={{ color: "var(--blue)" }}
-        >
-          Manage contacts
-        </button>
-        {" "}to get more reach.
-      </p>
+      {/* honest framing — kept short; "Manage contacts" link above is the hook */}
     </div>
   );
 }
@@ -4979,23 +5016,27 @@ function LiveStateHero({ rules }: { rules: ReminderAutomationRules }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* 4 value-oriented tiles — what an SMB owner cares about */}
+      {/* Value tiles. ONE hero (Recovered) carries the green accent + icon;
+           the others render neutral so the eye lands on what matters first.
+           Sentence-case labels — uppercase shouting was every-tile-shouts /
+           nothing-is-heard. Subtitles trimmed to a single fact each. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <LiveTile
           label="Recovered this month"
           bigValue={attribution ? formatINR(attribution.amountAttributed) : "—"}
           subValue={
             attribution
-              ? `${attribution.paymentsAttributed} of ${attribution.remindersSent} reminders paid · ${Math.round((attribution.paymentsAttributed / Math.max(attribution.remindersSent, 1)) * 100)}% conversion`
+              ? `${attribution.paymentsAttributed} of ${attribution.remindersSent} paid (${Math.round((attribution.paymentsAttributed / Math.max(attribution.remindersSent, 1)) * 100)}%)`
               : "No reminders sent yet this month."
           }
           color="var(--green)"
           icon={<MessageCircle size={14} />}
+          hero
         />
         <LiveTile
           label="Reply rate"
           bigValue={`${Math.round(state.replyRate * 100)}%`}
-          subValue={`${channelLabel} leads at ${Math.round(bestChannel.pct * 100)}% · ${state.sentThisMonth} sends · across all channels`}
+          subValue={`${channelLabel} leads at ${Math.round(bestChannel.pct * 100)}%`}
           color="var(--blue)"
           icon={<Activity size={14} />}
         />
@@ -5004,8 +5045,8 @@ function LiveStateHero({ rules }: { rules: ReminderAutomationRules }) {
           bigValue={avgPayDays !== null ? `${avgPayDays.toFixed(1)}d` : "—"}
           subValue={
             avgPayDays !== null
-              ? `Days from reminder send to receipt voucher · vs ${Math.round(K.dso)}d typical DSO`
-              : "Not enough data — needs 3+ attributed payments."
+              ? `vs ${Math.round(K.dso)}d typical DSO`
+              : "Need 3+ attributed payments."
           }
           color="var(--purple)"
           icon={<Clock size={14} />}
@@ -5015,86 +5056,39 @@ function LiveStateHero({ rules }: { rules: ReminderAutomationRules }) {
           bigValue={bestTone ? bestTone.charAt(0).toUpperCase() + bestTone.slice(1) : "—"}
           subValue={
             bestTone
-              ? `${Math.round(bestTonePct * 100)}% paid within 7d · ladder validates fresh dues land hardest`
-              : "Run more reminders to see correlation."
+              ? `${Math.round(bestTonePct * 100)}% paid within 7d`
+              : "Need more send history."
           }
           color="var(--orange)"
           icon={<CheckCircle2 size={14} />}
         />
       </div>
 
-      {/* Operational status strip — three labeled columns, no chart.
-           The 4 value tiles above already carry the ROI story; this row
-           just answers "what's the system doing right now?" in plain
-           English so the user doesn't have to decode a tiny stacked-bar.
-           Detail charts (30-day daily sends, reply-rate-by-channel,
-           tone→payment correlation) live in Advanced > Analytics. */}
-      <div
-        className="rounded-md grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x"
-        style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border)",
-          // CSS-var-aware divider color
-          ["--tw-divide-opacity" as string]: "1",
-        }}
-      >
-        <OpsCell
-          label="Next batch"
-          primary={`Tomorrow ${rules.cronTimeIst} IST`}
-          secondary={state.queued === 0 ? "0 parties queued — quiet day" : `${state.queued} ${state.queued === 1 ? "party" : "parties"} queued`}
-          accent="var(--green)"
-        />
-        <OpsCell
-          label="Reminders running"
-          primary={`${state.active} of ${RECEIVABLES.length} parties`}
-          secondary={`${state.paused} paused · ${state.optedOut} opted out`}
-          accent="var(--blue)"
-        />
-        <OpsCell
-          label="MSG91 credits"
-          primary={`${rules.msg91Credits.toLocaleString("en-IN")} left`}
-          secondary={`~${Math.round(rules.msg91Credits / Math.max(REMINDER_ANALYTICS_30D.creditsBurnRate, 1))} days runway at current pace`}
-          accent="var(--purple)"
-        />
-      </div>
-    </div>
-  );
-}
-
-/** A single labeled cell in the ops status strip. Stacked layout:
- *  uppercase label on top, primary fact below, secondary muted below. */
-function OpsCell({
-  label,
-  primary,
-  secondary,
-  accent,
-}: {
-  label: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-}) {
-  return (
-    <div className="px-4 py-3 flex flex-col gap-0.5" style={{ borderColor: "var(--border)" }}>
-      <span
-        className="inline-flex items-center gap-1.5 text-[9.5px] uppercase tracking-wider font-semibold"
+      {/* Operational status — single muted line. Was 3 stat cells; the
+           value tiles above carry the ROI story, so ops are demoted to
+           one inline strip the eye can skim or skip. Saves ~80px desktop,
+           ~150px mobile, removes 3 tile-shaped objects from the first
+           viewport. Detailed charts live in Advanced > Analytics. */}
+      <p
+        className="text-[10.5px] flex flex-wrap items-center gap-x-3 gap-y-1 px-1"
         style={{ color: "var(--text-4)" }}
       >
-        <span
-          aria-hidden
-          style={{ width: 5, height: 5, borderRadius: 999, background: accent, flexShrink: 0 }}
-        />
-        {label}
-      </span>
-      <span
-        className="text-[12.5px] font-bold tabular-nums"
-        style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
-      >
-        {primary}
-      </span>
-      <span className="text-[10.5px]" style={{ color: "var(--text-3)" }}>
-        {secondary}
-      </span>
+        <span>
+          Next batch <strong style={{ color: "var(--text-2)" }}>tomorrow {rules.cronTimeIst} IST</strong>
+          {state.queued > 0 && <> · {state.queued} queued</>}
+        </span>
+        <span style={{ color: "var(--text-4)" }}>·</span>
+        <span>
+          <strong style={{ color: "var(--text-2)" }}>{state.active} of {RECEIVABLES.length}</strong> active
+          {state.paused > 0 && <>, {state.paused} paused</>}
+          {state.optedOut > 0 && <>, {state.optedOut} opted out</>}
+        </span>
+        <span style={{ color: "var(--text-4)" }}>·</span>
+        <span>
+          <strong style={{ color: "var(--text-2)" }}>{rules.msg91Credits.toLocaleString("en-IN")}</strong> credits
+          {" "}(~{Math.round(rules.msg91Credits / Math.max(REMINDER_ANALYTICS_30D.creditsBurnRate, 1))}d runway)
+        </span>
+      </p>
     </div>
   );
 }
@@ -5106,6 +5100,7 @@ function LiveTile({
   color,
   icon,
   suffix,
+  hero,
 }: {
   label: string;
   bigValue: string;
@@ -5113,6 +5108,9 @@ function LiveTile({
   color: string;
   icon: React.ReactNode;
   suffix?: string;
+  /** Hero tile gets the colored accent border + icon. Others render
+   *  with neutral border so only ONE thing in the row is shouting. */
+  hero?: boolean;
 }) {
   return (
     <motion.div
@@ -5124,19 +5122,22 @@ function LiveTile({
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
-        borderLeft: `3px solid ${color}`,
+        borderLeft: hero ? `3px solid ${color}` : "1px solid var(--border)",
       }}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+        <span className="text-[11px] font-medium" style={{ color: "var(--text-3)" }}>
           {label}
         </span>
-        <span style={{ color }}>{icon}</span>
+        {hero && <span style={{ color }}>{icon}</span>}
       </div>
       <div className="flex items-baseline gap-1">
         <p
           className="text-xl font-bold tabular-nums"
-          style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+          style={{
+            color: hero ? color : "var(--text-1)",
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}
         >
           {bigValue}
         </p>
@@ -5146,7 +5147,7 @@ function LiveTile({
           </span>
         )}
       </div>
-      <p className="text-[11px] leading-snug" style={{ color: "var(--text-3)" }}>
+      <p className="text-[11px] leading-snug" style={{ color: "var(--text-4)" }}>
         {subValue}
       </p>
     </motion.div>
