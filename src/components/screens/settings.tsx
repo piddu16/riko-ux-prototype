@@ -3320,7 +3320,7 @@ function GateRow({
 }) {
   return (
     <div
-      className="flex items-start gap-3 rounded-md p-3"
+      className="flex flex-col sm:flex-row sm:items-start gap-3 rounded-md p-3"
       style={{
         background: done
           ? "color-mix(in srgb, var(--green) 5%, transparent)"
@@ -3331,33 +3331,41 @@ function GateRow({
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <div
-        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-        style={{
-          background: done ? "var(--green)" : "transparent",
-          color: done ? "#fff" : "var(--text-3)",
-          border: done ? "none" : "1px solid var(--border)",
-        }}
-      >
-        {done ? <Check size={12} /> : icon}
+      {/* Title block — icon + title + subtitle. On mobile this is row 1; on desktop it's the left side. */}
+      <div className="flex items-start gap-3 flex-1 min-w-0 w-full">
+        <div
+          className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
+          style={{
+            background: done ? "var(--green)" : "transparent",
+            color: done ? "#fff" : "var(--text-3)",
+            border: done ? "none" : "1px solid var(--border)",
+          }}
+        >
+          {done ? <Check size={12} /> : icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[12.5px] font-semibold" style={{ color: "var(--text-1)" }}>
+            {title}
+          </p>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+            {subtitle}
+          </p>
+        </div>
+        {/* On desktop, a switch-style rightControl goes inline next to title */}
+        {rightControl && <div className="hidden sm:block flex-shrink-0">{rightControl}</div>}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[12.5px] font-semibold" style={{ color: "var(--text-1)" }}>
-          {title}
-        </p>
-        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
-          {subtitle}
-        </p>
-      </div>
+
+      {/* Action block — on mobile this is row 2 (full width); on desktop it sits to the right. */}
       {rightControl ? (
-        <div className="flex-shrink-0">{rightControl}</div>
+        // For switch-style rightControl, mobile row 2 right-aligns it.
+        <div className="sm:hidden self-end flex-shrink-0">{rightControl}</div>
       ) : actionLabel && onAction ? (
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
           {secondaryActionLabel && onSecondaryAction && (
             <button
               onClick={onSecondaryAction}
               disabled={disabled}
-              className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none"
               style={{
                 background: "transparent",
                 color: "var(--text-2)",
@@ -3370,7 +3378,7 @@ function GateRow({
           <button
             onClick={onAction}
             disabled={disabled}
-            className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 flex-1 sm:flex-none"
             style={{
               background: actionVariant === "primary" ? "var(--green)" : "transparent",
               color: actionVariant === "primary" ? "#fff" : "var(--text-2)",
@@ -3991,8 +3999,8 @@ function SchedulePreview({
         </span>
       </div>
 
-      {/* Timeline — relative-positioned line with absolute dots */}
-      <div className="relative" style={{ paddingTop: 8, paddingBottom: 36 }}>
+      {/* Desktop: horizontal timeline with dots positioned by day-offset */}
+      <div className="hidden sm:block relative" style={{ paddingTop: 8, paddingBottom: 36 }}>
         {/* Base line */}
         <div
           style={{
@@ -4091,6 +4099,66 @@ function SchedulePreview({
                 }}
               >
                 {s.toneLabel}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mobile: vertical list — one row per milestone with dot + day + tone.
+           Cramming 6 dots into 320px breaks labels, so on mobile we ditch
+           the timeline metaphor and use a plain reading order (top → bottom). */}
+      <div className="sm:hidden flex flex-col gap-1.5">
+        {schedule.map((s) => {
+          const isEscalate = s.action === "escalate";
+          const color = isEscalate ? "var(--red)" : TONE_COLOR[s.tone];
+          return (
+            <div
+              key={s.sequence}
+              className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5"
+              style={{
+                background: isEscalate
+                  ? "color-mix(in srgb, var(--red) 6%, transparent)"
+                  : "var(--bg-surface)",
+                border: `1px solid ${isEscalate ? "color-mix(in srgb, var(--red) 28%, transparent)" : "var(--border)"}`,
+              }}
+            >
+              {/* Sequence dot */}
+              <span
+                className="flex-shrink-0 inline-flex items-center justify-center text-[9px] font-bold"
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 999,
+                  background: color,
+                  color: "#fff",
+                }}
+              >
+                {isEscalate ? "!" : s.sequence}
+              </span>
+              {/* Day offset */}
+              <span
+                className="text-[11.5px] font-semibold tabular-nums w-12 flex-shrink-0"
+                style={{
+                  color: isEscalate ? "var(--red)" : "var(--text-1)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                {s.dayOffset > 0 ? `+${s.dayOffset}d` : s.dayOffset === 0 ? "Day 0" : `${s.dayOffset}d`}
+              </span>
+              {/* Tone pill */}
+              <span
+                className="text-[9.5px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                style={{
+                  background: `color-mix(in srgb, ${color} 14%, transparent)`,
+                  color,
+                }}
+              >
+                {s.toneLabel}
+              </span>
+              {/* Description */}
+              <span className="text-[10.5px] flex-1 min-w-0 truncate" style={{ color: "var(--text-3)" }}>
+                {isEscalate ? "Manual handoff to Accounts" : s.sequence === 1 ? "First reminder fires" : `Reminder #${s.sequence}`}
               </span>
             </div>
           );
@@ -5255,11 +5323,23 @@ function ChannelApprovalRow({
     case "draft":    actionLabel = "Submit for review"; break;
   }
 
+  // Context line varies by status — extracted so we can render it
+  // separately on mobile (where space won't fit it inline).
+  const contextLine =
+    approval.status === "rejected"
+      ? approval.rejectionReason ?? `Rejected by ${approval.reviewer}`
+      : approval.status === "pending"
+        ? `${approval.reviewer} · ETA ${approval.slaLabel}`
+        : approval.status === "draft"
+          ? "Local edit — submit to push to provider"
+          : `Approved · ${approval.revisions} revision${approval.revisions === 1 ? "" : "s"}`;
+
   return (
     <div
-      className="flex items-center justify-between gap-2 rounded p-2"
+      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded p-2"
       style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}
     >
+      {/* Row A — channel pill + status pill + (desktop only) context inline */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <span
           className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0"
@@ -5279,21 +5359,28 @@ function ChannelApprovalRow({
         >
           {cfg.symbol} {cfg.label}
         </span>
-        <span className="text-[10px] truncate" style={{ color: "var(--text-4)" }}>
-          {approval.status === "rejected"
-            ? approval.rejectionReason
-            : approval.status === "pending"
-              ? `${approval.reviewer} · ETA ${approval.slaLabel}`
-              : approval.status === "draft"
-                ? "Local edit — submit to push to provider"
-                : `Approved · ${approval.revisions} revision${approval.revisions === 1 ? "" : "s"}`}
+        {/* Context inline on desktop only */}
+        <span className="hidden sm:inline text-[10px] truncate" style={{ color: "var(--text-4)" }}>
+          {contextLine}
         </span>
       </div>
+
+      {/* Row B (mobile only) — context line on its own row, full width.
+           Long rejection reasons need room to breathe; on desktop they
+           truncate inline next to the status pill. */}
+      <p
+        className="sm:hidden text-[10px] leading-snug"
+        style={{ color: "var(--text-4)" }}
+      >
+        {contextLine}
+      </p>
+
+      {/* Action button — full-width on mobile, inline on desktop */}
       <button
         type="button"
         onClick={onRequestRevision}
         disabled={actionDisabled}
-        className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+        className="text-[10px] font-semibold px-2 py-1.5 rounded-md cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto"
         style={{
           background: actionDisabled ? "transparent" : "var(--bg-hover)",
           color: actionDisabled ? "var(--text-4)" : "var(--text-2)",
