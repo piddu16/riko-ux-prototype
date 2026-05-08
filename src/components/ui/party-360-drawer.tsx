@@ -596,11 +596,12 @@ function ContactInfoRow({ partyName }: { partyName: string }) {
     );
   }
 
-  const sourceMeta = {
-    tally:  { label: "Tally",  color: "var(--green)" },
-    manual: { label: "Manual", color: "var(--blue)"  },
-    none:   { label: "—",      color: "var(--text-4)" },
-  }[contact.source];
+  const sourceMeta = ({
+    tally:    { label: "Tally",    color: "var(--green)"  },
+    manual:   { label: "Manual",   color: "var(--blue)"   },
+    enriched: { label: "Enriched", color: "var(--purple)" },
+    none:     { label: "—",        color: "var(--text-4)" },
+  } as const)[contact.source];
 
   return (
     <div

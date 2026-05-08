@@ -35,6 +35,12 @@ import {
   AlertCircle,
   Plus,
   Activity,
+  Info,
+  ChevronRight,
+  Search,
+  Pause,
+  Phone,
+  ArrowRight,
 } from "lucide-react";
 import {
   TEAM_MEMBERS,
@@ -51,13 +57,42 @@ import {
   REMINDER_ANALYTICS_30D,
   REMINDER_TEMPLATES,
   RECEIVABLES,
+  K,
   renderTemplate,
   cleanCompanyName,
   computeReminderLiveState,
+  computeReminderSetupGate,
+  computeReminderAttribution,
+  computeAvgTimeToPayDays,
+  bestReplyChannel,
+  computeReminderSchedule,
+  computeContactsCoverage,
+  buildReminderMonitor,
+  filterMonitorRows,
+  getTemplateApproval,
+  TEMPLATE_REVIEWERS,
+  REMINDER_MONITOR_FILTERS,
+  REMINDER_TONE_PRESETS,
+  REMINDER_TRIGGER_PRESETS,
+  CONTACT_ROLE_LABELS,
+  CONTACT_ROLE_COLORS,
+  COMPANY,
+  formatINR,
   type ReminderAutomationRules,
   type ReminderTone,
   type ReminderChannel,
+  type ReminderTriggerType,
+  type ReminderRecipient,
+  type ReminderRecipientStrategy,
+  type ReminderMonitorRow,
+  type ReminderMonitorFilter,
+  type ContactRole,
+  type TemplateApprovalStatus,
+  type TemplateApprovalMeta,
+  type ScheduledReminder,
 } from "@/lib/data";
+import { BulkImportModal } from "@/components/ui/bulk-import-modal";
+import { ContactManagerDrawer } from "@/components/ui/contact-manager-drawer";
 import { useRbac } from "@/lib/rbac-context";
 
 /* ------------------------------------------------------------------ */
@@ -98,6 +133,27 @@ const statusStyle: Record<MemberStatus, { color: string; label: string }> = {
 /* ================================================================== */
 export function SettingsScreen() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("team");
+
+  // Listen for cross-screen deep-links to a specific Settings sub-tab.
+  // Outstanding's "Auto reminder" button dispatches this so we land on
+  // Reminders directly instead of Team. Pattern mirrors the global
+  // `riko:navigate` event used between screens.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (typeof detail === "string") {
+        const valid: SettingsTab[] = [
+          "team", "profile", "billing", "integrations",
+          "api", "notifications", "approvals", "reminders",
+        ];
+        if (valid.includes(detail as SettingsTab)) {
+          setActiveTab(detail as SettingsTab);
+        }
+      }
+    };
+    window.addEventListener("riko:settings-tab", handler as EventListener);
+    return () => window.removeEventListener("riko:settings-tab", handler as EventListener);
+  }, []);
 
   return (
     <div className="min-h-screen pb-24" style={{ background: "var(--bg-primary)" }}>
@@ -2938,35 +2994,31 @@ function ToggleRow({
 }
 
 /* ================================================================== */
-/*  RemindersTab — Control Center for Payment Reminders               */
-/*  (PRD v2.0 §4 Automation — full 8-section redesign)                */
+/*  RemindersTab — Payment Reminders MVP (May 7 2026 meeting)         */
 /*                                                                    */
-/*  Sections (sticky left sub-nav on desktop, linear on mobile):      */
-/*    1. Live state      — 4-tile status hero                         */
-/*    2. Templates       — 4-tier tone library with WABA status       */
-/*    3. Schedule        — quiet hours, min amount, on-account        */
-/*    4. Exclusions      — blacklist + key-account whitelist          */
-/*    5. Escalation      — after-no-reply + final-tier alert + SLA    */
-/*    6. Auto-stop       — payment / STOP / promise / partial         */
-/*    7. Channels        — WA / Email / SMS health + costs            */
-/*    8. Analytics       — 30d sends-by-tier + reply rate + corr      */
+/*  Three vertical stages, top-to-bottom:                             */
+/*    1. Setup Gate  — contact import + master toggle (mandatory)     */
+/*    2. Defaults    — trigger / terms / template / channel / send-to */
+/*    3. Monitor     — schedule table with status + filters           */
+/*                                                                    */
+/*  Why this shape: the team called the previous 8-section panel      */
+/*  confusing. The MVP is "import contacts → enable with sensible     */
+/*  defaults → monitor" so the user never gets lost in config.        */
 /* ================================================================== */
 
-const REMINDER_SECTIONS: { id: string; label: string; icon: React.ElementType }[] = [
-  { id: "live",        label: "Live state",    icon: Activity },
-  { id: "templates",   label: "Templates",     icon: FileSpreadsheet },
-  { id: "schedule",    label: "Schedule",      icon: Clock },
-  { id: "exclusions",  label: "Exclusions",    icon: Shield },
-  { id: "escalation",  label: "Escalation",    icon: AlertCircle },
-  { id: "stop-rules",  label: "Auto-stop",     icon: CheckCircle2 },
-  { id: "channels",    label: "Channels",      icon: MessageCircle },
-  { id: "analytics",   label: "Analytics",     icon: Activity },
-];
-
 function RemindersTab() {
-  const [rules, setRules] = useState<ReminderAutomationRules>(REMINDER_AUTOMATION_DEFAULTS);
+  // Demo seed: pretend the user has already onboarded — contacts imported
+  // (mostly) + master toggle on. This makes the Monitor + Live State strip
+  // show realistic activity instead of empty zeros. Production new-tenant
+  // default stays `enabled: false` per the May 7 meeting; the override only
+  // applies to the prototype's initial render.
+  const [rules, setRules] = useState<ReminderAutomationRules>({
+    ...REMINDER_AUTOMATION_DEFAULTS,
+    enabled: true,
+  });
   const [saved, setSaved] = useState(false);
-  const [active, setActive] = useState<string>("live");
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [contactManagerOpen, setContactManagerOpen] = useState(false);
 
   const update = <K extends keyof ReminderAutomationRules>(
     key: K,
@@ -2980,144 +3032,1732 @@ function RemindersTab() {
     window.setTimeout(() => setSaved(false), 2200);
   };
 
-  // Scrollspy — highlight the section the user has scrolled to.
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActive(entry.target.id);
-          }
-        }
-      },
-      { rootMargin: "-40% 0px -55% 0px" },
-    );
-    REMINDER_SECTIONS.forEach((s) => {
-      const el = document.getElementById(`reminder-section-${s.id}`);
-      if (el) obs.observe(el);
-    });
-    return () => obs.disconnect();
-  }, []);
+  const gate = computeReminderSetupGate(rules);
 
   return (
-    <div className="flex gap-5">
-      {/* Sticky sub-nav (desktop) */}
-      <aside className="hidden lg:block flex-shrink-0" style={{ width: 180 }}>
-        <nav
-          className="sticky top-5 rounded-md p-2 flex flex-col gap-0.5"
-          style={{
-            background: "var(--bg-surface)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          {REMINDER_SECTIONS.map(({ id, label, icon: Icon }) => {
-            const activeSection = active === id;
-            return (
-              <a
-                key={id}
-                href={`#reminder-section-${id}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  document
-                    .getElementById(`reminder-section-${id}`)
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  setActive(id);
-                }}
-                className="flex items-center gap-2 text-[11.5px] font-semibold px-2.5 py-2 rounded-md cursor-pointer transition-colors"
-                style={{
-                  background: activeSection
-                    ? "color-mix(in srgb, var(--green) 12%, transparent)"
-                    : "transparent",
-                  color: activeSection ? "var(--green)" : "var(--text-3)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!activeSection)
-                    (e.currentTarget as HTMLElement).style.background = "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  if (!activeSection)
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
-                }}
+    <div className="flex flex-col gap-5">
+      {/* Page intro — sets expectations */}
+      <div>
+        <h2 className="text-base font-bold" style={{ color: "var(--text-1)" }}>
+          Payment reminders
+        </h2>
+        <p className="text-[12px] mt-1" style={{ color: "var(--text-4)" }}>
+          Three steps: import contacts, pick defaults, monitor.
+          Reminders go to the <strong style={{ color: "var(--text-2)" }}>invoice owner</strong> — not your accounting team.
+        </p>
+      </div>
+
+      {/* Live State strip — only when reminders are ON (gated per user pref) */}
+      {rules.enabled && <LiveStateHero rules={rules} />}
+
+      {/* ─── 1. Setup Gate ─────────────────────────────────────── */}
+      <SetupGateSection
+        gate={gate}
+        rules={rules}
+        update={update}
+        onImportClick={() => setBulkImportOpen(true)}
+        onManageContacts={() => setContactManagerOpen(true)}
+      />
+
+      {/* ─── 2. Defaults ─────────────────────────────────────── */}
+      <DefaultsSection
+        rules={rules}
+        update={update}
+        onManageContacts={() => setContactManagerOpen(true)}
+      />
+
+      {/* ─── 3. Monitor ─────────────────────────────────────── */}
+      <MonitorSection rules={rules} />
+
+      {/* ─── Advanced settings (collapsed by default) ─────────── */}
+      <AdvancedSection rules={rules} update={update} />
+
+      {/* Sticky save bar */}
+      <div
+        className="sticky bottom-0 flex items-center justify-between gap-3 py-3 px-4 rounded-md mt-2"
+        style={{
+          background: "color-mix(in srgb, var(--bg-surface) 92%, transparent)",
+          backdropFilter: "blur(8px)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
+          {rules.enabled
+            ? <>Active. Next cron <span style={{ color: "var(--text-2)" }}>{rules.cronTimeIst}</span> IST tomorrow.</>
+            : <>Reminders are paused. Toggle on above to start.</>}
+        </p>
+        <div className="flex items-center gap-3">
+          <AnimatePresence>
+            {saved && (
+              <motion.span
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0 }}
+                className="text-[12px] font-semibold"
+                style={{ color: "var(--green)" }}
               >
-                <Icon size={13} />
-                {label}
-              </a>
-            );
-          })}
-        </nav>
-      </aside>
-
-      {/* Main column */}
-      <div className="flex-1 min-w-0 flex flex-col gap-5">
-        <section id="reminder-section-live">
-          <LiveStateHero rules={rules} />
-        </section>
-
-        <section id="reminder-section-templates">
-          <TemplatesSection wabaByTone={rules.wabaApprovalByTone} />
-        </section>
-
-        <section id="reminder-section-schedule">
-          <ScheduleSection rules={rules} update={update} />
-        </section>
-
-        <section id="reminder-section-exclusions">
-          <ExclusionsSection rules={rules} update={update} />
-        </section>
-
-        <section id="reminder-section-escalation">
-          <EscalationSection rules={rules} update={update} />
-        </section>
-
-        <section id="reminder-section-stop-rules">
-          <StopRulesSection rules={rules} update={update} />
-        </section>
-
-        <section id="reminder-section-channels">
-          <ChannelsSection rules={rules} update={update} />
-        </section>
-
-        <section id="reminder-section-analytics">
-          <AnalyticsSection />
-        </section>
-
-        {/* Save bar */}
-        <div
-          className="sticky bottom-0 flex items-center justify-between gap-3 py-3 px-4 rounded-md mt-2"
-          style={{
-            background: "color-mix(in srgb, var(--bg-surface) 92%, transparent)",
-            backdropFilter: "blur(8px)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
-            Changes apply to the next cron run (
-            <span style={{ color: "var(--text-2)" }}>{rules.cronTimeIst}</span> IST)
-          </p>
-          <div className="flex items-center gap-3">
-            <AnimatePresence>
-              {saved && (
-                <motion.span
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="text-[12px] font-semibold"
-                  style={{ color: "var(--green)" }}
-                >
-                  ✓ Saved
-                </motion.span>
-              )}
-            </AnimatePresence>
-            <button
-              onClick={handleSave}
-              className="text-[12px] font-semibold px-4 py-2 rounded-lg cursor-pointer"
-              style={{ background: "var(--green)", color: "#fff" }}
-            >
-              Save reminder rules
-            </button>
-          </div>
+                ✓ Saved
+              </motion.span>
+            )}
+          </AnimatePresence>
+          <button
+            onClick={handleSave}
+            className="text-[12px] font-semibold px-4 py-2 rounded-lg cursor-pointer"
+            style={{ background: "var(--green)", color: "#fff" }}
+          >
+            Save defaults
+          </button>
         </div>
       </div>
+
+      {/* Modals */}
+      <BulkImportModal open={bulkImportOpen} onClose={() => setBulkImportOpen(false)} />
+      <ContactManagerDrawer open={contactManagerOpen} onClose={() => setContactManagerOpen(false)} />
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  Stage 1 — Setup Gate                                              */
+/*                                                                    */
+/*  Three checklist rows, each green-✓ or amber-action.               */
+/*  Step 1 must be ✓ before steps 2 & 3 do anything useful.           */
+/* ────────────────────────────────────────────────────────────────── */
+function SetupGateSection({
+  gate,
+  rules,
+  update,
+  onImportClick,
+  onManageContacts,
+}: {
+  gate: ReturnType<typeof computeReminderSetupGate>;
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(
+    key: K,
+    value: ReminderAutomationRules[K],
+  ) => void;
+  onImportClick: () => void;
+  onManageContacts: () => void;
+}) {
+  const [showInfo, setShowInfo] = useState(false);
+
+  return (
+    <div
+      className="rounded-md overflow-hidden"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      {/* Card header */}
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border)" }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--green) 14%, transparent)",
+              color: "var(--green)",
+            }}
+          >
+            Step 1
+          </span>
+          <h3 className="text-[13px] font-bold" style={{ color: "var(--text-1)" }}>
+            Setup
+          </h3>
+        </div>
+        <span
+          className="text-[10.5px]"
+          style={{
+            color: gate.canFire && gate.contactsFullyImported
+              ? "var(--green)"
+              : gate.canFire
+                ? "var(--blue)"
+                : "var(--yellow)",
+          }}
+        >
+          {gate.canFire && gate.contactsFullyImported
+            ? "✓ Ready"
+            : gate.canFire
+              ? "Running with gaps"
+              : "Action needed"}
+        </span>
+      </div>
+
+      <div className="p-4 flex flex-col gap-3">
+        {/* Checklist row 1 — Contact import (green ✓ only when 100% covered;
+             partial coverage shows yellow "warning needed" but still unlocks
+             the master toggle below). */}
+        <GateRow
+          done={gate.contactsFullyImported}
+          icon={<Phone size={14} />}
+          title="Import party contacts"
+          subtitle={
+            gate.contactsFullyImported
+              ? `All ${gate.totalParties} parties have a phone number.`
+              : `${gate.contactsMissingCount} of ${gate.totalParties} parties missing a phone or email — they’ll be skipped at send time.`
+          }
+          actionLabel={gate.contactsFullyImported ? "Re-import" : "Import contacts"}
+          actionVariant={gate.contactsFullyImported ? "ghost" : "primary"}
+          onAction={onImportClick}
+          secondaryActionLabel="Manage contacts"
+          onSecondaryAction={onManageContacts}
+        />
+
+        {/* Checklist row 2 — Master toggle (unlocked once at least one
+             party can receive a reminder; partial coverage is OK). */}
+        <GateRow
+          done={rules.enabled}
+          disabled={!gate.contactsImported}
+          icon={<Send size={14} />}
+          title={
+            <span className="flex items-center gap-1.5">
+              Enable automated reminders
+              <button
+                type="button"
+                onClick={() => setShowInfo((v) => !v)}
+                aria-label="What gets sent?"
+                className="cursor-pointer"
+                style={{ color: "var(--text-4)" }}
+              >
+                <Info size={12} />
+              </button>
+            </span>
+          }
+          subtitle={
+            rules.enabled
+              ? `Riko will send the daily batch at ${rules.cronTimeIst} IST. ${gate.contactsImportedCount} parties scoped.`
+              : "Off by default. Switch on after you’ve imported contacts and reviewed defaults."
+          }
+          rightControl={
+            <button
+              role="switch"
+              aria-checked={rules.enabled}
+              disabled={!gate.contactsImported}
+              onClick={() => update("enabled", !rules.enabled)}
+              className="relative cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                width: 36,
+                height: 20,
+                borderRadius: 999,
+                background: rules.enabled ? "var(--green)" : "var(--bg-hover)",
+                border: "1px solid var(--border)",
+                transition: "background 150ms",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: rules.enabled ? 18 : 2,
+                  width: 14,
+                  height: 14,
+                  borderRadius: 999,
+                  background: "#fff",
+                  transition: "left 150ms",
+                }}
+              />
+            </button>
+          }
+        />
+
+        {/* Info popover */}
+        <AnimatePresence>
+          {showInfo && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18 }}
+              className="rounded-md p-3 text-[11.5px] leading-relaxed"
+              style={{
+                background: "color-mix(in srgb, var(--blue) 8%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--blue) 22%, transparent)",
+                color: "var(--text-2)",
+              }}
+            >
+              <p className="font-semibold mb-1" style={{ color: "var(--blue)" }}>
+                What gets sent when reminders are on?
+              </p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>One {rules.cronTimeIst}-IST batch per day, weekdays only.</li>
+                <li>Up to <strong>{rules.dailyBatchLimit} parties</strong> per batch (rate-limited to protect deliverability).</li>
+                <li>Tone ladder: <strong>gentle</strong> ≤7d → <strong>standard</strong> 8–30d → <strong>firm</strong> 31–180d.</li>
+                <li>Auto-stop on payment received, “STOP” reply, or promise-to-pay detected.</li>
+                <li>Hard cap: <strong>{rules.maxRemindersPerParty} sends/party</strong> before flagged for manual outreach.</li>
+              </ul>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+function GateRow({
+  done,
+  disabled,
+  icon,
+  title,
+  subtitle,
+  actionLabel,
+  actionVariant = "primary",
+  onAction,
+  secondaryActionLabel,
+  onSecondaryAction,
+  rightControl,
+}: {
+  done: boolean;
+  disabled?: boolean;
+  icon: React.ReactNode;
+  title: React.ReactNode;
+  subtitle: string;
+  actionLabel?: string;
+  actionVariant?: "primary" | "ghost";
+  onAction?: () => void;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
+  rightControl?: React.ReactNode;
+}) {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-md p-3"
+      style={{
+        background: done
+          ? "color-mix(in srgb, var(--green) 5%, transparent)"
+          : disabled
+            ? "color-mix(in srgb, var(--bg-hover) 40%, transparent)"
+            : "color-mix(in srgb, var(--yellow) 6%, transparent)",
+        border: `1px solid ${done ? "color-mix(in srgb, var(--green) 22%, transparent)" : disabled ? "var(--border)" : "color-mix(in srgb, var(--yellow) 22%, transparent)"}`,
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <div
+        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
+        style={{
+          background: done ? "var(--green)" : "transparent",
+          color: done ? "#fff" : "var(--text-3)",
+          border: done ? "none" : "1px solid var(--border)",
+        }}
+      >
+        {done ? <Check size={12} /> : icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[12.5px] font-semibold" style={{ color: "var(--text-1)" }}>
+          {title}
+        </p>
+        <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+          {subtitle}
+        </p>
+      </div>
+      {rightControl ? (
+        <div className="flex-shrink-0">{rightControl}</div>
+      ) : actionLabel && onAction ? (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {secondaryActionLabel && onSecondaryAction && (
+            <button
+              onClick={onSecondaryAction}
+              disabled={disabled}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: "transparent",
+                color: "var(--text-2)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              {secondaryActionLabel}
+            </button>
+          )}
+          <button
+            onClick={onAction}
+            disabled={disabled}
+            className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            style={{
+              background: actionVariant === "primary" ? "var(--green)" : "transparent",
+              color: actionVariant === "primary" ? "#fff" : "var(--text-2)",
+              border: actionVariant === "primary" ? "none" : "1px solid var(--border)",
+            }}
+          >
+            {actionLabel}
+            {actionVariant === "primary" && <ArrowRight size={11} />}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  Stage 2 — Defaults                                                */
+/*                                                                    */
+/*  Single card with 4 settings rows:                                 */
+/*    A. Trigger (radio) + N input                                    */
+/*    B. Payment terms ladder (visual: voucher → ledger → 45d)        */
+/*    C. Template tone (3 chips + Request custom)                     */
+/*    D. Channel (WA/Email checkboxes) + recipient (Owner/Accounting) */
+/* ────────────────────────────────────────────────────────────────── */
+function DefaultsSection({
+  rules,
+  update,
+  onManageContacts,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(
+    key: K,
+    value: ReminderAutomationRules[K],
+  ) => void;
+  onManageContacts: () => void;
+}) {
+  return (
+    <div
+      className="rounded-md overflow-hidden"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border)" }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--blue) 14%, transparent)",
+              color: "var(--blue)",
+            }}
+          >
+            Step 2
+          </span>
+          <h3 className="text-[13px] font-bold" style={{ color: "var(--text-1)" }}>
+            Defaults
+          </h3>
+        </div>
+        <span className="text-[10.5px]" style={{ color: "var(--text-4)" }}>
+          Applied to all new parties
+        </span>
+      </div>
+
+      <div className="p-4 flex flex-col gap-5">
+        {/* A. Trigger */}
+        <DefaultRow
+          label="When to send"
+          help="Pick the event that fires a reminder."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {REMINDER_TRIGGER_PRESETS.map((t) => {
+              const active = rules.triggerType === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => update("triggerType", t.id)}
+                  className="rounded-md p-3 text-left cursor-pointer transition-colors"
+                  style={{
+                    background: active ? "color-mix(in srgb, var(--green) 8%, transparent)" : "var(--bg-primary)",
+                    border: `1px solid ${active ? "var(--green)" : "var(--border)"}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className="text-[12px] font-bold"
+                      style={{ color: active ? "var(--green)" : "var(--text-1)" }}
+                    >
+                      {t.label}
+                    </span>
+                    {t.recommended && (
+                      <span
+                        className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                        style={{
+                          background: "color-mix(in srgb, var(--green) 14%, transparent)",
+                          color: "var(--green)",
+                        }}
+                      >
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10.5px] leading-snug" style={{ color: "var(--text-3)" }}>
+                    {t.blurb}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* N-input only when relevant */}
+          {(rules.triggerType === "n-days-after-due" ||
+            rules.triggerType === "n-days-before-due") && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[11.5px]" style={{ color: "var(--text-3)" }}>
+                Send
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={rules.triggerOffsetDays}
+                onChange={(e) =>
+                  update("triggerOffsetDays", Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 1)))
+                }
+                className="w-16 text-[12px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+                style={{
+                  background: "var(--bg-primary)",
+                  color: "var(--text-1)",
+                  border: "1px solid var(--border)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              />
+              <span className="text-[11.5px]" style={{ color: "var(--text-3)" }}>
+                day{rules.triggerOffsetDays === 1 ? "" : "s"}{" "}
+                {rules.triggerType === "n-days-after-due" ? "after" : "before"} due date
+              </span>
+            </div>
+          )}
+        </DefaultRow>
+
+        {/* B. Follow-up cadence — May 8 mtg ask: make repeat schedule visible */}
+        <DefaultRow
+          label="Follow-up cadence"
+          help="After the first reminder, how often to chase the same party. The schedule preview below shows the actual send dates and tone for the next 5 reminders."
+        >
+          <FollowUpCadenceControls rules={rules} update={update} />
+        </DefaultRow>
+
+        {/* C. Payment terms ladder */}
+        <DefaultRow
+          label="Payment terms source"
+          help="Riko reads terms in this order. We rarely fall through to the default — most invoices have voucher-level terms."
+        >
+          <div className="flex items-stretch gap-1.5 flex-wrap">
+            <TermsLadderStep
+              n={1}
+              title="Voucher"
+              subtitle="Per-invoice override"
+              accent="var(--green)"
+            />
+            <TermsLadderArrow />
+            <TermsLadderStep
+              n={2}
+              title="Ledger"
+              subtitle="Party master default"
+              accent="var(--blue)"
+            />
+            <TermsLadderArrow />
+            <TermsLadderStep
+              n={3}
+              title={`${rules.paymentTermsFallbackDays}-day fallback`}
+              subtitle="If neither set"
+              accent="var(--text-4)"
+              editable={
+                <input
+                  type="number"
+                  min={7}
+                  max={120}
+                  value={rules.paymentTermsFallbackDays}
+                  onChange={(e) =>
+                    update(
+                      "paymentTermsFallbackDays",
+                      Math.max(7, Math.min(120, parseInt(e.target.value, 10) || 45)),
+                    )
+                  }
+                  className="w-12 text-[10.5px] font-semibold px-1.5 py-0.5 rounded tabular-nums text-right"
+                  style={{
+                    background: "var(--bg-primary)",
+                    color: "var(--text-1)",
+                    border: "1px solid var(--border)",
+                  }}
+                />
+              }
+            />
+          </div>
+        </DefaultRow>
+
+        {/* C. Template tone */}
+        <DefaultRow
+          label="Default tone"
+          help="Riko picks per overdue bucket when set to Auto. Override here to lock one tone across all parties."
+        >
+          <div className="flex flex-wrap gap-2">
+            {/* Auto chip */}
+            <ToneChip
+              active={rules.defaultTone === "auto"}
+              label="Auto (recommended)"
+              sub="Ladder by overdue days"
+              onClick={() => update("defaultTone", "auto")}
+            />
+            {REMINDER_TONE_PRESETS.map((p) => (
+              <ToneChip
+                key={p.id}
+                active={rules.defaultTone === p.id}
+                label={p.label}
+                sub={`${p.daysBucket} · ${p.blurb}`}
+                onClick={() => update("defaultTone", p.id)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="text-[10.5px] font-semibold mt-2 cursor-pointer"
+            style={{ color: "var(--blue)" }}
+          >
+            Request a custom template →
+          </button>
+        </DefaultRow>
+
+        {/* D. Channels */}
+        <DefaultRow
+          label="Channels"
+          help="WhatsApp gets the highest reply rate. Email is the deliverability backstop. SMS reserved for final-tier."
+        >
+          <div className="flex flex-wrap gap-2">
+            <ChannelToggle
+              channel="whatsapp"
+              label="WhatsApp"
+              replyRate={REMINDER_ANALYTICS_30D.replyRateByChannel.whatsapp}
+              rules={rules}
+              update={update}
+            />
+            <ChannelToggle
+              channel="email"
+              label="Email"
+              replyRate={REMINDER_ANALYTICS_30D.replyRateByChannel.email}
+              rules={rules}
+              update={update}
+            />
+            <ChannelToggle
+              channel="sms"
+              label="SMS"
+              replyRate={REMINDER_ANALYTICS_30D.replyRateByChannel.sms}
+              rules={rules}
+              update={update}
+            />
+          </div>
+        </DefaultRow>
+
+        {/* E. Who gets the reminder — multi-contact-aware strategy */}
+        <DefaultRow
+          label="Who gets the reminder"
+          help="Default sends to the contact already imported from Tally. Add more contacts per party (founder, finance, etc.) and pick a broader strategy if you want to chase multiple people."
+        >
+          <RecipientStrategyPicker
+            rules={rules}
+            update={update}
+            onManageContacts={onManageContacts}
+          />
+        </DefaultRow>
+      </div>
+    </div>
+  );
+}
+
+function DefaultRow({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  help?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div>
+        <p className="text-[11.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-3)" }}>
+          {label}
+        </p>
+        {help && (
+          <p className="text-[10.5px] mt-0.5" style={{ color: "var(--text-4)" }}>
+            {help}
+          </p>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   FollowUpCadenceControls — repeat-cadence picker + max + escalation
+   + visual schedule timeline preview.
+
+   Three knobs:
+     1. Frequency presets (3 / 7 / 14 days) + custom number input
+     2. Max reminders before manual handoff (uses maxRemindersPerParty)
+     3. Escalation window in days (uses escalateAfterDays)
+
+   Below the controls: a horizontal timeline showing exactly when the
+   next 5 reminders fire, what tone each one carries (gentle / standard
+   / firm) and where the escalation milestone lands. Updates live as
+   the user changes the inputs.
+   ──────────────────────────────────────────────────────────────────── */
+function FollowUpCadenceControls({
+  rules,
+  update,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(
+    key: K,
+    value: ReminderAutomationRules[K],
+  ) => void;
+}) {
+  const FREQ_PRESETS = [
+    { days: 3,  label: "Every 3 days", subtitle: "Aggressive — top 10 collections", color: "var(--red)" },
+    { days: 7,  label: "Every 7 days", subtitle: "Standard — best balance",          color: "var(--green)", recommended: true },
+    { days: 14, label: "Every 14 days", subtitle: "Gentle — relationship-first",     color: "var(--blue)" },
+  ];
+
+  const schedule = computeReminderSchedule(rules);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Knobs row 1 — frequency presets + custom */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        {FREQ_PRESETS.map((p) => {
+          const active = rules.defaultFrequencyDays === p.days;
+          return (
+            <button
+              key={p.days}
+              type="button"
+              onClick={() => update("defaultFrequencyDays", p.days)}
+              className="rounded-md p-2.5 text-left cursor-pointer transition-colors"
+              style={{
+                background: active
+                  ? `color-mix(in srgb, ${p.color} 8%, transparent)`
+                  : "var(--bg-primary)",
+                border: `1px solid ${active ? p.color : "var(--border)"}`,
+              }}
+            >
+              <div className="flex items-center justify-between mb-0.5">
+                <span
+                  className="text-[12px] font-bold"
+                  style={{ color: active ? p.color : "var(--text-1)" }}
+                >
+                  {p.label}
+                </span>
+                {p.recommended && (
+                  <span
+                    className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+                    style={{
+                      background: "color-mix(in srgb, var(--green) 14%, transparent)",
+                      color: "var(--green)",
+                    }}
+                  >
+                    Default
+                  </span>
+                )}
+              </div>
+              <p className="text-[10.5px] leading-snug" style={{ color: "var(--text-3)" }}>
+                {p.subtitle}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Knobs row 2 — custom frequency + max + escalation */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px]" style={{ color: "var(--text-3)" }}>
+        <span className="flex items-center gap-1.5">
+          Or custom:
+          <input
+            type="number"
+            min={1}
+            max={60}
+            value={rules.defaultFrequencyDays}
+            onChange={(e) =>
+              update("defaultFrequencyDays", Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 1)))
+            }
+            className="w-14 text-[12px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+            style={{
+              background: "var(--bg-primary)",
+              color: "var(--text-1)",
+              border: "1px solid var(--border)",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          />
+          day{rules.defaultFrequencyDays === 1 ? "" : "s"}
+        </span>
+        <span style={{ color: "var(--text-4)" }}>·</span>
+        <span className="flex items-center gap-1.5">
+          Up to
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={rules.maxRemindersPerParty}
+            onChange={(e) =>
+              update("maxRemindersPerParty", Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5)))
+            }
+            className="w-12 text-[12px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+            style={{
+              background: "var(--bg-primary)",
+              color: "var(--text-1)",
+              border: "1px solid var(--border)",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          />
+          reminder{rules.maxRemindersPerParty === 1 ? "" : "s"}
+        </span>
+        <span style={{ color: "var(--text-4)" }}>·</span>
+        <span className="flex items-center gap-1.5">
+          Then escalate after
+          <input
+            type="number"
+            min={1}
+            max={60}
+            value={rules.escalateAfterDays}
+            onChange={(e) =>
+              update("escalateAfterDays", Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 14)))
+            }
+            className="w-14 text-[12px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+            style={{
+              background: "var(--bg-primary)",
+              color: "var(--text-1)",
+              border: "1px solid var(--border)",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          />
+          days no reply
+        </span>
+      </div>
+
+      {/* Timeline preview — horizontal strip with milestone dots */}
+      <SchedulePreview schedule={schedule} rules={rules} />
+    </div>
+  );
+}
+
+/** Horizontal timeline showing the next 5 reminders + escalation
+ *  milestone. Each dot is a reminder, colored by tone. The line
+ *  underneath labels the day-offset and tone bucket per dot. */
+function SchedulePreview({
+  schedule,
+  rules,
+}: {
+  schedule: ScheduledReminder[];
+  rules: ReminderAutomationRules;
+}) {
+  const TONE_COLOR: Record<ReminderTone, string> = {
+    gentle:   "var(--green)",
+    standard: "var(--blue)",
+    firm:     "var(--orange)",
+    final:    "var(--red)",
+  };
+
+  // For positioning, the timeline spans from min(0, first) to last+pad
+  const minDay = Math.min(0, schedule[0]?.dayOffset ?? 0);
+  const maxDay = (schedule[schedule.length - 1]?.dayOffset ?? 30) + 2;
+  const range = Math.max(1, maxDay - minDay);
+  const pct = (d: number) => ((d - minDay) / range) * 100;
+
+  // Trigger anchor — "Day 0" or due date marker
+  const anchorPct = pct(0);
+
+  return (
+    <div
+      className="rounded-md p-3 mt-1"
+      style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+          Schedule preview · for one party
+        </span>
+        <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+          {rules.maxRemindersPerParty} reminders, then manual handoff
+        </span>
+      </div>
+
+      {/* Timeline — relative-positioned line with absolute dots */}
+      <div className="relative" style={{ paddingTop: 8, paddingBottom: 36 }}>
+        {/* Base line */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 16,
+            height: 2,
+            background: "var(--border)",
+            borderRadius: 1,
+          }}
+        />
+
+        {/* Trigger anchor — "Due date" marker */}
+        <div
+          style={{
+            position: "absolute",
+            left: `${anchorPct}%`,
+            top: 0,
+            transform: "translateX(-50%)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <span
+            className="text-[8.5px] font-bold uppercase tracking-wider mb-0.5"
+            style={{ color: "var(--text-4)" }}
+          >
+            Due
+          </span>
+          <span
+            style={{
+              width: 1,
+              height: 36,
+              background: "var(--text-4)",
+              opacity: 0.4,
+            }}
+          />
+        </div>
+
+        {/* Reminder dots */}
+        {schedule.map((s) => {
+          const isEscalate = s.action === "escalate";
+          const color = isEscalate ? "var(--red)" : TONE_COLOR[s.tone];
+          return (
+            <div
+              key={s.sequence}
+              style={{
+                position: "absolute",
+                left: `${pct(s.dayOffset)}%`,
+                top: 0,
+                transform: "translateX(-50%)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+              }}
+            >
+              {/* Day label above */}
+              <span
+                className="text-[10px] font-semibold tabular-nums"
+                style={{
+                  color: isEscalate ? "var(--red)" : "var(--text-2)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  marginBottom: 2,
+                }}
+              >
+                {s.dayOffset > 0 ? `+${s.dayOffset}d` : s.dayOffset === 0 ? "Day 0" : `${s.dayOffset}d`}
+              </span>
+              {/* Dot */}
+              <span
+                style={{
+                  width: isEscalate ? 14 : 12,
+                  height: isEscalate ? 14 : 12,
+                  borderRadius: 999,
+                  background: color,
+                  border: `2px solid var(--bg-primary)`,
+                  boxShadow: `0 0 0 1.5px ${color}`,
+                  zIndex: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  fontSize: 8,
+                  fontWeight: 700,
+                }}
+              >
+                {isEscalate ? "!" : s.sequence}
+              </span>
+              {/* Tone label below */}
+              <span
+                className="text-[9px] uppercase tracking-wider font-semibold mt-1"
+                style={{
+                  color: isEscalate ? "var(--red)" : color,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {s.toneLabel}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Plain-English summary line */}
+      <p className="text-[10.5px] mt-2" style={{ color: "var(--text-3)" }}>
+        First reminder fires{" "}
+        <strong style={{ color: "var(--text-1)" }}>
+          {rules.triggerType === "n-days-after-due" && `${rules.triggerOffsetDays}d after due`}
+          {rules.triggerType === "n-days-before-due" && `${rules.triggerOffsetDays}d before due`}
+          {rules.triggerType === "weekly" && "in the next Monday batch"}
+          {rules.triggerType === "on-create" && "when the invoice posts"}
+        </strong>
+        , then every <strong style={{ color: "var(--text-1)" }}>{rules.defaultFrequencyDays}{" "}
+        day{rules.defaultFrequencyDays === 1 ? "" : "s"}</strong> until the party pays or we hit{" "}
+        <strong style={{ color: "var(--text-1)" }}>{rules.maxRemindersPerParty} reminders</strong>.
+        After that, no reply for{" "}
+        <strong style={{ color: "var(--text-1)" }}>{rules.escalateAfterDays}d</strong> → flagged
+        for manual review by the Accounts team.
+      </p>
+    </div>
+  );
+}
+
+function TermsLadderStep({
+  n,
+  title,
+  subtitle,
+  accent,
+  editable,
+}: {
+  n: number;
+  title: string;
+  subtitle: string;
+  accent: string;
+  editable?: React.ReactNode;
+}) {
+  return (
+    <div
+      className="rounded-md p-2.5 flex items-center gap-2 flex-1 min-w-[140px]"
+      style={{
+        background: "var(--bg-primary)",
+        border: `1px solid ${accent === "var(--text-4)" ? "var(--border)" : "color-mix(in srgb, " + accent + " 30%, transparent)"}`,
+      }}
+    >
+      <div
+        className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold tabular-nums"
+        style={{
+          background: `color-mix(in srgb, ${accent} 18%, transparent)`,
+          color: accent,
+        }}
+      >
+        {n}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className="text-[11.5px] font-bold" style={{ color: "var(--text-1)" }}>
+            {title}
+          </p>
+          {editable}
+        </div>
+        <p className="text-[9.5px]" style={{ color: "var(--text-4)" }}>
+          {subtitle}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TermsLadderArrow() {
+  return (
+    <div className="flex items-center justify-center px-0.5" style={{ color: "var(--text-4)" }}>
+      <ChevronRight size={14} />
+    </div>
+  );
+}
+
+function ToneChip({
+  active,
+  label,
+  sub,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-md p-2.5 text-left cursor-pointer transition-colors flex-1 min-w-[160px] max-w-[240px]"
+      style={{
+        background: active ? "color-mix(in srgb, var(--green) 8%, transparent)" : "var(--bg-primary)",
+        border: `1px solid ${active ? "var(--green)" : "var(--border)"}`,
+      }}
+    >
+      <p className="text-[11.5px] font-bold" style={{ color: active ? "var(--green)" : "var(--text-1)" }}>
+        {label}
+      </p>
+      <p className="text-[10px] mt-0.5 leading-snug" style={{ color: "var(--text-4)" }}>
+        {sub}
+      </p>
+    </button>
+  );
+}
+
+function ChannelToggle({
+  channel,
+  label,
+  replyRate,
+  rules,
+  update,
+}: {
+  channel: ReminderChannel;
+  label: string;
+  replyRate: number;
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(
+    key: K,
+    value: ReminderAutomationRules[K],
+  ) => void;
+}) {
+  // Channel selection is global for the prototype — toggles WABA/email
+  // approval state. For real wiring this'd be per-party.
+  const active =
+    channel === "whatsapp" ? rules.wabaApproved : channel === "email" ? !!rules.emailFromAddress : true;
+  // The toggle is read-only display in the prototype since channel
+  // wiring lives in per-party settings + INFINI templates.
+  void active;
+  return (
+    <div
+      className="rounded-md px-3 py-2 flex items-center gap-2 cursor-pointer"
+      style={{
+        background: "var(--bg-primary)",
+        border: "1px solid var(--border)",
+      }}
+      onClick={() => {
+        // No-op for now — channel selection moved to per-party in real PRD.
+        void update;
+      }}
+    >
+      {channel === "whatsapp" && <MessageCircle size={13} style={{ color: "var(--green)" }} />}
+      {channel === "email" && <Mail size={13} style={{ color: "var(--blue)" }} />}
+      {channel === "sms" && <Bell size={13} style={{ color: "var(--orange)" }} />}
+      <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-1)" }}>
+        {label}
+      </span>
+      <span className="text-[10px] tabular-nums" style={{ color: "var(--text-4)" }}>
+        {(replyRate * 100).toFixed(0)}% reply
+      </span>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   RecipientStrategyPicker — multi-contact-aware recipient picker
+
+   Three modes per the May 8 conversation:
+     1. Primary only (default — keeps it simple, the Tally contact gets
+        the reminder)
+     2. All marked — every contact at the party with receivesReminders
+     3. By role(s) — only contacts whose role(s) match user's selection
+
+   Coverage stat below the picker shows how many contacts are captured
+   so users see the impact of their pick. "Manage contacts" jumps to
+   the full CRUD drawer.
+   ══════════════════════════════════════════════════════════════════ */
+function RecipientStrategyPicker({
+  rules,
+  update,
+  onManageContacts,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(
+    key: K,
+    value: ReminderAutomationRules[K],
+  ) => void;
+  onManageContacts: () => void;
+}) {
+  const strategy = rules.defaultRecipientStrategy;
+  const coverage = computeContactsCoverage();
+
+  const setStrategy = (next: ReminderRecipientStrategy) =>
+    update("defaultRecipientStrategy", next);
+
+  const isPrimary = strategy.kind === "primary-only";
+  const isAll = strategy.kind === "all-marked";
+  const isByRole = strategy.kind === "by-role";
+  const selectedRoles: ContactRole[] = isByRole ? strategy.roles : [];
+
+  const toggleRole = (role: ContactRole) => {
+    if (!isByRole) return;
+    const next = selectedRoles.includes(role)
+      ? selectedRoles.filter((r) => r !== role)
+      : [...selectedRoles, role];
+    setStrategy({ kind: "by-role", roles: next });
+  };
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      {/* Three strategy options as stacked rows */}
+      <div className="flex flex-col gap-1.5">
+        <StrategyOption
+          active={isPrimary}
+          recommended
+          label="Primary contact only"
+          blurb="Send to whichever contact is marked Primary on each party. For most parties this is the contact that came from Tally."
+          onClick={() => setStrategy({ kind: "primary-only" })}
+        />
+        <StrategyOption
+          active={isAll}
+          label="All contacts marked “Receive reminders”"
+          blurb="Sends to multiple people per party. Best when you've captured both the owner and the accounting contact."
+          onClick={() => setStrategy({ kind: "all-marked" })}
+        />
+        <StrategyOption
+          active={isByRole}
+          label="Specific role(s) only"
+          blurb="Useful when you want the founder copied on Final-tier reminders, or want to skip operations contacts."
+          onClick={() => setStrategy({ kind: "by-role", roles: selectedRoles.length ? selectedRoles : ["owner", "accounting"] })}
+        />
+      </div>
+
+      {/* Role chip selector — only visible when by-role active */}
+      {isByRole && (
+        <div className="ml-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-wider font-semibold mr-1" style={{ color: "var(--text-4)" }}>
+            Roles to include:
+          </span>
+          {(["owner", "accounting", "finance", "purchase", "operations", "sales", "other"] as ContactRole[]).map((r) => {
+            const active = selectedRoles.includes(r);
+            const c = CONTACT_ROLE_COLORS[r];
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => toggleRole(r)}
+                className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded cursor-pointer flex items-center gap-1"
+                style={{
+                  background: active
+                    ? `color-mix(in srgb, ${c} 18%, transparent)`
+                    : "var(--bg-primary)",
+                  color: active ? c : "var(--text-4)",
+                  border: `1px solid ${active ? c : "var(--border)"}`,
+                }}
+              >
+                {active && <Check size={9} />}
+                {CONTACT_ROLE_LABELS[r]}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Coverage stat strip + Manage CTA */}
+      <div
+        className="flex items-center justify-between gap-3 rounded-md px-3 py-2 flex-wrap"
+        style={{
+          background: "var(--bg-primary)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div className="flex items-center gap-3 text-[11px] flex-wrap">
+          <span style={{ color: "var(--text-4)" }}>Coverage:</span>
+          <span style={{ color: "var(--text-2)" }}>
+            <strong style={{ color: "var(--text-1)" }}>{coverage.totalContacts}</strong> contacts across{" "}
+            <strong style={{ color: "var(--text-1)" }}>{coverage.partiesWithContact}</strong> of{" "}
+            {coverage.totalParties} parties
+          </span>
+          <span style={{ color: "var(--text-4)" }}>·</span>
+          <span style={{ color: "var(--text-2)" }}>
+            <strong style={{ color: "var(--text-1)" }}>{coverage.secondaryContacts}</strong> secondary
+            contacts in {coverage.partiesWithSecondary} parties
+          </span>
+          {coverage.partiesMissingContact > 0 && (
+            <>
+              <span style={{ color: "var(--text-4)" }}>·</span>
+              <span style={{ color: "var(--orange)" }}>
+                {coverage.partiesMissingContact} parties without any contact
+              </span>
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onManageContacts}
+          className="text-[11px] font-semibold px-3 py-1 rounded-md cursor-pointer flex items-center gap-1 flex-shrink-0"
+          style={{
+            background: "transparent",
+            color: "var(--text-2)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          Manage contacts <ArrowRight size={11} />
+        </button>
+      </div>
+
+      {/* Honest framing line */}
+      <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-4)" }}>
+        Tally typically gives you one contact per party (usually the accounting/billing person).
+        Capture additional contacts (founder, finance, purchase) via{" "}
+        <button
+          type="button"
+          onClick={onManageContacts}
+          className="cursor-pointer underline"
+          style={{ color: "var(--blue)" }}
+        >
+          Manage contacts
+        </button>
+        {" "}to get more reach.
+      </p>
+    </div>
+  );
+}
+
+function StrategyOption({
+  active,
+  recommended,
+  label,
+  blurb,
+  onClick,
+}: {
+  active: boolean;
+  recommended?: boolean;
+  label: string;
+  blurb: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-md p-2.5 text-left cursor-pointer transition-colors flex items-start gap-2.5"
+      style={{
+        background: active
+          ? "color-mix(in srgb, var(--green) 6%, transparent)"
+          : "var(--bg-primary)",
+        border: `1px solid ${active ? "var(--green)" : "var(--border)"}`,
+      }}
+    >
+      <span
+        className="flex-shrink-0 mt-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center"
+        style={{
+          background: active ? "var(--green)" : "transparent",
+          border: `2px solid ${active ? "var(--green)" : "var(--text-4)"}`,
+        }}
+      >
+        {active && <span style={{ width: 5, height: 5, borderRadius: 999, background: "#fff" }} />}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-2 mb-0.5 flex-wrap">
+          <span
+            className="text-[11.5px] font-bold"
+            style={{ color: active ? "var(--green)" : "var(--text-1)" }}
+          >
+            {label}
+          </span>
+          {recommended && (
+            <span
+              className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded"
+              style={{
+                background: "color-mix(in srgb, var(--green) 14%, transparent)",
+                color: "var(--green)",
+              }}
+            >
+              Default · Recommended
+            </span>
+          )}
+        </span>
+        <span className="text-[10.5px] leading-snug block" style={{ color: "var(--text-4)" }}>
+          {blurb}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  Stage 3 — Monitor                                                 */
+/*                                                                    */
+/*  Lightweight schedule view. Filter chips, then a list of           */
+/*  ReminderMonitorRow with party · next-send · status · channels.    */
+/* ────────────────────────────────────────────────────────────────── */
+function MonitorSection({ rules }: { rules: ReminderAutomationRules }) {
+  const [filter, setFilter] = useState<ReminderMonitorFilter>("all");
+  const [search, setSearch] = useState("");
+
+  const allRows = buildReminderMonitor(rules);
+  const filtered = filterMonitorRows(allRows, filter, rules).filter((r) =>
+    !search.trim() || r.partyName.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  // Counts per filter for chip badges
+  const counts: Record<ReminderMonitorFilter, number> = {
+    "all": allRows.length,
+    "scheduled-today": filterMonitorRows(allRows, "scheduled-today", rules).length,
+    "scheduled-tomorrow": filterMonitorRows(allRows, "scheduled-tomorrow", rules).length,
+    "needs-contact": filterMonitorRows(allRows, "needs-contact", rules).length,
+    "paused": filterMonitorRows(allRows, "paused", rules).length,
+    "needs-manual": filterMonitorRows(allRows, "needs-manual", rules).length,
+  };
+
+  return (
+    <div
+      className="rounded-md overflow-hidden"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3"
+        style={{ borderBottom: "1px solid var(--border)" }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--purple) 14%, transparent)",
+              color: "var(--purple)",
+            }}
+          >
+            Step 3
+          </span>
+          <h3 className="text-[13px] font-bold" style={{ color: "var(--text-1)" }}>
+            Monitor
+          </h3>
+        </div>
+        <span className="text-[10.5px]" style={{ color: "var(--text-4)" }}>
+          {filtered.length} of {allRows.length} · Trigger:{" "}
+          <span style={{ color: "var(--text-2)" }}>
+            {rules.triggerType === "n-days-after-due" && `${rules.triggerOffsetDays}d after due`}
+            {rules.triggerType === "n-days-before-due" && `${rules.triggerOffsetDays}d before due`}
+            {rules.triggerType === "weekly" && "Weekly batch"}
+            {rules.triggerType === "on-create" && "On invoice create"}
+          </span>
+          {" · "}cron {rules.cronTimeIst} IST
+        </span>
+      </div>
+
+      <div className="p-4 flex flex-col gap-3">
+        {/* Filter chips + search */}
+        <div className="flex flex-wrap items-center gap-2 justify-between">
+          <div className="flex flex-wrap gap-1.5">
+            {REMINDER_MONITOR_FILTERS.map((f) => {
+              const active = filter === f.id;
+              const c = counts[f.id];
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFilter(f.id)}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer transition-colors flex items-center gap-1.5"
+                  style={{
+                    background: active ? "var(--bg-surface)" : "transparent",
+                    color: active ? "var(--text-1)" : "var(--text-3)",
+                    border: `1px solid ${active ? "var(--text-3)" : "var(--border)"}`,
+                  }}
+                >
+                  {f.label}
+                  <span
+                    className="text-[9.5px] tabular-nums px-1.5 py-0.5 rounded"
+                    style={{
+                      background: active ? "var(--bg-hover)" : "var(--bg-secondary)",
+                      color: "var(--text-4)",
+                    }}
+                  >
+                    {c}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 min-w-[200px]"
+            style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}
+          >
+            <Search size={12} style={{ color: "var(--text-4)" }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search party"
+              className="bg-transparent text-[11.5px] outline-none flex-1 min-w-0"
+              style={{ color: "var(--text-1)" }}
+            />
+          </div>
+        </div>
+
+        {/* Table — desktop */}
+        <div
+          className="hidden md:block rounded-md overflow-hidden"
+          style={{ border: "1px solid var(--border)" }}
+        >
+          <table className="w-full text-[11.5px]">
+            <thead style={{ background: "var(--bg-primary)" }}>
+              <tr>
+                {[
+                  { label: "Party",       align: "left"  },
+                  { label: "Outstanding", align: "right" },
+                  { label: "Status",      align: "left"  },
+                  { label: "Next",        align: "left"  },
+                  { label: "Channels",    align: "left"  },
+                  { label: "Open",        align: "right" },
+                  { label: "Last sent",   align: "left"  },
+                ].map((h) => (
+                  <th
+                    key={h.label}
+                    className={`px-3 py-2 font-semibold uppercase tracking-wider text-[10px] ${h.align === "right" ? "text-right" : "text-left"}`}
+                    style={{
+                      color: "var(--text-4)",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    {h.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center py-6" style={{ color: "var(--text-4)" }}>
+                    No parties match this filter.
+                  </td>
+                </tr>
+              )}
+              {filtered.map((r, i) => (
+                <MonitorRow key={r.partyName} row={r} striped={i % 2 === 1} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden flex flex-col gap-2">
+          {filtered.map((r) => (
+            <MonitorCard key={r.partyName} row={r} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MonitorRow({ row, striped }: { row: ReminderMonitorRow; striped: boolean }) {
+  return (
+    <tr
+      style={{
+        background: row.attributedPayment
+          ? "color-mix(in srgb, var(--green) 5%, transparent)"
+          : striped
+            ? "color-mix(in srgb, var(--bg-primary) 40%, transparent)"
+            : "transparent",
+        borderTop: "1px solid var(--border)",
+        borderLeft: row.attributedPayment ? "2px solid var(--green)" : "2px solid transparent",
+      }}
+    >
+      <td className="px-3 py-2.5">
+        <p className="font-semibold truncate max-w-[200px]" style={{ color: "var(--text-1)" }}>
+          {row.partyName}
+        </p>
+        <p className="text-[10px] truncate max-w-[200px]" style={{ color: "var(--text-4)" }}>
+          {row.contact.contactPerson ?? row.contact.phone ?? row.contact.email ?? "No contact"} · {row.daysOverdue}d overdue
+        </p>
+      </td>
+      <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}>
+        {formatINR(row.amount)}
+      </td>
+      <td className="px-3 py-2.5">
+        <MonitorStatusPill status={row.status} />
+      </td>
+      <td className="px-3 py-2.5 text-[10.5px]" style={{ color: row.status === "queued" ? "var(--text-1)" : "var(--text-4)" }}>
+        {row.nextLabel}
+      </td>
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-1">
+          {row.channels.map((c) => (
+            <ChannelDot key={c} channel={c} />
+          ))}
+        </div>
+      </td>
+      <td className="px-3 py-2.5 text-right tabular-nums" style={{ color: "var(--text-2)", fontFamily: "'Space Grotesk', sans-serif" }}>
+        {row.openRate === null ? "—" : `${Math.round(row.openRate * 100)}%`}
+      </td>
+      <td className="px-3 py-2.5 text-[10.5px]" style={{ color: "var(--text-3)" }}>
+        {row.lastSentLabel}
+        {row.attributedPayment && (
+          <span
+            className="ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--green) 14%, transparent)",
+              color: "var(--green)",
+            }}
+            title="Reminder credited a payment within 7d"
+          >
+            ₹ paid
+          </span>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function MonitorCard({ row }: { row: ReminderMonitorRow }) {
+  return (
+    <div
+      className="rounded-md p-3 flex flex-col gap-1.5"
+      style={{
+        background: row.attributedPayment
+          ? "color-mix(in srgb, var(--green) 5%, var(--bg-primary))"
+          : "var(--bg-primary)",
+        border: "1px solid var(--border)",
+        borderLeft: row.attributedPayment ? "2px solid var(--green)" : "1px solid var(--border)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-[12px] font-bold truncate" style={{ color: "var(--text-1)" }}>
+            {row.partyName}
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+            {row.daysOverdue}d overdue · {formatINR(row.amount)}
+          </p>
+        </div>
+        <MonitorStatusPill status={row.status} />
+      </div>
+      <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--text-3)" }}>
+        <span className="truncate flex-1 min-w-0 mr-2">{row.nextLabel}</span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {row.channels.map((c) => <ChannelDot key={c} channel={c} />)}
+          <span className="ml-1">
+            {row.openRate === null ? "—" : `${Math.round(row.openRate * 100)}%`}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-[10px] pt-1" style={{ color: "var(--text-4)", borderTop: "1px solid var(--border)" }}>
+        <span>Last: {row.lastSentLabel}</span>
+        {row.attributedPayment && (
+          <span
+            className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--green) 14%, transparent)",
+              color: "var(--green)",
+            }}
+          >
+            ₹ paid
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Status pill — short semantic word, no timestamp.
+ *  The Next column carries the timestamp/action separately. */
+function MonitorStatusPill({ status }: { status: ReminderMonitorRow["status"] }) {
+  const cfg: Record<ReminderMonitorRow["status"], { color: string; bg: string; label: string; icon: React.ReactNode }> = {
+    "queued":        { color: "var(--green)",  bg: "color-mix(in srgb, var(--green) 12%, transparent)",  label: "Queued",        icon: <Clock size={9} /> },
+    "paused":        { color: "var(--yellow)", bg: "color-mix(in srgb, var(--yellow) 14%, transparent)", label: "Paused",        icon: <Pause size={9} /> },
+    "disabled":      { color: "var(--text-4)", bg: "var(--bg-hover)",                                    label: "Disabled",      icon: null },
+    "needs-contact": { color: "var(--orange)", bg: "color-mix(in srgb, var(--orange) 14%, transparent)", label: "Needs contact", icon: <Phone size={9} /> },
+    "needs-manual":  { color: "var(--red)",    bg: "color-mix(in srgb, var(--red) 12%, transparent)",    label: "Manual",        icon: <AlertCircle size={9} /> },
+  };
+  const c = cfg[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded"
+      style={{ background: c.bg, color: c.color }}
+    >
+      {c.icon}
+      {c.label}
+    </span>
+  );
+}
+
+function ChannelDot({ channel }: { channel: ReminderChannel }) {
+  const cfg: Record<ReminderChannel, { color: string; letter: string; title: string }> = {
+    whatsapp: { color: "var(--green)", letter: "W", title: "WhatsApp" },
+    email:    { color: "var(--blue)",  letter: "E", title: "Email" },
+    sms:      { color: "var(--orange)", letter: "S", title: "SMS" },
+  };
+  const c = cfg[channel];
+  return (
+    <span
+      title={c.title}
+      className="inline-flex items-center justify-center text-[8.5px] font-bold rounded"
+      style={{
+        width: 14,
+        height: 14,
+        background: `color-mix(in srgb, ${c.color} 15%, transparent)`,
+        color: c.color,
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
+      {c.letter}
+    </span>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  Advanced settings — collapsed by default                          */
+/*                                                                    */
+/*  Wraps the 7 deployed-version sections in one progressive-         */
+/*  disclosure expander so the 3-stage MVP stays clean for new        */
+/*  users while power users (CA, accounts head) can drill in to       */
+/*  tune cron timing, exclusions, escalation, auto-stop, channel      */
+/*  health, templates, and analytics. Each child component already    */
+/*  has its own card chrome; this expander adds only the parent       */
+/*  toggle + animated reveal.                                         */
+/* ────────────────────────────────────────────────────────────────── */
+function AdvancedSection({
+  rules,
+  update,
+}: {
+  rules: ReminderAutomationRules;
+  update: <K extends keyof ReminderAutomationRules>(
+    key: K,
+    value: ReminderAutomationRules[K],
+  ) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div
+      className="rounded-md overflow-hidden"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between px-4 py-3 cursor-pointer text-left"
+        style={{
+          borderBottom: open ? "1px solid var(--border)" : "none",
+          background: open ? "color-mix(in srgb, var(--bg-hover) 50%, transparent)" : "transparent",
+          transition: "background 150ms",
+        }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <ChevronDown
+            size={14}
+            style={{
+              color: "var(--text-3)",
+              transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+              transition: "transform 200ms",
+              flexShrink: 0,
+            }}
+          />
+          <span
+            className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex-shrink-0"
+            style={{
+              background: "color-mix(in srgb, var(--text-3) 14%, transparent)",
+              color: "var(--text-3)",
+            }}
+          >
+            Advanced
+          </span>
+          <span className="text-[13px] font-bold flex-shrink-0" style={{ color: "var(--text-1)" }}>
+            Settings
+          </span>
+          <span
+            className="text-[10.5px] truncate hidden sm:inline"
+            style={{ color: "var(--text-4)" }}
+          >
+            · Templates · Schedule · Exclusions · Escalation · Auto-stop · Channels · Analytics
+          </span>
+        </div>
+        <span className="text-[10.5px] flex-shrink-0" style={{ color: "var(--text-4)" }}>
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            style={{ overflow: "hidden" }}
+          >
+            <div className="p-4 flex flex-col gap-5">
+              <TemplatesSection wabaByTone={rules.wabaApprovalByTone} />
+              <ScheduleSection rules={rules} update={update} />
+              <ExclusionsSection rules={rules} update={update} />
+              <EscalationSection rules={rules} update={update} />
+              <StopRulesSection rules={rules} update={update} />
+              <ChannelsSection rules={rules} update={update} />
+              <AnalyticsSection />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -3127,42 +4767,139 @@ function RemindersTab() {
 /* ────────────────────────────────────────────────────────────────── */
 function LiveStateHero({ rules }: { rules: ReminderAutomationRules }) {
   const state = computeReminderLiveState();
-  const monthlyCostEst = (state.sentThisMonth * rules.msg91CostPerMessage).toFixed(2);
-  const creditsRunwayDays =
-    rules.msg91Credits / Math.max(REMINDER_ANALYTICS_30D.creditsBurnRate, 1);
+  const attribution = computeReminderAttribution();
+  const avgPayDays = computeAvgTimeToPayDays();
+  const bestChannel = bestReplyChannel();
+  // Sparkline data still available via computeDailySendsSparkline()
+  // for the Advanced > Analytics deep-dive — not used in this row.
+
+  // Best-tone label
+  let bestTone: ReminderTone | null = null;
+  let bestTonePct = 0;
+  for (const [tone, v] of Object.entries(REMINDER_ANALYTICS_30D.paymentCorrelation) as Array<[ReminderTone, { reminded: number; paidWithin7d: number; pct: number }]>) {
+    if (v.pct > bestTonePct) { bestTonePct = v.pct; bestTone = tone; }
+  }
+
+  const channelLabel = bestChannel.channel === "whatsapp" ? "WhatsApp" : bestChannel.channel === "email" ? "Email" : "SMS";
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <LiveTile
-        label="Next batch"
-        bigValue="Tomorrow"
-        subValue={`${rules.cronTimeIst} IST · ${state.queued} queued`}
-        color="var(--green)"
-        icon={<Clock size={14} />}
-      />
-      <LiveTile
-        label="Active / Paused"
-        bigValue={`${state.active}`}
-        subValue={`${state.paused} paused · ${state.optedOut} opted out`}
-        color="var(--blue)"
-        icon={<Activity size={14} />}
-        suffix="active"
-      />
-      <LiveTile
-        label="Sent this month"
-        bigValue={`${state.sentThisMonth}`}
-        subValue={`${Math.round(state.replyRate * 100)}% reply rate · ₹${(state.collectedThisMonth / 1e5).toFixed(1)}L collected`}
-        color="var(--purple)"
-        icon={<MessageCircle size={14} />}
-        suffix="sends"
-      />
-      <LiveTile
-        label="Est. monthly cost"
-        bigValue={`₹${monthlyCostEst}`}
-        subValue={`${rules.msg91Credits} credits · ~${Math.round(creditsRunwayDays)}d runway`}
-        color="var(--orange)"
-        icon={<CreditCard size={14} />}
-      />
+    <div className="flex flex-col gap-3">
+      {/* 4 value-oriented tiles — what an SMB owner cares about */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <LiveTile
+          label="Recovered this month"
+          bigValue={attribution ? formatINR(attribution.amountAttributed) : "—"}
+          subValue={
+            attribution
+              ? `${attribution.paymentsAttributed} of ${attribution.remindersSent} reminders paid · ${Math.round((attribution.paymentsAttributed / Math.max(attribution.remindersSent, 1)) * 100)}% conversion`
+              : "No reminders sent yet this month."
+          }
+          color="var(--green)"
+          icon={<MessageCircle size={14} />}
+        />
+        <LiveTile
+          label="Reply rate"
+          bigValue={`${Math.round(state.replyRate * 100)}%`}
+          subValue={`${channelLabel} leads at ${Math.round(bestChannel.pct * 100)}% · ${state.sentThisMonth} sends · across all channels`}
+          color="var(--blue)"
+          icon={<Activity size={14} />}
+        />
+        <LiveTile
+          label="Avg time to pay"
+          bigValue={avgPayDays !== null ? `${avgPayDays.toFixed(1)}d` : "—"}
+          subValue={
+            avgPayDays !== null
+              ? `Days from reminder send to receipt voucher · vs ${Math.round(K.dso)}d typical DSO`
+              : "Not enough data — needs 3+ attributed payments."
+          }
+          color="var(--purple)"
+          icon={<Clock size={14} />}
+        />
+        <LiveTile
+          label="Top tone"
+          bigValue={bestTone ? bestTone.charAt(0).toUpperCase() + bestTone.slice(1) : "—"}
+          subValue={
+            bestTone
+              ? `${Math.round(bestTonePct * 100)}% paid within 7d · ladder validates fresh dues land hardest`
+              : "Run more reminders to see correlation."
+          }
+          color="var(--orange)"
+          icon={<CheckCircle2 size={14} />}
+        />
+      </div>
+
+      {/* Operational status strip — three labeled columns, no chart.
+           The 4 value tiles above already carry the ROI story; this row
+           just answers "what's the system doing right now?" in plain
+           English so the user doesn't have to decode a tiny stacked-bar.
+           Detail charts (30-day daily sends, reply-rate-by-channel,
+           tone→payment correlation) live in Advanced > Analytics. */}
+      <div
+        className="rounded-md grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x"
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border)",
+          // CSS-var-aware divider color
+          ["--tw-divide-opacity" as string]: "1",
+        }}
+      >
+        <OpsCell
+          label="Next batch"
+          primary={`Tomorrow ${rules.cronTimeIst} IST`}
+          secondary={state.queued === 0 ? "0 parties queued — quiet day" : `${state.queued} ${state.queued === 1 ? "party" : "parties"} queued`}
+          accent="var(--green)"
+        />
+        <OpsCell
+          label="Reminders running"
+          primary={`${state.active} of ${RECEIVABLES.length} parties`}
+          secondary={`${state.paused} paused · ${state.optedOut} opted out`}
+          accent="var(--blue)"
+        />
+        <OpsCell
+          label="MSG91 credits"
+          primary={`${rules.msg91Credits.toLocaleString("en-IN")} left`}
+          secondary={`~${Math.round(rules.msg91Credits / Math.max(REMINDER_ANALYTICS_30D.creditsBurnRate, 1))} days runway at current pace`}
+          accent="var(--purple)"
+        />
+      </div>
+    </div>
+  );
+}
+
+/** A single labeled cell in the ops status strip. Stacked layout:
+ *  uppercase label on top, primary fact below, secondary muted below. */
+function OpsCell({
+  label,
+  primary,
+  secondary,
+  accent,
+}: {
+  label: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+}) {
+  return (
+    <div className="px-4 py-3 flex flex-col gap-0.5" style={{ borderColor: "var(--border)" }}>
+      <span
+        className="inline-flex items-center gap-1.5 text-[9.5px] uppercase tracking-wider font-semibold"
+        style={{ color: "var(--text-4)" }}
+      >
+        <span
+          aria-hidden
+          style={{ width: 5, height: 5, borderRadius: 999, background: accent, flexShrink: 0 }}
+        />
+        {label}
+      </span>
+      <span
+        className="text-[12.5px] font-bold tabular-nums"
+        style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {primary}
+      </span>
+      <span className="text-[10.5px]" style={{ color: "var(--text-3)" }}>
+        {secondary}
+      </span>
     </div>
   );
 }
@@ -3232,34 +4969,84 @@ const TONE_META: Record<ReminderTone, { label: string; bucket: string; color: st
   final:    { label: "Final",    bucket: "180+ days",     color: "var(--red)"    },
 };
 
+/* ────────────────────────────────────────────────────────────────────
+   Template approval — providers gate template content, not us.
+
+   Why this UX is read-first:
+   - WhatsApp: every template needs Meta WABA approval (24-48h via MSG91)
+   - SMS:     headers + body need TRAI DLT approval (3-5 business days)
+   - Email:   instant once domain is verified, free-form OK
+
+   So we don't let users freely edit text. They request a revision
+   which routes to the provider's review queue. Riko shows status,
+   not an inline editor.
+   ──────────────────────────────────────────────────────────────────── */
 function TemplatesSection({
-  wabaByTone,
+  wabaByTone: _wabaByTone,
 }: {
   wabaByTone: ReminderAutomationRules["wabaApprovalByTone"];
 }) {
+  void _wabaByTone; // legacy prop — superseded by getTemplateApproval()
+  const [revisionTarget, setRevisionTarget] = useState<{ tone: ReminderTone; channel: ReminderChannel } | null>(null);
+
   return (
     <SectionCard
       title="Template library"
-      subtitle="4-tier tone ladder × 3 channels. Variables fill automatically per party on send."
+      subtitle="4-tier tone ladder × 3 channels. Provider approval required — Riko submits revisions, doesn't inline-edit."
     >
+      {/* Compact provider-info strip */}
+      <div
+        className="rounded-md p-2.5 mb-3 flex flex-wrap items-center gap-3 text-[10.5px]"
+        style={{
+          background: "color-mix(in srgb, var(--blue) 6%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--blue) 22%, transparent)",
+          color: "var(--text-3)",
+        }}
+      >
+        <span style={{ color: "var(--blue)", fontWeight: 700 }}>How approval works:</span>
+        {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => {
+          const r = TEMPLATE_REVIEWERS[ch];
+          const label = ch === "whatsapp" ? "WhatsApp" : ch === "email" ? "Email" : "SMS";
+          return (
+            <span key={ch} className="inline-flex items-center gap-1">
+              <strong style={{ color: "var(--text-2)" }}>{label}:</strong>
+              {r.reviewer} · ETA {r.sla}
+            </span>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {(Object.keys(TONE_META) as ReminderTone[]).map((tone) => (
-          <TemplateCard key={tone} tone={tone} waba={wabaByTone[tone]} />
+          <TemplateCard
+            key={tone}
+            tone={tone}
+            onRequestRevision={(channel) => setRevisionTarget({ tone, channel })}
+          />
         ))}
       </div>
+
+      {revisionTarget && (
+        <TemplateRevisionModal
+          tone={revisionTarget.tone}
+          channel={revisionTarget.channel}
+          onClose={() => setRevisionTarget(null)}
+        />
+      )}
     </SectionCard>
   );
 }
 
+/** Per-tone card showing all 3 channels' approval state side-by-side. */
 function TemplateCard({
   tone,
-  waba,
+  onRequestRevision,
 }: {
   tone: ReminderTone;
-  waba: "approved" | "pending" | "rejected";
+  onRequestRevision: (channel: ReminderChannel) => void;
 }) {
   const meta = TONE_META[tone];
-  // Sample render for preview (first 140 chars of WA template)
+  // Sample render for preview (WA template first)
   const waTemplate = REMINDER_TEMPLATES.find((t) => t.tone === tone && t.channel === "whatsapp");
   const previewText = waTemplate
     ? renderTemplate(waTemplate.body, {
@@ -3271,12 +5058,6 @@ function TemplateCard({
         company_name: cleanCompanyName("Bandra Soap Pvt Ltd(2020-2024)"),
       })
     : "—";
-
-  const channelStatus: Record<ReminderChannel, "approved" | "pending" | "rejected" | "n/a"> = {
-    whatsapp: waba,
-    email:    "approved",
-    sms:      "approved",
-  };
 
   return (
     <motion.div
@@ -3300,42 +5081,366 @@ function TemplateCard({
             {meta.bucket}
           </p>
         </div>
-        <button
-          className="text-[10px] font-semibold px-2.5 py-1 rounded-md cursor-pointer"
-          style={{ background: "var(--bg-hover)", color: "var(--text-2)" }}
-        >
-          Edit
-        </button>
       </div>
+
       <p
         className="text-[11px] leading-relaxed line-clamp-3 rounded-md p-2.5"
         style={{ background: "var(--bg-primary)", color: "var(--text-2)" }}
       >
         {previewText}
       </p>
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => {
-          const st = channelStatus[ch];
-          const chLabel = ch === "whatsapp" ? "WA" : ch === "email" ? "Email" : "SMS";
-          const fg =
-            st === "approved" ? "var(--green)" : st === "pending" ? "var(--yellow)" : "var(--red)";
-          const sym = st === "approved" ? "✓" : st === "pending" ? "…" : "✗";
-          return (
-            <span
-              key={ch}
-              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded"
-              style={{
-                background: `color-mix(in srgb, ${fg} 12%, transparent)`,
-                color: fg,
-              }}
-              title={`${chLabel}: ${st}`}
-            >
-              {chLabel} {sym}
-            </span>
-          );
-        })}
+
+      {/* 3-channel approval strip — one row per channel with status + action */}
+      <div className="flex flex-col gap-1.5">
+        {(["whatsapp", "email", "sms"] as ReminderChannel[]).map((ch) => (
+          <ChannelApprovalRow
+            key={ch}
+            tone={tone}
+            channel={ch}
+            onRequestRevision={() => onRequestRevision(ch)}
+          />
+        ))}
       </div>
     </motion.div>
+  );
+}
+
+function ChannelApprovalRow({
+  tone,
+  channel,
+  onRequestRevision,
+}: {
+  tone: ReminderTone;
+  channel: ReminderChannel;
+  onRequestRevision: () => void;
+}) {
+  const approval = getTemplateApproval(tone, channel);
+  const cfg = STATUS_CFG[approval.status];
+  const channelLabel = channel === "whatsapp" ? "WhatsApp" : channel === "email" ? "Email" : "SMS";
+
+  // Action varies by status (see comment block above)
+  let actionLabel: string;
+  let actionDisabled = false;
+  switch (approval.status) {
+    case "approved": actionLabel = "Request revision"; break;
+    case "pending":  actionLabel = "Under review"; actionDisabled = true; break;
+    case "rejected": actionLabel = "View reason · Resubmit"; break;
+    case "draft":    actionLabel = "Submit for review"; break;
+  }
+
+  return (
+    <div
+      className="flex items-center justify-between gap-2 rounded p-2"
+      style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <span
+          className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded flex-shrink-0"
+          style={{
+            background: "var(--bg-hover)",
+            color: "var(--text-3)",
+            minWidth: 48,
+            textAlign: "center",
+          }}
+        >
+          {channelLabel}
+        </span>
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+          style={{ background: cfg.bg, color: cfg.fg }}
+          title={cfg.tooltip(approval)}
+        >
+          {cfg.symbol} {cfg.label}
+        </span>
+        <span className="text-[10px] truncate" style={{ color: "var(--text-4)" }}>
+          {approval.status === "rejected"
+            ? approval.rejectionReason
+            : approval.status === "pending"
+              ? `${approval.reviewer} · ETA ${approval.slaLabel}`
+              : approval.status === "draft"
+                ? "Local edit — submit to push to provider"
+                : `Approved · ${approval.revisions} revision${approval.revisions === 1 ? "" : "s"}`}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onRequestRevision}
+        disabled={actionDisabled}
+        className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer flex-shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+        style={{
+          background: actionDisabled ? "transparent" : "var(--bg-hover)",
+          color: actionDisabled ? "var(--text-4)" : "var(--text-2)",
+          border: actionDisabled ? "1px solid var(--border)" : "none",
+        }}
+      >
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
+const STATUS_CFG: Record<TemplateApprovalStatus, {
+  label: string;
+  bg: string;
+  fg: string;
+  symbol: string;
+  tooltip: (m: TemplateApprovalMeta) => string;
+}> = {
+  approved: {
+    label: "Approved",
+    bg: "color-mix(in srgb, var(--green) 14%, transparent)",
+    fg: "var(--green)",
+    symbol: "✓",
+    tooltip: (m) => `Approved by ${m.reviewer}${m.approvedAt ? ` on ${new Date(m.approvedAt).toLocaleDateString("en-IN")}` : ""}`,
+  },
+  pending: {
+    label: "Under review",
+    bg: "color-mix(in srgb, var(--yellow) 14%, transparent)",
+    fg: "var(--yellow)",
+    symbol: "…",
+    tooltip: (m) => `Submitted to ${m.reviewer}. ETA ${m.slaLabel}.`,
+  },
+  rejected: {
+    label: "Rejected",
+    bg: "color-mix(in srgb, var(--red) 14%, transparent)",
+    fg: "var(--red)",
+    symbol: "✗",
+    tooltip: (m) => m.rejectionReason ?? `Rejected by ${m.reviewer}.`,
+  },
+  draft: {
+    label: "Draft",
+    bg: "color-mix(in srgb, var(--text-3) 14%, transparent)",
+    fg: "var(--text-3)",
+    symbol: "•",
+    tooltip: () => "Local revision — not yet submitted to provider.",
+  },
+};
+
+/* ────────────────────────────────────────────────────────────────── */
+/*  TemplateRevisionModal — submit-for-review flow                     */
+/* ────────────────────────────────────────────────────────────────── */
+function TemplateRevisionModal({
+  tone,
+  channel,
+  onClose,
+}: {
+  tone: ReminderTone;
+  channel: ReminderChannel;
+  onClose: () => void;
+}) {
+  const meta = TONE_META[tone];
+  const approval = getTemplateApproval(tone, channel);
+  const reviewer = TEMPLATE_REVIEWERS[channel];
+  const original = REMINDER_TEMPLATES.find((t) => t.tone === tone && t.channel === channel)?.body ?? "";
+  const channelLabel = channel === "whatsapp" ? "WhatsApp" : channel === "email" ? "Email" : "SMS";
+
+  const [body, setBody] = useState<string>(approval.pendingRevisionBody ?? original);
+  const [reason, setReason] = useState<string>("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = () => {
+    setSubmitted(true);
+    window.setTimeout(() => onClose(), 1400);
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="fixed inset-0 z-[70]"
+        style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(2px)" }}
+        onClick={onClose}
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 16, scale: 0.98 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="fixed inset-0 z-[80] flex items-center justify-center p-4 pointer-events-none"
+      >
+        <div
+          className="w-full max-w-2xl rounded-lg overflow-hidden pointer-events-auto flex flex-col"
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.5)",
+            maxHeight: "92vh",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div
+            className="flex items-center justify-between px-5 py-3"
+            style={{ borderBottom: "1px solid var(--border)" }}
+          >
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+                Request revision · <span style={{ color: meta.color }}>{meta.label}</span> · {channelLabel}
+              </h3>
+              <p className="text-[10.5px]" style={{ color: "var(--text-4)" }}>
+                {reviewer.reviewer} · ETA {reviewer.sla}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-md cursor-pointer"
+              style={{ color: "var(--text-3)" }}
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="p-5 overflow-y-auto flex flex-col gap-4">
+            {submitted ? (
+              <div className="flex flex-col items-center text-center py-8 gap-3">
+                <div
+                  className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{ background: "color-mix(in srgb, var(--green) 18%, transparent)" }}
+                >
+                  <CheckCircle2 size={24} style={{ color: "var(--green)" }} />
+                </div>
+                <p className="text-base font-bold" style={{ color: "var(--text-1)" }}>
+                  Revision submitted
+                </p>
+                <p className="text-[12px]" style={{ color: "var(--text-3)" }}>
+                  {reviewer.reviewer} will review your changes. ETA {reviewer.sla}.<br />
+                  This template stays at its previous approved version until the new one is greenlit.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Provider context callout */}
+                <div
+                  className="rounded-md p-3 text-[11px]"
+                  style={{
+                    background: "color-mix(in srgb, var(--blue) 6%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--blue) 22%, transparent)",
+                    color: "var(--text-2)",
+                  }}
+                >
+                  <p className="font-semibold mb-1" style={{ color: "var(--blue)" }}>
+                    Why this needs review
+                  </p>
+                  <p>
+                    {channel === "whatsapp" && (
+                      <>
+                        WhatsApp Business templates must be approved by Meta via your WABA provider
+                        (MSG91). Riko submits the revision and waits — automated sends keep using the
+                        last approved version until Meta greenlights the change.
+                      </>
+                    )}
+                    {channel === "email" && (
+                      <>
+                        Email is the most flexible channel — once your sending domain is verified
+                        with Resend, content edits go live almost instantly. Still routed through
+                        Riko&apos;s template registry for audit.
+                      </>
+                    )}
+                    {channel === "sms" && (
+                      <>
+                        SMS templates are gated by India&apos;s TRAI DLT registry. Both the header
+                        (BNDSOP) and the body content need DLT approval. Promotional language gets
+                        rejected — keep it transactional.
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                {/* Original (read-only) */}
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+                    Currently approved version
+                  </span>
+                  <textarea
+                    value={original}
+                    readOnly
+                    rows={4}
+                    className="text-[11.5px] rounded-md px-3 py-2 resize-none cursor-not-allowed"
+                    style={{
+                      background: "var(--bg-primary)",
+                      color: "var(--text-3)",
+                      border: "1px solid var(--border)",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                </label>
+
+                {/* New revision (editable) */}
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+                    Your proposed revision
+                  </span>
+                  <textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    rows={6}
+                    className="text-[11.5px] rounded-md px-3 py-2 resize-none outline-none"
+                    style={{
+                      background: "var(--bg-primary)",
+                      color: "var(--text-1)",
+                      border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                  <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
+                    Variables: {"{party_name}, {invoice_no}, {net_amount}, {due_date}, {days_overdue}, {company_name}"}
+                  </span>
+                </label>
+
+                {/* Reason for change */}
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+                    Reason for revision (sent to reviewer)
+                  </span>
+                  <input
+                    type="text"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="e.g. Adding payment link, softening tone, fixing typo"
+                    className="text-[11.5px] rounded-md px-3 py-2 outline-none"
+                    style={{
+                      background: "var(--bg-primary)",
+                      color: "var(--text-1)",
+                      border: "1px solid var(--border)",
+                    }}
+                  />
+                </label>
+
+                {/* Footer actions */}
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-[10.5px]" style={{ color: "var(--text-4)" }}>
+                    Submitting locks this template until {reviewer.reviewer} responds.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={onClose}
+                      className="text-[12px] font-semibold px-3 py-1.5 rounded-md cursor-pointer"
+                      style={{ background: "transparent", color: "var(--text-3)", border: "1px solid var(--border)" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!body.trim() || body === original}
+                      className="text-[12px] font-semibold px-4 py-1.5 rounded-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      style={{ background: "var(--green)", color: "#fff" }}
+                    >
+                      <Send size={11} />
+                      Submit for review
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

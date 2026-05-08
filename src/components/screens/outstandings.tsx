@@ -6,15 +6,14 @@ import {
   MessageCircle,
   Mail,
   MessageSquare as MessageSquareIcon,
-  Upload,
   AlertTriangle,
   X,
   Phone,
+  ArrowRight,
 } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import { WhatsAppModal } from "@/components/ui/whatsapp-modal";
 import { Party360Drawer } from "@/components/ui/party-360-drawer";
-import { BulkImportModal } from "@/components/ui/bulk-import-modal";
 import {
   RECEIVABLES,
   PAYABLES,
@@ -24,6 +23,7 @@ import {
   lastRemindedLabel,
   agingColor5,
   REMINDER_LIST_FILTERS,
+  REMINDER_AUTOMATION_DEFAULTS,
   type ReminderListFilter,
   getPartyReminderHistory,
 } from "@/lib/data";
@@ -139,7 +139,17 @@ export default function OutstandingsScreen() {
 
   // Reminder-list state (PRD Priority 2 enhancements)
   const [reminderFilter, setReminderFilter] = useState<ReminderListFilter>("all");
-  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  // Reminder enable state — read from defaults for prototype display.
+  // Real product would persist this server-side per company.
+  const remindersOn = REMINDER_AUTOMATION_DEFAULTS.enabled;
+  const goToReminderSettings = () => {
+    window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "settings" }));
+    // SettingsScreen mounts on the next tick, so defer the sub-tab
+    // dispatch so the listener is registered before the event fires.
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("riko:settings-tab", { detail: "reminders" }));
+    }, 60);
+  };
   // Toast shown after clicking WA/Email/SMS in the bulk bar — pure demo.
   const [bulkToast, setBulkToast] = useState<string | null>(null);
 
@@ -439,24 +449,49 @@ export default function OutstandingsScreen() {
                 })}
               </div>
               <button
-                onClick={() => setBulkImportOpen(true)}
+                onClick={goToReminderSettings}
                 className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-md cursor-pointer transition-colors"
                 style={{
-                  background: "transparent",
-                  color: "var(--text-2)",
-                  border: "1px solid var(--border)",
+                  background: remindersOn
+                    ? "color-mix(in srgb, var(--green) 10%, transparent)"
+                    : "transparent",
+                  color: remindersOn ? "var(--green)" : "var(--text-2)",
+                  border: `1px solid ${remindersOn ? "color-mix(in srgb, var(--green) 30%, transparent)" : "var(--border)"}`,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-hover)";
-                  e.currentTarget.style.color = "var(--text-1)";
+                  if (!remindersOn) {
+                    e.currentTarget.style.background = "var(--bg-hover)";
+                    e.currentTarget.style.color = "var(--text-1)";
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "var(--text-2)";
+                  if (!remindersOn) {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--text-2)";
+                  }
                 }}
-                title="Bulk-import contact info via CSV"
+                title={
+                  remindersOn
+                    ? "Auto reminder is on. Click to manage rules."
+                    : "Set up automated WhatsApp / Email reminders for overdue parties"
+                }
               >
-                <Upload size={12} /> Import contacts
+                <span
+                  aria-hidden
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: remindersOn ? "var(--green)" : "var(--text-4)",
+                    flexShrink: 0,
+                  }}
+                />
+                <MessageCircle size={11} />
+                Auto reminder
+                <span style={{ color: remindersOn ? "var(--green)" : "var(--text-4)", fontSize: 10 }}>
+                  {remindersOn ? "On" : "Off"}
+                </span>
+                <ArrowRight size={10} style={{ opacity: 0.7 }} />
               </button>
             </div>
 
@@ -927,11 +962,8 @@ export default function OutstandingsScreen() {
               partyName={partyDrawer ?? ""}
             />
 
-            {/* Bulk Contact Import modal */}
-            <BulkImportModal
-              open={bulkImportOpen}
-              onClose={() => setBulkImportOpen(false)}
-            />
+            {/* Bulk Contact Import lives in Settings → Reminders → Step 1.
+                Outstanding's button now jumps there directly via Auto reminder. */}
 
             {/* Desktop: Collection Insights */}
             <motion.div

@@ -111,6 +111,17 @@ export function compactINR(v: number): string {
 }
 
 export const RECEIVABLES = [
+  // ── Fresh demo parties (May 7 mtg deliverable) ──
+  // Exercise the Monitor's primary use-cases: queued today, queued tomorrow,
+  // paused (promise-to-pay), and a near-threshold firm-stage party. All have
+  // contacts so they pass the gate; days are < maxOverdueThresholdDays (180)
+  // so they don't fall into manual-handoff. Place at top so the demo reads
+  // automation-first instead of red-noise-first.
+  { name: "Mehra Trading Co",            amount:  85000, days:  18, bills:  4, priority: "P3" },
+  { name: "FreshKart Wholesale Pvt Ltd", amount: 240000, days:   5, bills:  8, priority: "P3" },
+  { name: "Pune Pharmacy Distributors",  amount: 110000, days: 152, bills:  6, priority: "P2" },
+  { name: "Surat Apparel Hub",           amount: 620000, days:  67, bills: 12, priority: "P2" },
+  // ── Existing super-overdue tail (manual handoff) ──
   { name: "Nykaa E-Retail Pvt Ltd", amount: 1261337, days: 2195, bills: 298, priority: "P1" },
   { name: "Website Debtors", amount: 1251122, days: 1431, bills: 548, priority: "P1" },
   { name: "LLC Olimpiya", amount: 449626, days: 1107, bills: 1, priority: "P2" },
@@ -2517,19 +2528,67 @@ export const CHAT_INVOICE_UPLOAD = {
 /** Source of a party's contact info. "tally" = synced from Tally
  *  master, "manual" = entered by the user (via side-panel or bulk
  *  import). "none" = we don't have a number yet. */
-export type ContactSource = "tally" | "manual" | "none";
+export type ContactSource = "tally" | "manual" | "enriched" | "none";
+
+/** Org roles a contact can hold. Used to filter reminder recipients
+ *  ("send to owners only", "send to accounting + finance"). Free-form
+ *  designation is captured separately so we don't lose CRM nuance. */
+export type ContactRole =
+  | "owner"        // Founder, proprietor, MD — decision maker
+  | "accounting"   // Accounts/billing person — usually who Tally has
+  | "finance"      // CFO, finance manager
+  | "purchase"     // Purchasing/procurement
+  | "operations"   // Ops/supply chain
+  | "sales"        // Sales lead inside the party org
+  | "other";       // Anything else
+
+/** One person at a party. Each party can have multiple — typically
+ *  starts with the Tally-imported contact (auto-tagged "accounting")
+ *  and grows as the SMB owner enriches with founders/buyers/CFO. */
+export interface PartyContactPerson {
+  /** Stable id for React keys + edit lookups. */
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  /** Free-text title — "Director", "Senior Accounts Mgr", etc. */
+  designation?: string;
+  role: ContactRole;
+  /** Default contact for the party — pre-selected for "primary only"
+   *  recipient strategy. Exactly one per party should be primary. */
+  isPrimary: boolean;
+  /** Whether automated reminders go to this person at all. Lets users
+   *  add a contact for record-keeping without spamming them. */
+  receivesReminders: boolean;
+  source: ContactSource;
+  /** If they replied STOP to WhatsApp, flag here. Per-contact, not
+   *  per-party — one contact opting out shouldn't silence the rest. */
+  optedOut?: boolean;
+}
 
 export interface PartyContact {
   /** Matches a RECEIVABLES.name — used as the join key. */
   partyName: string;
+  /** All known contacts for this party. Empty array = no contacts at all. */
+  contacts: PartyContactPerson[];
+
+  // ── Legacy/derived fields (read-only) ─────────────────────────
+  // Computed from the primary contact for backward compat with callsites
+  // that read `c.phone` / `c.email` / `c.contactPerson` / `c.source` /
+  // `c.optedOut` directly. New code should use getPrimaryContact() or
+  // getReminderRecipients() helpers below.
   phone?: string;
   email?: string;
   contactPerson?: string;
   source: ContactSource;
-  /** If the party replied STOP to a WhatsApp reminder, we flag
-   *  them and disable future automated sends. */
   optedOut?: boolean;
 }
+
+/** Strategy for picking which contacts at a party receive a reminder. */
+export type ReminderRecipientStrategy =
+  | { kind: "primary-only" }                          // Just the primary contact (default)
+  | { kind: "all-marked" }                            // Everyone with receivesReminders === true
+  | { kind: "by-role"; roles: ContactRole[] };        // Anyone whose role matches
 
 /** The 4-tier tone ladder (PRD §3.2 — the existing 3-tier system
  *  enhanced with a Final tier for 180d+ dues). */
@@ -2681,87 +2740,371 @@ export interface ReminderHistoryItem {
   /** The bills this reminder covered. */
   billsCovered: number;
   netAmountAtSend: number;
+  /** Engagement tracking — opened the WA / email (May 7 mtg). */
+  openedAt?: string;
+  /** Engagement tracking — clicked the embedded pay link. */
+  clickedPayLinkAt?: string;
+  /** ROI attribution — payment received within 7d after this reminder.
+   *  When set, dashboards credit this amount to the reminder. */
+  attributedPaymentAmount?: number;
+  /** The receipt voucher that paid (drilldown to Day Book). */
+  attributedReceiptVoucher?: string;
+  /** Who triggered the send — owner if manual, "auto" if cron batch. */
+  sentBy?: string;
 }
 
-/* ── Party contacts — backfilled for the 10 RECEIVABLES parties ── */
-export const PARTY_CONTACTS: PartyContact[] = [
+/* ── Party contacts — multi-contact per party ───────────────────
+   Each party has 1+ PartyContactPerson entries. The primary (the
+   one Tally typically gives you) is auto-tagged "accounting". Power
+   users add owners/finance/purchase contacts as enrichment.
+   `getPartyContact()` exposes the primary's fields at the top level
+   for backward compat with existing callsites. */
+const RAW_PARTY_CONTACTS: PartyContact[] = [
+  // ── Mehra Trading Co — 2 contacts (owner + accounting) demo ──
+  {
+    partyName: "Mehra Trading Co",
+    contacts: [
+      {
+        id: "c-mehra-1",
+        name: "Amit Mehra",
+        phone: "+91 98980 22334",
+        email: "amit@mehratrading.com",
+        designation: "Founder",
+        role: "owner",
+        isPrimary: true,
+        receivesReminders: true,
+        source: "manual",
+      },
+      {
+        id: "c-mehra-2",
+        name: "Sneha Mehra",
+        phone: "+91 98765 99887",
+        email: "ops@mehratrading.com",
+        designation: "Accounts Manager",
+        role: "accounting",
+        isPrimary: false,
+        receivesReminders: true,
+        source: "tally",
+      },
+    ],
+    source: "manual", // legacy mirror
+  },
+  // ── FreshKart — single accounting contact ──
+  {
+    partyName: "FreshKart Wholesale Pvt Ltd",
+    contacts: [
+      {
+        id: "c-freshkart-1",
+        name: "Priya Mehta",
+        phone: "+91 98765 12345",
+        email: "accounts@freshkart.in",
+        designation: "Senior Accountant",
+        role: "accounting",
+        isPrimary: true,
+        receivesReminders: true,
+        source: "tally",
+      },
+    ],
+    source: "tally",
+  },
+  // ── Pune Pharmacy — 3 contacts (owner + finance + ops) ──
+  {
+    partyName: "Pune Pharmacy Distributors",
+    contacts: [
+      {
+        id: "c-pune-1",
+        name: "Asha Joshi",
+        phone: "+91 98221 88990",
+        email: "accounts@punepharmadistro.in",
+        designation: "Proprietor",
+        role: "owner",
+        isPrimary: true,
+        receivesReminders: true,
+        source: "manual",
+      },
+      {
+        id: "c-pune-2",
+        name: "Rajesh Joshi",
+        phone: "+91 98765 44550",
+        email: "finance@punepharmadistro.in",
+        designation: "Finance Manager",
+        role: "finance",
+        isPrimary: false,
+        receivesReminders: true,
+        source: "manual",
+      },
+      {
+        id: "c-pune-3",
+        name: "Manoj Patel",
+        phone: "+91 99887 11223",
+        designation: "Warehouse In-Charge",
+        role: "operations",
+        isPrimary: false,
+        receivesReminders: false, // captured for record only — not chased
+        source: "manual",
+      },
+    ],
+    source: "manual",
+  },
+  // ── Surat Apparel — single contact ──
+  {
+    partyName: "Surat Apparel Hub",
+    contacts: [
+      {
+        id: "c-surat-1",
+        name: "Bhavin Patel",
+        phone: "+91 99300 55667",
+        email: "finance@suratapparel.in",
+        designation: "Finance Lead",
+        role: "finance",
+        isPrimary: true,
+        receivesReminders: true,
+        source: "manual",
+      },
+    ],
+    source: "manual",
+  },
+  // ── Existing super-overdue tail (single accounting contact each) ──
   {
     partyName: "Nykaa E-Retail Pvt Ltd",
-    phone: "+91 98200 44112",
-    email: "ar-mumbai@nykaa.com",
-    contactPerson: "Sakshi Rao",
+    contacts: [
+      { id: "c-nykaa-1", name: "Sakshi Rao", phone: "+91 98200 44112", email: "ar-mumbai@nykaa.com", role: "accounting", isPrimary: true, receivesReminders: true, source: "tally" },
+    ],
     source: "tally",
   },
   {
     partyName: "Website Debtors",
-    // Aggregated ledger — no single phone. Owner flagged manual.
+    contacts: [], // Aggregated ledger — no contacts.
     source: "none",
   },
   {
     partyName: "LLC Olimpiya",
-    phone: "+7 495 123 45 67",
-    email: "acct@olimpiya.ru",
-    contactPerson: "Dmitri Olimpov",
+    contacts: [
+      { id: "c-olimpiya-1", name: "Dmitri Olimpov", phone: "+7 495 123 45 67", email: "acct@olimpiya.ru", role: "accounting", isPrimary: true, receivesReminders: true, source: "manual" },
+    ],
     source: "manual",
   },
   {
     partyName: "One97 Communications (Paytm)",
-    phone: "+91 99870 55102",
-    email: "vendor-payments@paytm.com",
-    contactPerson: "Rahul Kohli",
+    contacts: [
+      { id: "c-paytm-1", name: "Rahul Kohli", phone: "+91 99870 55102", email: "vendor-payments@paytm.com", role: "accounting", isPrimary: true, receivesReminders: true, source: "tally" },
+    ],
     source: "tally",
   },
   {
     partyName: "Prodsol Biotech Pvt Ltd",
-    phone: "+91 98765 33221",
-    email: "accounts@prodsol.in",
-    contactPerson: "Meena Shah",
+    contacts: [
+      { id: "c-prodsol-1", name: "Meena Shah", phone: "+91 98765 33221", email: "accounts@prodsol.in", role: "accounting", isPrimary: true, receivesReminders: true, source: "tally", optedOut: true },
+    ],
     source: "tally",
-    optedOut: true, // replied STOP
   },
   {
     partyName: "Nykaa E-Retail (2)",
-    phone: "+91 98200 44112",
-    email: "ar-mumbai@nykaa.com",
-    contactPerson: "Sakshi Rao",
+    contacts: [
+      { id: "c-nykaa2-1", name: "Sakshi Rao", phone: "+91 98200 44112", email: "ar-mumbai@nykaa.com", role: "accounting", isPrimary: true, receivesReminders: true, source: "tally" },
+    ],
     source: "tally",
   },
   {
     partyName: "Scale Global Debtors",
-    // Known party but missed during Tally sync.
+    contacts: [],
     source: "none",
   },
   {
     partyName: "Buy More (Counfreedise)",
-    phone: "+91 87890 11220",
+    contacts: [
+      { id: "c-buymore-1", name: "—", phone: "+91 87890 11220", role: "accounting", isPrimary: true, receivesReminders: true, source: "manual" },
+    ],
     source: "manual",
   },
   {
     partyName: "NYKAA Mumbai 2",
-    phone: "+91 98200 44112",
+    contacts: [
+      { id: "c-nykaam2-1", name: "—", phone: "+91 98200 44112", role: "accounting", isPrimary: true, receivesReminders: true, source: "tally" },
+    ],
     source: "tally",
   },
   {
     partyName: "Bigfoot/Shiprocket",
-    phone: "+91 90042 00111",
-    email: "ar@shiprocket.com",
-    contactPerson: "Varun Bhalla",
+    contacts: [
+      { id: "c-bigfoot-1", name: "Varun Bhalla", phone: "+91 90042 00111", email: "ar@shiprocket.com", role: "accounting", isPrimary: true, receivesReminders: true, source: "tally" },
+    ],
     source: "tally",
   },
 ];
 
-/** Helper to fetch a contact for a party (falls back to none). */
+/** Backfill the legacy top-level fields (phone/email/contactPerson/optedOut)
+ *  from each party's primary contact so old callsites keep working. */
+function withPrimaryFields(p: PartyContact): PartyContact {
+  const primary = p.contacts.find((c) => c.isPrimary) ?? p.contacts[0];
+  if (!primary) return p; // No contacts — leave legacy fields blank.
+  return {
+    ...p,
+    phone: primary.phone ?? p.phone,
+    email: primary.email ?? p.email,
+    contactPerson: primary.name && primary.name !== "—" ? primary.name : p.contactPerson,
+    optedOut: primary.optedOut ?? p.optedOut,
+  };
+}
+
+export const PARTY_CONTACTS: PartyContact[] = RAW_PARTY_CONTACTS.map(withPrimaryFields);
+
+/** Helper to fetch a contact for a party (falls back to none).
+ *  Returns the legacy-flat shape with primary fields surfaced for
+ *  backward compat — new callers should use getPrimaryContact() or
+ *  getReminderRecipients() for richer access. */
 export function getPartyContact(partyName: string): PartyContact {
   return (
     PARTY_CONTACTS.find((c) => c.partyName === partyName) ?? {
       partyName,
+      contacts: [],
       source: "none" as ContactSource,
     }
   );
 }
 
+/** Returns the primary contact for a party, or undefined if the
+ *  party has no contacts. */
+export function getPrimaryContact(partyName: string): PartyContactPerson | undefined {
+  const p = getPartyContact(partyName);
+  return p.contacts.find((c) => c.isPrimary) ?? p.contacts[0];
+}
+
+/** Resolve the actual recipients for a reminder send to a given party
+ *  using the configured strategy. Filters out opted-out contacts. */
+export function getReminderRecipients(
+  partyName: string,
+  strategy: ReminderRecipientStrategy,
+): PartyContactPerson[] {
+  const p = getPartyContact(partyName);
+  const eligible = p.contacts.filter((c) => !c.optedOut && (c.phone || c.email));
+  if (eligible.length === 0) return [];
+
+  if (strategy.kind === "primary-only") {
+    const primary = eligible.find((c) => c.isPrimary) ?? eligible[0];
+    return primary && primary.receivesReminders ? [primary] : [];
+  }
+  if (strategy.kind === "all-marked") {
+    return eligible.filter((c) => c.receivesReminders);
+  }
+  if (strategy.kind === "by-role") {
+    return eligible.filter((c) => c.receivesReminders && strategy.roles.includes(c.role));
+  }
+  return [];
+}
+
+/** Aggregate contact coverage across the receivables list. Drives
+ *  the "X primary contacts · Y secondary across Z parties" summary
+ *  in the recipient-strategy picker. */
+export function computeContactsCoverage() {
+  const totalParties = RECEIVABLES.length;
+  let partiesWithContact = 0;
+  let totalContacts = 0;
+  let primaryContacts = 0;
+  let secondaryContacts = 0;
+  let partiesWithSecondary = 0;
+  const byRole: Record<ContactRole, number> = {
+    owner: 0, accounting: 0, finance: 0, purchase: 0,
+    operations: 0, sales: 0, other: 0,
+  };
+
+  for (const r of RECEIVABLES) {
+    const p = getPartyContact(r.name);
+    if (p.contacts.length > 0) partiesWithContact++;
+    totalContacts += p.contacts.length;
+    let sec = 0;
+    for (const c of p.contacts) {
+      if (c.isPrimary) primaryContacts++;
+      else { secondaryContacts++; sec++; }
+      byRole[c.role]++;
+    }
+    if (sec > 0) partiesWithSecondary++;
+  }
+
+  return {
+    totalParties,
+    partiesWithContact,
+    partiesMissingContact: totalParties - partiesWithContact,
+    totalContacts,
+    primaryContacts,
+    secondaryContacts,
+    partiesWithSecondary,
+    byRole,
+  };
+}
+
+/** Friendly label for a ContactRole. */
+export const CONTACT_ROLE_LABELS: Record<ContactRole, string> = {
+  owner: "Owner",
+  accounting: "Accounting",
+  finance: "Finance",
+  purchase: "Purchase",
+  operations: "Operations",
+  sales: "Sales",
+  other: "Other",
+};
+
+/** Color hint per role for chips/pills. Keep neutral — these aren't
+ *  alert states. */
+export const CONTACT_ROLE_COLORS: Record<ContactRole, string> = {
+  owner:      "var(--green)",
+  accounting: "var(--blue)",
+  finance:    "var(--purple)",
+  purchase:   "var(--orange)",
+  operations: "var(--text-3)",
+  sales:      "var(--yellow)",
+  other:      "var(--text-4)",
+};
+
 /* ── Per-party reminder settings — demo seeds ── */
 export const REMINDER_SETTINGS: ReminderSettings[] = [
+  // ── Fresh demo parties exercising Monitor states ──
+  {
+    // Queued today — Mehra is 18d overdue, sent twice already, gentle ladder
+    partyName: "Mehra Trading Co",
+    enabled: true,
+    frequencyDays: 7,
+    channels: ["whatsapp", "email"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 2,
+    nextReminderAt: "2026-04-21T10:00:00+05:30",
+  },
+  {
+    // Queued tomorrow — FreshKart is 5d overdue, first reminder
+    partyName: "FreshKart Wholesale Pvt Ltd",
+    enabled: true,
+    frequencyDays: 7,
+    channels: ["whatsapp"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 0,
+    nextReminderAt: "2026-04-22T10:00:00+05:30",
+  },
+  {
+    // Queued tomorrow, firm stage — Pune is 152d overdue, near manual threshold
+    partyName: "Pune Pharmacy Distributors",
+    enabled: true,
+    frequencyDays: 14,
+    channels: ["whatsapp", "email"],
+    tone: "firm",
+    maxReminders: 5,
+    sendsSoFar: 4,
+    nextReminderAt: "2026-04-22T10:00:00+05:30",
+  },
+  {
+    // Paused — promise-to-pay detected 2d ago, auto-pause for 7d
+    partyName: "Surat Apparel Hub",
+    enabled: true,
+    frequencyDays: 7,
+    channels: ["whatsapp"],
+    tone: "auto",
+    maxReminders: 5,
+    sendsSoFar: 1,
+    nextReminderAt: "2026-04-28T10:00:00+05:30",
+    pauseUntil: "2026-04-28",
+  },
+  // ── Existing super-overdue parties (manual handoff) ──
   {
     partyName: "Nykaa E-Retail Pvt Ltd",
     enabled: true,
@@ -2852,7 +3195,7 @@ export function getReminderSettings(partyName: string): ReminderSettings | undef
 export const REMINDER_HISTORY: ReminderHistoryItem[] = [
   { id: "rh-1", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-04-13T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "read", messagePreview: "Dear Nykaa, this is a follow-up for ₹12.6L outstanding since…", daysOverdueAtSend: 2189, billsCovered: 298, netAmountAtSend: 1261337 },
   { id: "rh-2", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-04-06T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "delivered", messagePreview: "Dear Nykaa, this is a follow-up for ₹12.6L outstanding since…", daysOverdueAtSend: 2182, billsCovered: 298, netAmountAtSend: 1261337 },
-  { id: "rh-3", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-03-30T10:02:00+05:30", channel: "email", tone: "firm", status: "replied", messagePreview: "Subject: Urgent — ₹12.6L outstanding. Dear Nykaa, …", daysOverdueAtSend: 2175, billsCovered: 298, netAmountAtSend: 1261337 },
+  { id: "rh-3", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-03-30T10:02:00+05:30", channel: "email", tone: "firm", status: "replied", messagePreview: "Subject: Urgent — ₹12.6L outstanding. Dear Nykaa, …", daysOverdueAtSend: 2175, billsCovered: 298, netAmountAtSend: 1261337, openedAt: "2026-03-30T11:18:00+05:30", clickedPayLinkAt: "2026-04-02T15:42:00+05:30", attributedPaymentAmount: 4_50_000, attributedReceiptVoucher: "RV-2604-0042", sentBy: "auto" },
   { id: "rh-4", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-03-23T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "read", messagePreview: "Dear Nykaa, Invoice #NYK-2301 for ₹12.6L remains unpaid since…", daysOverdueAtSend: 2168, billsCovered: 298, netAmountAtSend: 1261337 },
   { id: "rh-5", partyName: "Nykaa E-Retail Pvt Ltd", sentAt: "2026-03-16T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "delivered", messagePreview: "Dear Nykaa, Invoice #NYK-2301 for ₹12.6L remains unpaid since…", daysOverdueAtSend: 2161, billsCovered: 298, netAmountAtSend: 1261337 },
 
@@ -2861,14 +3204,26 @@ export const REMINDER_HISTORY: ReminderHistoryItem[] = [
   { id: "rh-8", partyName: "One97 Communications (Paytm)", sentAt: "2026-03-23T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "read", messagePreview: "Dear One97 Communications, this is a follow-up for ₹3.55L outstanding…", daysOverdueAtSend: 2104, billsCovered: 180, netAmountAtSend: 355000 },
 
   { id: "rh-9", partyName: "Bigfoot/Shiprocket", sentAt: "2026-04-18T10:02:00+05:30", channel: "email", tone: "final", status: "delivered", messagePreview: "Subject: Final notice — ₹1.78L overdue since…", daysOverdueAtSend: 2166, billsCovered: 173, netAmountAtSend: 177730 },
-  { id: "rh-10", partyName: "Bigfoot/Shiprocket", sentAt: "2026-04-11T10:02:00+05:30", channel: "whatsapp", tone: "final", status: "read", messagePreview: "Dear Bigfoot, final reminder: ₹1.78L has been outstanding since…", daysOverdueAtSend: 2159, billsCovered: 173, netAmountAtSend: 177730 },
+  { id: "rh-10", partyName: "Bigfoot/Shiprocket", sentAt: "2026-04-11T10:02:00+05:30", channel: "whatsapp", tone: "final", status: "read", messagePreview: "Dear Bigfoot, final reminder: ₹1.78L has been outstanding since…", daysOverdueAtSend: 2159, billsCovered: 173, netAmountAtSend: 177730, openedAt: "2026-04-11T10:14:00+05:30", clickedPayLinkAt: "2026-04-12T09:25:00+05:30", attributedPaymentAmount: 1_77_730, attributedReceiptVoucher: "RV-2604-0067", sentBy: "auto" },
 
   { id: "rh-11", partyName: "Nykaa E-Retail (2)", sentAt: "2026-04-19T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "sent", messagePreview: "Dear Nykaa, this is a follow-up for ₹3.06L outstanding since…", daysOverdueAtSend: 2132, billsCovered: 60, netAmountAtSend: 306667 },
   { id: "rh-12", partyName: "NYKAA Mumbai 2", sentAt: "2026-04-20T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "delivered", messagePreview: "Dear NYKAA Mumbai 2, this is a follow-up for ₹2.93L outstanding since…", daysOverdueAtSend: 2132, billsCovered: 35, netAmountAtSend: 292810 },
 
   { id: "rh-13", partyName: "Prodsol Biotech Pvt Ltd", sentAt: "2026-03-01T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "opted-out", messagePreview: "Dear Prodsol, Invoice #PSB-2201 for ₹2.90L remains unpaid since…", daysOverdueAtSend: 1575, billsCovered: 17, netAmountAtSend: 289756 },
 
-  { id: "rh-14", partyName: "Buy More (Counfreedise)", sentAt: "2026-04-14T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "read", messagePreview: "Dear Buy More, this is a follow-up for ₹2.58L outstanding since…", daysOverdueAtSend: 954, billsCovered: 63, netAmountAtSend: 257865 },
+  { id: "rh-14", partyName: "Buy More (Counfreedise)", sentAt: "2026-04-14T10:02:00+05:30", channel: "whatsapp", tone: "firm", status: "read", messagePreview: "Dear Buy More, this is a follow-up for ₹2.58L outstanding since…", daysOverdueAtSend: 954, billsCovered: 63, netAmountAtSend: 257865, openedAt: "2026-04-14T10:31:00+05:30", clickedPayLinkAt: "2026-04-17T12:08:00+05:30", attributedPaymentAmount: 2_12_500, attributedReceiptVoucher: "RV-2604-0088", sentBy: "auto" },
+
+  // ── Fresh demo party history (drives Last sent + Open % columns) ──
+  // Mehra Trading — 2 sends, 1 opened → 50% open rate
+  { id: "rh-15", partyName: "Mehra Trading Co",            sentAt: "2026-04-14T10:02:00+05:30", channel: "whatsapp", tone: "gentle",   status: "read",      messagePreview: "Dear Mehra, a gentle reminder that Invoice #MTC-104 for ₹85,000 was due on…",         daysOverdueAtSend: 11,  billsCovered: 4, netAmountAtSend:  85000, openedAt: "2026-04-14T10:18:00+05:30", sentBy: "auto" },
+  { id: "rh-16", partyName: "Mehra Trading Co",            sentAt: "2026-04-07T10:02:00+05:30", channel: "whatsapp", tone: "gentle",   status: "delivered", messagePreview: "Dear Mehra, a gentle reminder that Invoice #MTC-104 for ₹85,000 was due on…",         daysOverdueAtSend:  4,  billsCovered: 4, netAmountAtSend:  85000, sentBy: "auto" },
+  // Pune Pharmacy — 4 sends, 2 opened → 50% open rate, near manual threshold
+  { id: "rh-17", partyName: "Pune Pharmacy Distributors",  sentAt: "2026-04-08T10:02:00+05:30", channel: "whatsapp", tone: "firm",     status: "read",      messagePreview: "Dear Pune Pharmacy, this is a follow-up for ₹1.10L outstanding since 21 Nov 2025…",  daysOverdueAtSend: 138, billsCovered: 6, netAmountAtSend: 110000, openedAt: "2026-04-08T11:24:00+05:30", sentBy: "auto" },
+  { id: "rh-18", partyName: "Pune Pharmacy Distributors",  sentAt: "2026-03-25T10:02:00+05:30", channel: "email",    tone: "firm",     status: "delivered", messagePreview: "Subject: Urgent — ₹1.10L outstanding. Dear Pune Pharmacy…",                          daysOverdueAtSend: 124, billsCovered: 6, netAmountAtSend: 110000, openedAt: "2026-03-25T15:08:00+05:30", sentBy: "auto" },
+  { id: "rh-19", partyName: "Pune Pharmacy Distributors",  sentAt: "2026-03-11T10:02:00+05:30", channel: "whatsapp", tone: "firm",     status: "delivered", messagePreview: "Dear Pune Pharmacy, this is a follow-up for ₹1.10L outstanding since 21 Nov 2025…",  daysOverdueAtSend: 110, billsCovered: 6, netAmountAtSend: 110000, sentBy: "auto" },
+  { id: "rh-20", partyName: "Pune Pharmacy Distributors",  sentAt: "2026-02-25T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "delivered", messagePreview: "Dear Pune Pharmacy, Invoice #PPD-072 for ₹1.10L remains unpaid since…",                  daysOverdueAtSend:  96, billsCovered: 6, netAmountAtSend: 110000, sentBy: "auto" },
+  // Surat Apparel — replied "paying soon" → auto-pause triggered
+  { id: "rh-21", partyName: "Surat Apparel Hub",           sentAt: "2026-04-19T10:02:00+05:30", channel: "whatsapp", tone: "standard", status: "replied",   messagePreview: "Dear Surat Apparel, Invoice #SAH-218 for ₹6.20L remains unpaid since 13 Feb 2026…",   daysOverdueAtSend:  65, billsCovered: 12, netAmountAtSend: 620000, openedAt: "2026-04-19T10:11:00+05:30", sentBy: "auto" },
 ];
 
 /** Fetch the last N history items for a party, newest first. */
@@ -2966,8 +3321,53 @@ export const BULK_IMPORT_SAMPLE: BulkImportRow[] = [
   { partyName: "Sales & Marketing Agencies", newPhone: "+91 99112 23344", status: "skipped", note: "Party not in Riko receivables master" },
 ];
 
+/** What event triggers a reminder. Surfaced as the primary radio
+ *  in the Defaults card per the May 7 meeting MVP spec. */
+export type ReminderTriggerType =
+  | "on-create"          // Send the moment an invoice is created (post-RERA E-invoice)
+  | "weekly"             // Weekly batch — scoops every overdue party once a week
+  | "n-days-before-due"  // N days before the due date (gentle nudge)
+  | "n-days-after-due";  // N days after the due date (default + safest)
+
+/** Where the system reads payment terms from. Voucher → Ledger → 45-day
+ *  fallback per the meeting decision. Surfaces as a visual ladder in the
+ *  Defaults card. */
+export type PaymentTermsSource = "voucher" | "ledger" | "default";
+
+/** Who the reminder gets sent to. Default = invoice owner per meeting
+ *  consensus (accounting will ignore repeated mails). */
+export type ReminderRecipient = "owner" | "accounting" | "both";
+
 /* ── Global reminder automation rules (Settings → Reminders) ── */
 export interface ReminderAutomationRules {
+  // ── MVP triggers (May 7 meeting) ──────────────────────────────
+  /** Master enable toggle. Default OFF — must be consciously enabled. */
+  enabled: boolean;
+  /** Primary trigger. Default = "n-days-after-due" with offset 1 (i.e.
+   *  the day a bill goes overdue, send the gentle reminder). */
+  triggerType: ReminderTriggerType;
+  /** N for the trigger types that need it (-before-due, -after-due). */
+  triggerOffsetDays: number;
+  /** Days to wait before payment terms fall back to default. 45 per
+   *  the May 7 meeting (industry-standard SMB term). */
+  paymentTermsFallbackDays: number;
+  /** Default recipient. "owner" per meeting (accounting will ignore). */
+  /** Legacy single-recipient pick (owner/accounting/both). Replaced
+   *  by `defaultRecipientStrategy` below — kept for any older callers. */
+  defaultRecipient: ReminderRecipient;
+  /** Per May-7 mtg + multi-contact extension: which contacts at a
+   *  party receive automated sends. Default = primary-only (the
+   *  contact that came from Tally), simple. Power users can pick
+   *  "all marked" to send to multiple, or "by-role" to filter. */
+  defaultRecipientStrategy: ReminderRecipientStrategy;
+  /** Tone preset selected by the user. "auto" = ladder by overdue days. */
+  defaultTone: "auto" | ReminderTone;
+  /** Default cadence between repeat reminders (in days). Applies to
+   *  parties without a per-party frequencyDays override. Surfaced
+   *  in the Defaults card so users see the repeat cadence upfront,
+   *  not buried in Advanced > Schedule. */
+  defaultFrequencyDays: number;
+
   // ── Schedule & frequency ──────────────────────────────────────
   /** Cron schedule (IST) — 10:00 AM daily per PRD. */
   cronTimeIst: string;
@@ -3050,6 +3450,15 @@ export interface ReminderAutomationRules {
 }
 
 export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
+  // MVP triggers (May 7 meeting consensus)
+  enabled: false,                  // OFF by default — must opt in
+  triggerType: "n-days-after-due", // Safest default
+  triggerOffsetDays: 1,            // 1 day after the due date
+  paymentTermsFallbackDays: 45,    // 45-day fallback per meeting
+  defaultRecipient: "owner",       // (legacy — kept for back-compat)
+  defaultRecipientStrategy: { kind: "primary-only" }, // ← new — simple default
+  defaultFrequencyDays: 7,         // ← new — resend every 7d until paid or capped
+  defaultTone: "auto",             // Tone ladder picks based on overdue days
   // Schedule
   cronTimeIst: "10:00",
   dailyBatchLimit: 5,
@@ -3193,4 +3602,414 @@ export function computeReminderLiveState() {
     collectedThisMonth: 8_40_000,
   };
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   Reminder MVP helpers (May 7 2026 meeting deliverables)
+   ────────────────────────────────────────────────────────────────── */
+
+/** Setup gate state. Drives the 3-step setup card at the top of the
+ *  Reminders tab. Each step is "done" or "needs action" and the user
+ *  must complete them in order before reminders fire. */
+export function computeReminderSetupGate(rules: ReminderAutomationRules) {
+  const totalParties = RECEIVABLES.length;
+  const partiesWithPhone = RECEIVABLES.filter((r) => {
+    const c = getPartyContact(r.name);
+    return !!c.phone;
+  }).length;
+  const missingContacts = totalParties - partiesWithPhone;
+
+  // Gate logic per May 7 mtg: contacts must be IMPORTED (at least once) before
+  // master toggle is unlocked, but partial coverage is OK — parties without a
+  // contact are simply skipped by the cron at send time, they don't block
+  // automation for the rest. The "N missing" warning still surfaces on the
+  // Setup row so users know to backfill.
+  const contactsImported = partiesWithPhone > 0;
+  // Setup row is "fully done" only when 100% covered — drives the green ✓
+  const contactsFullyImported = missingContacts === 0;
+
+  return {
+    /** Toggle is unlocked when at least one party can receive a reminder. */
+    contactsImported,
+    /** Setup row shows green ✓ only when all parties have contacts. */
+    contactsFullyImported,
+    contactsImportedCount: partiesWithPhone,
+    contactsMissingCount: missingContacts,
+    totalParties,
+    enabled: rules.enabled,
+    /** "Sensible defaults are set" — true when triggerType is non-default
+     *  OR user explicitly saved (we treat REMINDER_AUTOMATION_DEFAULTS as
+     *  the unsaved state). For demo: just check enabled flag. */
+    defaultsConfigured: rules.enabled,
+    /** Convenience: cron will fire if at least one party is reachable + on. */
+    canFire: contactsImported && rules.enabled,
+  };
+}
+
+/** ROI attribution for the dashboard tile + monthly reports.
+ *  Returns null when both totalsAreZero (per meeting: hide when zero). */
+export function computeReminderAttribution(): {
+  remindersSent: number;
+  paymentsAttributed: number;
+  amountAttributed: number;
+  bestTone: ReminderTone | null;
+  bestTonePct: number;
+  monthLabel: string;
+} | null {
+  const monthHistory = REMINDER_HISTORY.filter((h) => {
+    const d = new Date(h.sentAt);
+    return d.getFullYear() === 2026 && d.getMonth() === 3; // April 2026
+  });
+  const remindersSent = monthHistory.length;
+  const credited = monthHistory.filter((h) => !!h.attributedPaymentAmount);
+  const paymentsAttributed = credited.length;
+  const amountAttributed = credited.reduce(
+    (s, h) => s + (h.attributedPaymentAmount ?? 0),
+    0,
+  );
+  // Per the meeting decision: hide the metric when totals are zero.
+  if (remindersSent === 0 && amountAttributed === 0) return null;
+
+  // Best-performing tone: from the 30d analytics correlation map
+  let bestTone: ReminderTone | null = null;
+  let bestTonePct = 0;
+  for (const [tone, v] of Object.entries(REMINDER_ANALYTICS_30D.paymentCorrelation)) {
+    if (v.pct > bestTonePct) {
+      bestTonePct = v.pct;
+      bestTone = tone as ReminderTone;
+    }
+  }
+
+  return {
+    remindersSent,
+    paymentsAttributed,
+    amountAttributed,
+    bestTone,
+    bestTonePct,
+    monthLabel: "April 2026",
+  };
+}
+
+/** Average days between reminder send and the receipt voucher that
+ *  Riko attributes to it. Powers the "Avg time to pay" tile in the
+ *  default Numbers panel. Returns null when no attribution exists. */
+export function computeAvgTimeToPayDays(): number | null {
+  // Mock: derive from REMINDER_HISTORY items that have both sentAt
+  // and clickedPayLinkAt (proxy for "paid soon after reminder").
+  const paid = REMINDER_HISTORY.filter(
+    (h) => h.attributedPaymentAmount && h.clickedPayLinkAt && h.sentAt,
+  );
+  if (paid.length === 0) return null;
+  const totalDays = paid.reduce((sum, h) => {
+    const sent = new Date(h.sentAt).getTime();
+    const clicked = new Date(h.clickedPayLinkAt!).getTime();
+    return sum + (clicked - sent) / (1000 * 60 * 60 * 24);
+  }, 0);
+  return totalDays / paid.length;
+}
+
+/** Top reply-rate channel — drives the "Reply rate" tile's subtitle. */
+export function bestReplyChannel(): { channel: ReminderChannel; pct: number } {
+  const map = REMINDER_ANALYTICS_30D.replyRateByChannel;
+  let best: ReminderChannel = "whatsapp";
+  let bestPct = 0;
+  for (const [ch, pct] of Object.entries(map) as Array<[ReminderChannel, number]>) {
+    if (pct > bestPct) { best = ch; bestPct = pct; }
+  }
+  return { channel: best, pct: bestPct };
+}
+
+/** Build a preview of the repeat-cadence schedule for a hypothetical
+ *  party. Drives the timeline strip in the Defaults > Follow-up
+ *  cadence section so users see exactly when the next 5 reminders
+ *  fire and what tone each one carries.
+ *
+ *  Returns N+1 entries: N reminders + a final "escalate" milestone. */
+export interface ScheduledReminder {
+  /** Days from due date (or invoice creation, depending on triggerType). */
+  dayOffset: number;
+  /** Index in the sequence (1-based) — first reminder is sequence 1. */
+  sequence: number;
+  /** Resolved tone based on `recommendTone` ladder + days overdue. */
+  tone: ReminderTone;
+  /** Human label for the tone bucket. */
+  toneLabel: string;
+  /** What happens at this point — "Send" or "Escalate to manual review". */
+  action: "send" | "escalate";
+}
+
+export function computeReminderSchedule(rules: ReminderAutomationRules): ScheduledReminder[] {
+  // First send is at triggerOffsetDays after due (or 0 for on-create / weekly).
+  // Subsequent sends are every defaultFrequencyDays days, up to maxRemindersPerParty.
+  const firstDay =
+    rules.triggerType === "n-days-after-due" ? rules.triggerOffsetDays
+    : rules.triggerType === "n-days-before-due" ? -rules.triggerOffsetDays
+    : 0;
+
+  const out: ScheduledReminder[] = [];
+  for (let i = 0; i < rules.maxRemindersPerParty; i++) {
+    const dayOffset = firstDay + i * rules.defaultFrequencyDays;
+    // For the tone ladder we use days-overdue, so negative offsets clamp to 0
+    const overdue = Math.max(0, dayOffset);
+    const tone =
+      rules.defaultTone === "auto" ? recommendTone(overdue) : rules.defaultTone;
+    const toneLabel = tone.charAt(0).toUpperCase() + tone.slice(1);
+    out.push({ dayOffset, sequence: i + 1, tone, toneLabel, action: "send" });
+  }
+  // Append the escalation milestone at +escalateAfterDays past the last send
+  // (or use rules.maxOverdueThresholdDays — whichever is sooner).
+  const last = out[out.length - 1]?.dayOffset ?? firstDay;
+  const escalateAt = Math.min(
+    last + rules.escalateAfterDays,
+    rules.maxOverdueThresholdDays,
+  );
+  out.push({
+    dayOffset: escalateAt,
+    sequence: out.length + 1,
+    tone: "final",
+    toneLabel: "Escalate",
+    action: "escalate",
+  });
+  return out;
+}
+
+/** 30-day daily-sends sparkline data — one bar per day, colored by
+ *  dominant tone. Drives the mini chart below the Numbers tiles. */
+export function computeDailySendsSparkline() {
+  return REMINDER_ANALYTICS_30D.dailySends.map((d) => ({
+    date: d.date,
+    dayLabel: d.dayLabel,
+    total: d.gentle + d.standard + d.firm + d.final,
+    gentle: d.gentle,
+    standard: d.standard,
+    firm: d.firm,
+    final: d.final,
+  }));
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Template approval — providers (Meta WABA / TRAI DLT / Email)
+   require approval before automated sends fire. Templates are not
+   freely user-editable; revisions go through a review queue.
+   ────────────────────────────────────────────────────────────────── */
+
+export type TemplateApprovalStatus =
+  | "approved"   // Provider greenlit — can fire automated sends
+  | "pending"    // Submitted, in review queue
+  | "rejected"   // Provider declined — needs revision before resubmit
+  | "draft";     // User edits saved locally, not yet submitted
+
+export interface TemplateApprovalMeta {
+  status: TemplateApprovalStatus;
+  /** Provider that owns approval for this channel. */
+  reviewer: string;
+  /** Estimated review time the provider commits to. */
+  slaLabel: string;
+  /** ISO when last submitted (only if status !== "approved-from-day-1"). */
+  submittedAt?: string;
+  approvedAt?: string;
+  /** Provider rejection reason (when status === "rejected"). */
+  rejectionReason?: string;
+  /** Number of times this template has been revised. */
+  revisions: number;
+  /** Pending revision body — locked under review. */
+  pendingRevisionBody?: string;
+}
+
+/** Per-channel reviewer + SLA — same across templates. */
+export const TEMPLATE_REVIEWERS: Record<ReminderChannel, { reviewer: string; sla: string }> = {
+  whatsapp: { reviewer: "Meta WABA (via MSG91)", sla: "24–48 hours" },
+  email:    { reviewer: "Resend domain auth",    sla: "Instant (already verified)" },
+  sms:      { reviewer: "TRAI DLT registry",     sla: "3–5 business days" },
+};
+
+/** Map: `${tone}-${channel}` → approval meta. Seed mixes statuses so
+ *  the demo shows the full state ladder (approved/pending/rejected/draft). */
+export const TEMPLATE_APPROVAL: Record<string, TemplateApprovalMeta> = {
+  // Gentle
+  "gentle-whatsapp":  { status: "approved", reviewer: "Meta WABA",  slaLabel: "24–48h", approvedAt: "2026-02-12T10:00:00+05:30", revisions: 0 },
+  "gentle-email":     { status: "approved", reviewer: "Resend",     slaLabel: "Instant", approvedAt: "2026-02-12T10:00:00+05:30", revisions: 0 },
+  "gentle-sms":       { status: "approved", reviewer: "TRAI DLT",   slaLabel: "3–5d",    approvedAt: "2026-02-15T10:00:00+05:30", revisions: 0 },
+  // Standard
+  "standard-whatsapp": { status: "approved", reviewer: "Meta WABA", slaLabel: "24–48h",  approvedAt: "2026-02-12T10:00:00+05:30", revisions: 1 },
+  "standard-email":    { status: "approved", reviewer: "Resend",    slaLabel: "Instant", approvedAt: "2026-02-12T10:00:00+05:30", revisions: 0 },
+  "standard-sms":      { status: "approved", reviewer: "TRAI DLT",  slaLabel: "3–5d",    approvedAt: "2026-02-18T10:00:00+05:30", revisions: 0 },
+  // Firm
+  "firm-whatsapp": { status: "pending", reviewer: "Meta WABA",  slaLabel: "24–48h", submittedAt: "2026-04-19T15:30:00+05:30", revisions: 2, pendingRevisionBody: "Dear {party_name}, your invoice of {net_amount} is past due {days_overdue} days. Please clear at the earliest to avoid escalation. — {company_name}" },
+  "firm-email":    { status: "approved", reviewer: "Resend",    slaLabel: "Instant", approvedAt: "2026-02-20T10:00:00+05:30", revisions: 0 },
+  "firm-sms":      { status: "rejected", reviewer: "TRAI DLT",  slaLabel: "3–5d",    submittedAt: "2026-04-15T10:00:00+05:30", revisions: 1, rejectionReason: "Promotional language flagged — TRAI DLT only allows transactional headers (BNDSOP_T) for payment reminders." },
+  // Final
+  "final-whatsapp": { status: "pending",  reviewer: "Meta WABA", slaLabel: "24–48h", submittedAt: "2026-04-21T09:00:00+05:30", revisions: 0 },
+  "final-email":    { status: "approved", reviewer: "Resend",    slaLabel: "Instant", approvedAt: "2026-03-01T10:00:00+05:30", revisions: 0 },
+  "final-sms":      { status: "draft",    reviewer: "TRAI DLT",  slaLabel: "3–5d",    revisions: 0, pendingRevisionBody: "BNDSOP: Final notice — {net_amount} overdue since {due_date}. Clear within 7 days or escalation will follow." },
+};
+
+export function getTemplateApproval(tone: ReminderTone, channel: ReminderChannel): TemplateApprovalMeta {
+  return TEMPLATE_APPROVAL[`${tone}-${channel}`] ?? { status: "draft", reviewer: "—", slaLabel: "—", revisions: 0 };
+}
+
+/** Build the Monitor view rows. Each row is one upcoming or past reminder
+ *  for one party, sorted by nextReminderAt asc. */
+export interface ReminderMonitorRow {
+  partyName: string;
+  amount: number;
+  daysOverdue: number;
+  contact: PartyContact;
+  /** "Tomorrow 10:00" / "Today 10:00" / "Paused until May 1" / "—" */
+  nextLabel: string;
+  /** ISO of the next scheduled send. Undefined when paused/disabled. */
+  nextAt?: string;
+  /** Resolved trigger reason: "1d after due", "Weekly batch", etc. */
+  triggerReason: string;
+  status: "queued" | "paused" | "disabled" | "needs-contact" | "needs-manual";
+  channels: ReminderChannel[];
+  lastSentLabel: string;
+  /** % opens out of last 5 sends (or null if no history). */
+  openRate: number | null;
+  /** True if this reminder produced a payment within 7d. */
+  attributedPayment: boolean;
+}
+
+export function buildReminderMonitor(
+  rules: ReminderAutomationRules,
+): ReminderMonitorRow[] {
+  const today = new Date("2026-04-21");
+  const todayStr = today.toISOString().slice(0, 10);
+  const tomorrowStr = new Date(today.getTime() + 86400_000).toISOString().slice(0, 10);
+
+  return RECEIVABLES.map((r): ReminderMonitorRow => {
+    const settings = getReminderSettings(r.name);
+    const contact = getPartyContact(r.name);
+    const history = getPartyReminderHistory(r.name, 5);
+
+    // Resolve status
+    let status: ReminderMonitorRow["status"] = "disabled";
+    let nextLabel = "—";
+    let nextAt: string | undefined;
+
+    if (!contact.phone && !contact.email) {
+      status = "needs-contact";
+      nextLabel = "Contact missing";
+    } else if (contact.optedOut) {
+      status = "needs-manual";
+      nextLabel = "Opted out";
+    } else if (r.days > rules.maxOverdueThresholdDays) {
+      status = "needs-manual";
+      nextLabel = `${r.days}d overdue · manual handoff`;
+    } else if (settings?.pauseUntil) {
+      status = "paused";
+      const d = new Date(settings.pauseUntil);
+      nextLabel = `Paused until ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
+    } else if (settings?.enabled && rules.enabled && settings.nextReminderAt) {
+      status = "queued";
+      nextAt = settings.nextReminderAt;
+      const next = new Date(settings.nextReminderAt).toISOString().slice(0, 10);
+      if (next === todayStr) nextLabel = `Today ${rules.cronTimeIst}`;
+      else if (next === tomorrowStr) nextLabel = `Tomorrow ${rules.cronTimeIst}`;
+      else {
+        const d = new Date(settings.nextReminderAt);
+        nextLabel = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + ` ${rules.cronTimeIst}`;
+      }
+    } else {
+      status = "disabled";
+      nextLabel = settings ? "Disabled" : "Not configured";
+    }
+
+    // Trigger reason — derived from rules
+    let triggerReason: string;
+    switch (rules.triggerType) {
+      case "on-create": triggerReason = "On invoice create"; break;
+      case "weekly": triggerReason = "Weekly batch"; break;
+      case "n-days-before-due": triggerReason = `${rules.triggerOffsetDays}d before due`; break;
+      case "n-days-after-due": triggerReason = `${rules.triggerOffsetDays}d after due`; break;
+    }
+
+    // Open rate
+    const opens = history.filter((h) => !!h.openedAt).length;
+    const openRate = history.length > 0 ? opens / history.length : null;
+
+    return {
+      partyName: r.name,
+      amount: r.amount,
+      daysOverdue: r.days,
+      contact,
+      nextLabel,
+      nextAt,
+      triggerReason,
+      status,
+      channels: settings?.channels ?? ["whatsapp"],
+      lastSentLabel: lastRemindedLabel(r.name),
+      openRate,
+      attributedPayment: history.some((h) => !!h.attributedPaymentAmount),
+    };
+  });
+}
+
+/** Filter chips for the Monitor table. Maps to ReminderMonitorRow.status
+ *  plus a couple of convenience filters. */
+export type ReminderMonitorFilter =
+  | "all"
+  | "scheduled-today"
+  | "scheduled-tomorrow"
+  | "needs-contact"
+  | "paused"
+  | "needs-manual";
+
+export const REMINDER_MONITOR_FILTERS: Array<{
+  id: ReminderMonitorFilter;
+  label: string;
+}> = [
+  { id: "all",                label: "All" },
+  { id: "scheduled-today",    label: "Today" },
+  { id: "scheduled-tomorrow", label: "Tomorrow" },
+  { id: "needs-contact",      label: "Missing contact" },
+  { id: "paused",             label: "Paused" },
+  { id: "needs-manual",       label: "Manual handoff" },
+];
+
+export function filterMonitorRows(
+  rows: ReminderMonitorRow[],
+  filter: ReminderMonitorFilter,
+  rules: ReminderAutomationRules,
+): ReminderMonitorRow[] {
+  if (filter === "all") return rows;
+  const today = new Date("2026-04-21").toISOString().slice(0, 10);
+  const tomorrow = new Date("2026-04-22").toISOString().slice(0, 10);
+  void rules;
+  return rows.filter((row) => {
+    if (filter === "scheduled-today")
+      return row.status === "queued" && row.nextAt && row.nextAt.slice(0, 10) === today;
+    if (filter === "scheduled-tomorrow")
+      return row.status === "queued" && row.nextAt && row.nextAt.slice(0, 10) === tomorrow;
+    if (filter === "needs-contact") return row.status === "needs-contact";
+    if (filter === "paused") return row.status === "paused";
+    if (filter === "needs-manual") return row.status === "needs-manual";
+    return true;
+  });
+}
+
+/** Tone preset chips for the Defaults card. Each is a 3-second elevator
+ *  pitch shown above the picker — meeting wanted "3 presets + custom". */
+export const REMINDER_TONE_PRESETS: Array<{
+  id: ReminderTone;
+  label: string;
+  daysBucket: string;
+  blurb: string;
+}> = [
+  { id: "gentle",   label: "Gentle",   daysBucket: "≤ 7d",   blurb: "Polite nudge for fresh dues. Best for first-time reminders." },
+  { id: "standard", label: "Standard", daysBucket: "8–30d",  blurb: "Direct ask with invoice number + days overdue." },
+  { id: "firm",     label: "Firm",     daysBucket: "31–180d", blurb: "Urgent escalation — flags weekly until paid." },
+];
+
+/** Trigger preset radio options. Each is a row in the Defaults card. */
+export const REMINDER_TRIGGER_PRESETS: Array<{
+  id: ReminderTriggerType;
+  label: string;
+  blurb: string;
+  recommended?: boolean;
+}> = [
+  { id: "n-days-after-due",  label: "N days after due",   blurb: "Wait until a bill goes overdue, then nudge daily.", recommended: true },
+  { id: "n-days-before-due", label: "N days before due",  blurb: "Pre-emptive — soft reminder before the deadline." },
+  { id: "weekly",            label: "Weekly batch",       blurb: "Every Monday 10am, scoop everything overdue." },
+  { id: "on-create",         label: "On invoice creation", blurb: "Send confirmation + payment link the moment the invoice posts." },
+];
 

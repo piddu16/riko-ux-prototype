@@ -65,6 +65,7 @@ import { ChatGstRecon } from "@/components/ui/chat-gst-recon";
 import { Gauge } from "@/components/ui/gauge";
 import dynamic from "next/dynamic";
 import { ChartRenderer, type DataShape } from "@/components/ui/chart-switcher";
+import { MoneyMachineFlow } from "@/components/ui/money-machine-flow";
 
 // DeadStockTreemap is ECharts-powered; defer its load so asking anything
 // other than "dead stock" doesn't pay the ECharts cost.
@@ -1643,8 +1644,10 @@ function ExchangeCohortRetention({ onFollowup }: { onFollowup: (q: string) => vo
   );
 }
 
-/* ── Money flow (sankey) ── */
+/* ── Money flow (animated particle stream) ── */
 function ExchangeMoneyFlow({ onFollowup }: { onFollowup: (q: string) => void }) {
+  const leakAmount = R.mkt + R.cac;
+  const leakPct = (leakAmount / R.indExp) * 100;
   return (
     <RikoMsg>
       <div
@@ -1655,20 +1658,77 @@ function ExchangeMoneyFlow({ onFollowup }: { onFollowup: (q: string) => void }) 
           Where your money flows
         </p>
         <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
-          Revenue to Net P&amp;L — ribbon width shows relative size of each flow
+          Revenue → expense buckets · particle density tracks rupee volume · Marketing &amp; CAC glow brightest
         </p>
+      </div>
+
+      {/* The money machine — animated SVG, runs on both mobile & desktop */}
+      <div
+        className="rounded-md mb-2 overflow-hidden"
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border)",
+          padding: "12px 8px",
+        }}
+      >
+        <MoneyMachineFlow height={320} />
+      </div>
+
+      {/* Read-out strip — every ₹100 of revenue */}
+      <div
+        className="rounded-md p-3 mb-2 text-[11px] flex flex-wrap items-center gap-x-3 gap-y-1"
+        style={{
+          background: "color-mix(in srgb, var(--bg-surface) 60%, transparent)",
+          border: "1px solid var(--border)",
+          color: "var(--text-3)",
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        <span style={{ color: "var(--text-4)", textTransform: "uppercase", letterSpacing: "0.06em", fontSize: 9 }}>
+          Every ₹100 of revenue
+        </span>
+        <span>
+          ₹100 in →{" "}
+          <span style={{ color: "#94A3B8" }}>₹{((R.cogs / R.rev) * 100).toFixed(0)} COGS</span>{" "}
+          ·{" "}
+          <span style={{ color: "#EF4444", fontWeight: 700 }}>
+            ₹{((R.mkt / R.rev) * 100).toFixed(0)} Marketing
+          </span>{" "}
+          ·{" "}
+          <span style={{ color: "#F97316", fontWeight: 700 }}>
+            ₹{((R.cac / R.rev) * 100).toFixed(0)} CAC
+          </span>{" "}
+          ·{" "}
+          <span style={{ color: "#A78BFA" }}>₹{((R.emp / R.rev) * 100).toFixed(0)} Employees</span>{" "}
+          ·{" "}
+          <span style={{ color: "#EAB308" }}>₹{((R.ful / R.rev) * 100).toFixed(0)} Fulfilment</span>{" "}
+          ·{" "}
+          <span style={{ color: "#64748B" }}>
+            ₹{(((R.ovh + R.orc) / R.rev) * 100).toFixed(0)} Overheads
+          </span>{" "}
+          ={" "}
+          <span style={{ color: "#EF4444", fontWeight: 700 }}>
+            −₹{((Math.abs(R.ebitda) / R.rev) * 100).toFixed(0)} loss
+          </span>
+        </span>
       </div>
 
       <Layer color="var(--red)" icon="💡" title="Riko's take">
         <p>
-          Marketing + CAC together are the thickest outflow at ₹
-          {((R.mkt + R.cac) / 1e7).toFixed(2)}Cr — 52% of total spend. That&apos;s
-          the single biggest lever for getting to profitability.
+          Marketing + CAC together are the thickest outflow at{" "}
+          <strong>₹{(leakAmount / 1e7).toFixed(2)}Cr</strong> — {leakPct.toFixed(0)}% of total spend.
+          That&apos;s the single biggest lever for getting to profitability. Cut CAC 30% and halve
+          Marketing → you&apos;re cash-flow neutral.
         </p>
       </Layer>
 
       <Chips
-        items={["P&L waterfall", "Cash runway", "Expense breakdown"]}
+        items={[
+          `Halve Marketing → +₹${(R.mkt / 2 / 1e7).toFixed(2)}Cr to EBITDA`,
+          `Cut CAC 30% → +₹${((R.cac * 0.3) / 1e5).toFixed(0)}L`,
+          "P&L waterfall",
+          "Cash runway",
+        ]}
         onPick={onFollowup}
       />
     </RikoMsg>
@@ -3170,56 +3230,22 @@ const RESULT_RENDERERS: Record<Intent, (ctx: ResultCtx) => JSX.Element> = {
     };
     return <ChartRenderer shape={shape} defaultType="heatmap" />;
   },
-  // Money flow sankey. Revenue channels → Net P&L with proportional ribbons.
-  "money-flow": () => {
-    // Build nodes + links. Amount at each edge = what's flowing through.
-    // Use approximate channel splits (matching CausalChain) + R numbers.
-    const channelRev = {
-      Marketplace: R.rev * 0.55,
-      "Website D2C": R.rev * 0.34,
-      "B2B Offline": R.rev * 0.11,
-    };
-    const shape: DataShape = {
-      kind: "flow",
-      title: "Money flow · Revenue to Net P&L",
-      subtitle: "Ribbon width shows the size of each flow — thick = big lever",
-      insight:
-        "Marketing + CAC together are the thickest outflow at ₹3.94Cr — 52% of all spend. That's your single biggest lever to profitability; halve it and you're cash-flow neutral.",
-      nodes: [
-        { name: "Marketplace", category: "source" },
-        { name: "Website D2C", category: "source" },
-        { name: "B2B Offline", category: "source" },
-        { name: "Total Revenue", category: "total" },
-        { name: "COGS", category: "deduction" },
-        { name: "Gross Profit", category: "total" },
-        { name: "Marketing", category: "deduction" },
-        { name: "CAC", category: "deduction" },
-        { name: "Employees", category: "deduction" },
-        { name: "Fulfilment", category: "deduction" },
-        { name: "Overheads", category: "deduction" },
-        { name: "EBITDA (loss)", category: "result" },
-      ],
-      links: [
-        { source: "Marketplace", target: "Total Revenue", value: channelRev.Marketplace },
-        { source: "Website D2C", target: "Total Revenue", value: channelRev["Website D2C"] },
-        { source: "B2B Offline", target: "Total Revenue", value: channelRev["B2B Offline"] },
-        { source: "Total Revenue", target: "COGS", value: R.cogs },
-        { source: "Total Revenue", target: "Gross Profit", value: R.gp },
-        { source: "Gross Profit", target: "Marketing", value: R.mkt },
-        { source: "Gross Profit", target: "CAC", value: R.cac },
-        { source: "Gross Profit", target: "Employees", value: R.emp },
-        { source: "Gross Profit", target: "Fulfilment", value: R.ful },
-        { source: "Gross Profit", target: "Overheads", value: R.ovh + R.orc },
-        {
-          source: "Gross Profit",
-          target: "EBITDA (loss)",
-          // Flow out to EBITDA must be positive for sankey; use absolute burn
-          value: Math.max(0, R.gp - (R.mkt + R.cac + R.emp + R.ful + R.ovh + R.orc)),
-        },
-      ],
-    };
-    return <ChartRenderer shape={shape} defaultType="sankey" />;
-  },
+  // Money flow — Bridgewater-style animated particle stream.
+  // Same component as the inline message; sized larger for the result pane.
+  "money-flow": () => (
+    <div
+      className="rounded-lg p-4"
+      style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+    >
+      <p className="text-sm font-bold mb-1" style={{ color: "var(--text-1)" }}>
+        Money flow · Revenue to Net P&amp;L
+      </p>
+      <p className="text-[11px] mb-3" style={{ color: "var(--text-4)" }}>
+        Particle density = rupee volume · Marketing &amp; CAC pulse loudest
+      </p>
+      <MoneyMachineFlow height={460} />
+    </div>
+  ),
   // Customer LTV vs recency scatter.
   "customer-ltv": () => {
     // "Today" = April 15 2026 for computing days-since-last-order

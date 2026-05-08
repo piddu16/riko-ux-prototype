@@ -21,8 +21,10 @@ import {
   fL,
   fCr,
   compactINR,
+  formatINR,
+  computeReminderAttribution,
 } from "@/lib/data";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, MessageCircle, ArrowUpRight } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
 /*  Shared animation variant                                          */
@@ -144,6 +146,11 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         {/*  6-Week Cash Flow Forecast                                */}
         {/* -------------------------------------------------------- */}
         <CashFlowForecastSection />
+
+        {/* -------------------------------------------------------- */}
+        {/*  Reminders impact (hidden when totals = 0)                */}
+        {/* -------------------------------------------------------- */}
+        <RemindersImpactCard />
 
         {/* -------------------------------------------------------- */}
         {/*  2. Health Score Card                                     */}
@@ -887,6 +894,129 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         </motion.div>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reminders Impact card — May 7 meeting deliverable                 */
+/*                                                                    */
+/*  Returns null when there are zero reminders & zero attributions    */
+/*  (per meeting decision: "hide the metric when value is zero").     */
+/*  Otherwise shows: sent · attributed payments · ₹ collected ·       */
+/*  best-performing tone. Tappable → jumps to Settings → Reminders.   */
+/* ------------------------------------------------------------------ */
+function RemindersImpactCard() {
+  const a = computeReminderAttribution();
+  if (!a) return null; // Hide when zero
+
+  const goToReminders = () => {
+    window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "settings" }));
+  };
+
+  return (
+    <motion.div
+      {...sectionAnim}
+      onClick={goToReminders}
+      className="rounded-md p-4 cursor-pointer"
+      style={{
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border)",
+        borderLeft: "3px solid var(--green)",
+      }}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="flex items-center justify-center w-6 h-6 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--green) 14%, transparent)",
+              color: "var(--green)",
+            }}
+          >
+            <MessageCircle size={13} />
+          </span>
+          <div>
+            <p className="text-[12px] font-bold" style={{ color: "var(--text-1)" }}>
+              Reminders → cash collected
+            </p>
+            <p className="text-[10.5px]" style={{ color: "var(--text-4)" }}>
+              {a.monthLabel} · attributed within 7 days of send
+            </p>
+          </div>
+        </div>
+        <ArrowUpRight size={14} style={{ color: "var(--text-4)" }} />
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        {/* Sent */}
+        <div>
+          <p className="text-[9.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+            Sent
+          </p>
+          <p
+            className="text-xl font-bold tabular-nums"
+            style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {a.remindersSent}
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+            reminders
+          </p>
+        </div>
+
+        {/* Payments attributed */}
+        <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 12 }}>
+          <p className="text-[9.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+            Paid
+          </p>
+          <p
+            className="text-xl font-bold tabular-nums"
+            style={{ color: "var(--text-1)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {a.paymentsAttributed}
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+            of {a.remindersSent}
+            {" · "}
+            {a.remindersSent > 0
+              ? `${Math.round((a.paymentsAttributed / a.remindersSent) * 100)}%`
+              : "—"}
+          </p>
+        </div>
+
+        {/* Amount collected */}
+        <div style={{ borderLeft: "1px solid var(--border)", paddingLeft: 12 }}>
+          <p className="text-[9.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--text-4)" }}>
+            Collected
+          </p>
+          <p
+            className="text-xl font-bold tabular-nums"
+            style={{ color: "var(--green)", fontFamily: "'Space Grotesk', sans-serif" }}
+          >
+            {formatINR(a.amountAttributed)}
+          </p>
+          <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+            via reminders
+          </p>
+        </div>
+      </div>
+
+      {a.bestTone && (
+        <div
+          className="mt-3 rounded text-[10.5px] px-2.5 py-1.5"
+          style={{
+            background: "color-mix(in srgb, var(--green) 6%, transparent)",
+            color: "var(--text-3)",
+          }}
+        >
+          <span style={{ color: "var(--text-4)" }}>Best-performing tone: </span>
+          <strong style={{ color: "var(--green)", textTransform: "capitalize" }}>{a.bestTone}</strong>{" "}
+          <span style={{ color: "var(--text-4)" }}>
+            · {Math.round(a.bestTonePct * 100)}% paid within 7 days
+          </span>
+        </div>
+      )}
+    </motion.div>
   );
 }
 
