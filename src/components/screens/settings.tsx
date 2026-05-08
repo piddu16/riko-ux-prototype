@@ -3436,12 +3436,12 @@ function DefaultsSection({
       </div>
 
       <div className="p-4 flex flex-col gap-5">
-        {/* A. Trigger */}
+        {/* A. Trigger — periodic reminder cadence (mutually exclusive) */}
         <DefaultRow
-          label="When to send"
-          help="Pick the event that fires a reminder."
+          label="When to chase overdue invoices"
+          help="Pick the cadence that fires a reminder for unpaid invoices. Per-event sends (invoice creation, payment receipt) live below — they're independent."
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {REMINDER_TRIGGER_PRESETS.map((t) => {
               const active = rules.triggerType === t.id;
               return (
@@ -3511,6 +3511,34 @@ function DefaultsSection({
               </span>
             </div>
           )}
+        </DefaultRow>
+
+        {/* A2. Per-event communications — orthogonal to the cadence trigger.
+              Lifecycle-event sends (invoice created / payment received) fire
+              independently from the periodic reminder ladder. Both can be on
+              with any cadence. Modeled after Credflow's "instant invoice
+              delivery" pattern called out in the May 7 meeting. */}
+        <DefaultRow
+          label="Per-event communications"
+          help="Lifecycle-event sends — independent of the cadence above. Both fire automatically when the matching voucher posts to Tally."
+        >
+          <div className="flex flex-col gap-2">
+            <PerEventToggle
+              checked={rules.sendOnInvoiceCreate}
+              onToggle={() => update("sendOnInvoiceCreate", !rules.sendOnInvoiceCreate)}
+              icon="📤"
+              title="Send invoice + payment link on creation"
+              subtitle="Customer gets the invoice + a one-click pay link the moment it posts to Tally. Closes the loop before any reminder ever fires."
+              recommended
+            />
+            <PerEventToggle
+              checked={rules.sendOnPaymentReceived}
+              onToggle={() => update("sendOnPaymentReceived", !rules.sendOnPaymentReceived)}
+              icon="🙏"
+              title="Send thank-you on payment receipt"
+              subtitle="Acknowledge the payment within 30 minutes of the receipt voucher landing. Builds trust and reduces inbound “did you receive my payment?” calls."
+            />
+          </div>
         </DefaultRow>
 
         {/* B. Follow-up cadence — May 8 mtg ask: make repeat schedule visible */}
@@ -3671,6 +3699,105 @@ function DefaultRow({
       </div>
       {children}
     </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   PerEventToggle — one-line toggle for lifecycle-event communications.
+   Same visual language as the Setup gate's master toggle (right-side
+   pill switch + checkmark when on) so users recognize the pattern.
+   ──────────────────────────────────────────────────────────────────── */
+function PerEventToggle({
+  checked,
+  onToggle,
+  icon,
+  title,
+  subtitle,
+  recommended,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  icon: string;
+  title: string;
+  subtitle: string;
+  recommended?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="rounded-md p-3 flex items-start gap-3 cursor-pointer transition-colors text-left"
+      style={{
+        background: checked
+          ? "color-mix(in srgb, var(--green) 5%, transparent)"
+          : "var(--bg-primary)",
+        border: `1px solid ${checked ? "color-mix(in srgb, var(--green) 32%, transparent)" : "var(--border)"}`,
+      }}
+    >
+      {/* Leading icon block */}
+      <span
+        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-sm"
+        style={{
+          background: checked
+            ? "color-mix(in srgb, var(--green) 14%, transparent)"
+            : "var(--bg-hover)",
+        }}
+        aria-hidden
+      >
+        {icon}
+      </span>
+
+      {/* Title + subtitle */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[12.5px] font-semibold" style={{ color: "var(--text-1)" }}>
+            {title}
+          </p>
+          {recommended && (
+            <span
+              className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+              style={{
+                background: "color-mix(in srgb, var(--green) 14%, transparent)",
+                color: "var(--green)",
+              }}
+            >
+              Recommended
+            </span>
+          )}
+        </div>
+        <p className="text-[10.5px] mt-0.5 leading-snug" style={{ color: "var(--text-3)" }}>
+          {subtitle}
+        </p>
+      </div>
+
+      {/* Toggle pill — same chrome as the master enable toggle */}
+      <span
+        role="switch"
+        aria-checked={checked}
+        className="relative flex-shrink-0 mt-0.5"
+        style={{
+          width: 36,
+          height: 20,
+          borderRadius: 999,
+          background: checked ? "var(--green)" : "var(--bg-hover)",
+          border: "1px solid var(--border)",
+          transition: "background 150ms",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: checked ? 18 : 2,
+            width: 14,
+            height: 14,
+            borderRadius: 999,
+            background: "#fff",
+            transition: "left 150ms",
+          }}
+        />
+      </span>
+    </button>
   );
 }
 

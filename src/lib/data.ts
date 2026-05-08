@@ -3367,6 +3367,17 @@ export interface ReminderAutomationRules {
    *  in the Defaults card so users see the repeat cadence upfront,
    *  not buried in Advanced > Schedule. */
   defaultFrequencyDays: number;
+  /** Per-event communications — orthogonal to the cadence trigger.
+   *  These fire on voucher lifecycle events, not on a periodic
+   *  schedule. Both can be on simultaneously with periodic reminders. */
+  /** Send invoice + payment link the moment a sales voucher posts
+   *  to Tally. Credflow-style "instant invoice delivery" — keeps the
+   *  customer in the loop before any reminder ever fires. */
+  sendOnInvoiceCreate: boolean;
+  /** Send a thank-you / payment confirmation back to the customer
+   *  when their receipt voucher lands. Closes the loop, builds trust,
+   *  reduces "did you receive my payment?" inbound calls. */
+  sendOnPaymentReceived: boolean;
 
   // ── Schedule & frequency ──────────────────────────────────────
   /** Cron schedule (IST) — 10:00 AM daily per PRD. */
@@ -3458,6 +3469,8 @@ export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
   defaultRecipient: "owner",       // (legacy — kept for back-compat)
   defaultRecipientStrategy: { kind: "primary-only" }, // ← new — simple default
   defaultFrequencyDays: 7,         // ← new — resend every 7d until paid or capped
+  sendOnInvoiceCreate: true,       // ← new — Credflow-style instant invoice delivery (default ON)
+  sendOnPaymentReceived: false,    // ← new — thank-you on payment (default OFF, opt-in)
   defaultTone: "auto",             // Tone ladder picks based on overdue days
   // Schedule
   cronTimeIst: "10:00",
@@ -4000,7 +4013,11 @@ export const REMINDER_TONE_PRESETS: Array<{
   { id: "firm",     label: "Firm",     daysBucket: "31–180d", blurb: "Urgent escalation — flags weekly until paid." },
 ];
 
-/** Trigger preset radio options. Each is a row in the Defaults card. */
+/** Trigger preset radio options for the cadence picker. Each is a
+ *  row in the "When to send" picker — these are mutually exclusive
+ *  (you can only pick one cadence). The "On invoice creation"
+ *  pattern was moved to a separate Per-event communications toggle
+ *  since it's a lifecycle event, not a cadence. */
 export const REMINDER_TRIGGER_PRESETS: Array<{
   id: ReminderTriggerType;
   label: string;
@@ -4010,6 +4027,5 @@ export const REMINDER_TRIGGER_PRESETS: Array<{
   { id: "n-days-after-due",  label: "N days after due",   blurb: "Wait until a bill goes overdue, then nudge daily.", recommended: true },
   { id: "n-days-before-due", label: "N days before due",  blurb: "Pre-emptive — soft reminder before the deadline." },
   { id: "weekly",            label: "Weekly batch",       blurb: "Every Monday 10am, scoop everything overdue." },
-  { id: "on-create",         label: "On invoice creation", blurb: "Send confirmation + payment link the moment the invoice posts." },
 ];
 
