@@ -10,6 +10,8 @@ import {
   X,
   Phone,
   ArrowRight,
+  BellRing,
+  BellOff,
 } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import { WhatsAppModal } from "@/components/ui/whatsapp-modal";
@@ -19,11 +21,13 @@ import {
   PAYABLES,
   K,
   fL,
+  formatINR,
   getPartyContact,
   lastRemindedLabel,
   agingColor5,
   REMINDER_LIST_FILTERS,
   REMINDER_AUTOMATION_DEFAULTS,
+  computeReminderAttribution,
   type ReminderListFilter,
   getPartyReminderHistory,
 } from "@/lib/data";
@@ -122,6 +126,153 @@ const rowVariants = {
     transition: { duration: 0.3, delay: i * 0.04, ease: "easeOut" as const },
   }),
 };
+
+/* ------------------------------------------------------------------ */
+/*  Auto-Reminder Hero card                                           */
+/*                                                                    */
+/*  Replaces the old chip-shaped "Auto reminder Off →" pill that      */
+/*  was jammed inline with the filter chips. That pill conflated      */
+/*  "filter the table" with "toggle a feature on for the whole AR     */
+/*  collection" — same visual weight, totally different jobs.         */
+/*                                                                    */
+/*  This card pulls Auto Reminders out of the chip row and gives      */
+/*  it appropriate prominence: dedicated row, accent border, real     */
+/*  CTA button, and at-a-glance numbers that motivate setup           */
+/*  (parties ready, ₹ recoverable) or report impact (sent / paid /    */
+/*  recovered, when reminders are on).                                */
+/* ------------------------------------------------------------------ */
+function AutoReminderHero({
+  remindersOn,
+  totalParties,
+  readyToRemindCount,
+  recoverableAmount,
+  onClick,
+}: {
+  remindersOn: boolean;
+  totalParties: number;
+  readyToRemindCount: number;
+  recoverableAmount: number;
+  onClick: () => void;
+}) {
+  const accent = remindersOn ? "var(--green)" : "var(--orange)";
+  const attribution = remindersOn ? computeReminderAttribution() : null;
+
+  // Cadence preview: derive a clean "1d after due" / "3d before due" / etc.
+  const cadenceLabel = (() => {
+    const t = REMINDER_AUTOMATION_DEFAULTS;
+    if (t.triggerType === "n-days-after-due") return `${t.triggerOffsetDays}d after due`;
+    if (t.triggerType === "n-days-before-due") return `${t.triggerOffsetDays}d before due`;
+    if (t.triggerType === "weekly") return "weekly batch";
+    return "on invoice create";
+  })();
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.3 }}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="rounded-md p-4 cursor-pointer"
+      style={{
+        background: `color-mix(in srgb, ${accent} 5%, var(--bg-surface))`,
+        border: "1px solid var(--border)",
+        borderLeft: `3px solid ${accent}`,
+      }}
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        {/* Left: icon + title row + stats line + cadence footer */}
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <span
+            className="flex items-center justify-center w-9 h-9 rounded-md flex-shrink-0"
+            style={{
+              background: `color-mix(in srgb, ${accent} 16%, transparent)`,
+              color: accent,
+            }}
+            aria-hidden
+          >
+            {remindersOn ? <BellRing size={16} /> : <BellOff size={16} />}
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <p className="text-[13px] font-bold" style={{ color: "var(--text-1)" }}>
+                Auto reminders
+              </p>
+              <span
+                className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                style={{
+                  background: `color-mix(in srgb, ${accent} 18%, transparent)`,
+                  color: accent,
+                }}
+              >
+                {remindersOn ? "On" : "Off"}
+              </span>
+            </div>
+
+            {/* Stats line: ON shows attribution, OFF shows recovery opportunity */}
+            {remindersOn && attribution ? (
+              <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
+                <strong className="tabular-nums">{attribution.remindersSent}</strong>{" "}
+                <span style={{ color: "var(--text-4)" }}>sent</span>
+                <span style={{ color: "var(--text-4)" }}> · </span>
+                <strong className="tabular-nums">{attribution.paymentsAttributed}</strong>{" "}
+                <span style={{ color: "var(--text-4)" }}>paid</span>
+                {attribution.remindersSent > 0 && (
+                  <span style={{ color: "var(--text-4)" }}>
+                    {" "}({Math.round((attribution.paymentsAttributed / attribution.remindersSent) * 100)}%)
+                  </span>
+                )}
+                <span style={{ color: "var(--text-4)" }}> · </span>
+                <strong className="tabular-nums" style={{ color: "var(--green)" }}>
+                  {formatINR(attribution.amountAttributed)}
+                </strong>{" "}
+                <span style={{ color: "var(--text-4)" }}>recovered</span>
+              </p>
+            ) : (
+              <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
+                <strong className="tabular-nums">{totalParties}</strong>{" "}
+                <span style={{ color: "var(--text-4)" }}>parties</span>
+                <span style={{ color: "var(--text-4)" }}> · </span>
+                <strong className="tabular-nums">{readyToRemindCount}</strong>{" "}
+                <span style={{ color: "var(--text-4)" }}>ready</span>
+                <span style={{ color: "var(--text-4)" }}> · </span>
+                <strong className="tabular-nums" style={{ color: accent }}>
+                  {formatINR(recoverableAmount)}
+                </strong>{" "}
+                <span style={{ color: "var(--text-4)" }}>recoverable</span>
+              </p>
+            )}
+
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
+              {remindersOn
+                ? <>Email + SMS · sends {cadenceLabel}</>
+                : <>Will send Email + SMS · {cadenceLabel}</>}
+            </p>
+          </div>
+        </div>
+
+        {/* Right: CTA button — full-width on mobile, inline on desktop */}
+        <div
+          className="flex items-center justify-center gap-1.5 text-[12px] font-semibold px-4 py-2.5 rounded-md w-full sm:w-auto flex-shrink-0"
+          style={{ background: accent, color: "#fff" }}
+          aria-hidden
+        >
+          {remindersOn ? "Manage rules" : "Set up auto reminders"}
+          <ArrowRight size={12} />
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                         */
@@ -414,85 +565,57 @@ export default function OutstandingsScreen() {
               </div>
             </motion.div>
 
-            {/* Reminder filter chips + Import Contacts button (PRD §Priority 2) */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {REMINDER_LIST_FILTERS.map((f) => {
-                  const active = reminderFilter === f.id;
-                  const count = chipCount(f.id);
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => setReminderFilter(f.id)}
-                      className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full cursor-pointer transition-colors"
+            {/* Auto-reminder hero — own row, accent border, real CTA.
+                Replaces the previous chip-shaped pill that conflated
+                "filter the table" with "toggle the whole feature on". */}
+            <AutoReminderHero
+              remindersOn={remindersOn}
+              totalParties={RECEIVABLES.length}
+              readyToRemindCount={
+                RECEIVABLES.filter(
+                  (r) => r.days > 0 && getPartyContact(r.name).source !== "none",
+                ).length
+              }
+              recoverableAmount={
+                RECEIVABLES.filter(
+                  (r) => r.days > 0 && getPartyContact(r.name).source !== "none",
+                ).reduce((s, r) => s + r.amount, 0)
+              }
+              onClick={goToReminderSettings}
+            />
+
+            {/* Reminder filter chips — slice the table below. */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {REMINDER_LIST_FILTERS.map((f) => {
+                const active = reminderFilter === f.id;
+                const count = chipCount(f.id);
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setReminderFilter(f.id)}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-full cursor-pointer transition-colors"
+                    style={{
+                      background: active
+                        ? "var(--bg-hover)"
+                        : "var(--bg-surface)",
+                      color: active ? "var(--text-1)" : "var(--text-3)",
+                      border: `1px solid ${active ? "var(--text-3)" : "var(--border)"}`,
+                    }}
+                  >
+                    {f.label}
+                    <span
+                      className="text-[10px] tabular-nums"
                       style={{
-                        background: active
-                          ? "var(--bg-hover)"
-                          : "var(--bg-surface)",
-                        color: active ? "var(--text-1)" : "var(--text-3)",
-                        border: `1px solid ${active ? "var(--text-3)" : "var(--border)"}`,
+                        color: active ? "var(--text-3)" : "var(--text-4)",
+                        minWidth: 18,
+                        textAlign: "center",
                       }}
                     >
-                      {f.label}
-                      <span
-                        className="text-[10px] tabular-nums"
-                        style={{
-                          color: active ? "var(--text-3)" : "var(--text-4)",
-                          minWidth: 18,
-                          textAlign: "center",
-                        }}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={goToReminderSettings}
-                className="flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-md cursor-pointer transition-colors"
-                style={{
-                  background: remindersOn
-                    ? "color-mix(in srgb, var(--green) 10%, transparent)"
-                    : "transparent",
-                  color: remindersOn ? "var(--green)" : "var(--text-2)",
-                  border: `1px solid ${remindersOn ? "color-mix(in srgb, var(--green) 30%, transparent)" : "var(--border)"}`,
-                }}
-                onMouseEnter={(e) => {
-                  if (!remindersOn) {
-                    e.currentTarget.style.background = "var(--bg-hover)";
-                    e.currentTarget.style.color = "var(--text-1)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!remindersOn) {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "var(--text-2)";
-                  }
-                }}
-                title={
-                  remindersOn
-                    ? "Auto reminder is on. Click to manage rules."
-                    : "Set up automated WhatsApp / Email reminders for overdue parties"
-                }
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 999,
-                    background: remindersOn ? "var(--green)" : "var(--text-4)",
-                    flexShrink: 0,
-                  }}
-                />
-                <MessageCircle size={11} />
-                Auto reminder
-                <span style={{ color: remindersOn ? "var(--green)" : "var(--text-4)", fontSize: 10 }}>
-                  {remindersOn ? "On" : "Off"}
-                </span>
-                <ArrowRight size={10} style={{ opacity: 0.7 }} />
-              </button>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Density toggle */}
