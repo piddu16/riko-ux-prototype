@@ -84,15 +84,19 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
       <div className="max-w-3xl md:max-w-6xl mx-auto px-4 py-6 flex flex-col gap-5">
         {/* -------------------------------------------------------- */}
         {/*  1. Alert Strip                                          */}
+        {/*     Mobile: vertical stack so all 5 critical signals     */}
+        {/*     are visible without horizontal swipe (hidden was     */}
+        {/*     showing only 2/5 on a 390px viewport).               */}
+        {/*     sm+: horizontal scroll-strip.                         */}
         {/* -------------------------------------------------------- */}
-        <motion.div {...sectionAnim} className="overflow-x-auto -mx-4 px-4">
-          <div className="flex gap-1.5 whitespace-nowrap pb-1">
+        <motion.div {...sectionAnim} className="sm:overflow-x-auto sm:-mx-4 sm:px-4">
+          <div className="flex flex-col sm:flex-row gap-1.5 sm:whitespace-nowrap pb-1">
             {ALERTS.map((a, i) => {
               const c = alertColorMap[a.type] ?? "var(--text-3)";
               return (
                 <span
                   key={i}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md flex-shrink-0 tabular-nums"
+                  className="inline-flex w-full sm:w-auto items-center gap-1.5 text-[11px] font-medium px-2.5 py-1.5 sm:py-1 rounded-md flex-shrink-0 tabular-nums"
                   style={{
                     background: "transparent",
                     border: "1px solid var(--border)",
@@ -113,24 +117,15 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
                 </span>
               );
             })}
-            {/* Desktop-only health */}
-            <span
-              className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md flex-shrink-0 tabular-nums"
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border)",
-                color: "var(--text-2)",
-              }}
-            >
-              <span
-                className="inline-block flex-shrink-0"
-                style={{ width: 6, height: 6, borderRadius: 999, background: "var(--yellow)" }}
-                aria-hidden
-              />
-              Health 48/100
-            </span>
           </div>
         </motion.div>
+
+        {/* -------------------------------------------------------- */}
+        {/*  Runway Timeline — promoted to position 2 (the answer    */}
+        {/*  to "am I OK?" should not require scroll past the        */}
+        {/*  Action Queue to find).                                   */}
+        {/* -------------------------------------------------------- */}
+        <RunwayTimeline />
 
         {/* -------------------------------------------------------- */}
         {/*  This Week Action Queue (founder priority actions)        */}
@@ -138,44 +133,28 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
         <ActionQueue />
 
         {/* -------------------------------------------------------- */}
-        {/*  Runway Timeline (visceral cash projection)               */}
-        {/* -------------------------------------------------------- */}
-        <RunwayTimeline />
-
-        {/* -------------------------------------------------------- */}
-        {/*  6-Week Cash Flow Forecast                                */}
-        {/* -------------------------------------------------------- */}
-        <CashFlowForecastSection />
-
-        {/* -------------------------------------------------------- */}
         {/*  Reminders impact (hidden when totals = 0)                */}
+        {/*  6-Week Cash Flow Forecast moved inside Advanced —        */}
+        {/*  it's depth content, not glance content.                 */}
         {/* -------------------------------------------------------- */}
         <RemindersImpactCard />
 
         {/* -------------------------------------------------------- */}
-        {/*  2. Health Score Card                                     */}
-        {/* -------------------------------------------------------- */}
-        <motion.div
-          {...sectionAnim}
-          className="rounded-md p-4"
-          style={{
-            background: "var(--bg-surface)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          <p
-            className="text-[10px] uppercase tracking-wider font-medium mb-3"
-            style={{ color: "var(--text-4)" }}
-          >
-            Financial Health
-          </p>
-          <HealthScore score={48} breakdown={HEALTH_SCORES} />
-        </motion.div>
-
-        {/* -------------------------------------------------------- */}
-        {/*  3. KPI Grid                                             */}
+        {/*  KPI Grid — slimmed from 7 cards to 6:                   */}
+        {/*  + Health 48 (was a dedicated 145-200px card; now scans   */}
+        {/*    alongside the other KPIs)                              */}
+        {/*  – Net Loss (already in the alert strip — duplicate)      */}
+        {/*  – Burn Rate (already in alert strip + Runway card)       */}
+        {/*  Result: 6 unique financial signals, no repeats.          */}
+        {/*  Full health breakdown lives inside Advanced analytics.   */}
         {/* -------------------------------------------------------- */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <KpiCard
+            title="Health"
+            value="48"
+            sub="of 100 · weighted score"
+            accentColor="var(--yellow)"
+          />
           <KpiCard
             title="Revenue"
             value={`${fCr(R.rev)}Cr`}
@@ -195,29 +174,15 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
             accentColor="var(--red)"
           />
           <KpiCard
-            title="Net Loss"
-            value={`${fL(Math.abs(R.netPL))}L`}
-            accentColor="var(--red)"
-          />
-          <KpiCard
             title="Cash"
             value={`${fL(R.cash)}L`}
             accentColor="var(--yellow)"
           />
           <KpiCard
-            title="Burn Rate"
-            value={`${fL(K.burn)}L/mo`}
-            sub={`${(R.cash / K.burn).toFixed(1)}mo runway`}
+            title="OpEx Ratio"
+            value={`${K.opexR.toFixed(1)}%`}
             accentColor="var(--red)"
           />
-          {/* Desktop-only 7th KPI */}
-          <div className="hidden lg:block">
-            <KpiCard
-              title="OpEx Ratio"
-              value={`${K.opexR.toFixed(1)}%`}
-              accentColor="var(--red)"
-            />
-          </div>
         </div>
 
         {/* -------------------------------------------------------- */}
@@ -247,6 +212,36 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className="overflow-hidden flex flex-col gap-5"
             >
+
+        {/* -------------------------------------------------------- */}
+        {/*  6-Week Cash Flow Forecast — moved from primary slot.     */}
+        {/*  Glance dashboard doesn't need weekly inflow/outflow      */}
+        {/*  bars; founders open this when planning, not checking.   */}
+        {/* -------------------------------------------------------- */}
+        <CashFlowForecastSection />
+
+        {/* -------------------------------------------------------- */}
+        {/*  Financial Health breakdown — full 4-bar score detail.    */}
+        {/*  The 48 overall lives in the KPI grid above; this card    */}
+        {/*  surfaces the sub-scores (Profitability / Liquidity /     */}
+        {/*  Efficiency / Growth) for users who want the why.        */}
+        {/* -------------------------------------------------------- */}
+        <motion.div
+          {...sectionAnim}
+          className="rounded-md p-4"
+          style={{
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <p
+            className="text-[10px] uppercase tracking-wider font-medium mb-3"
+            style={{ color: "var(--text-4)" }}
+          >
+            Financial Health · breakdown
+          </p>
+          <HealthScore score={48} breakdown={HEALTH_SCORES} />
+        </motion.div>
 
         {/* -------------------------------------------------------- */}
         {/*  3a. Causal Chain — DAG of P&L flow                       */}
@@ -796,12 +791,9 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
           </p>
         </motion.div>
 
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* -------------------------------------------------------- */}
-        {/*  7. Revenue Trend                                        */}
+        {/*  Monthly Revenue Trend \u2014 moved inside Advanced.           */}
+        {/*  YoY review chart, not a daily glance metric.            */}
         {/* -------------------------------------------------------- */}
         <motion.div
           {...sectionAnim}
@@ -892,6 +884,10 @@ export default function DashboardScreen({ onAskRiko }: DashboardScreenProps = {}
             })}
           </div>
         </motion.div>
+
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
