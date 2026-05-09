@@ -104,10 +104,13 @@ export default function Home() {
               R
             </div>
             <div>
-              <h1 className="text-sm font-bold" style={{ color: "var(--text-1)" }}>
+              <h1
+                className="text-base md:text-lg font-bold leading-tight tracking-tight"
+                style={{ color: "var(--text-1)" }}
+              >
                 {COMPANY.shortName}
               </h1>
-              <p className="text-[10px]" style={{ color: "var(--text-4)" }}>
+              <p className="text-[10px] md:text-[11px] mt-0.5" style={{ color: "var(--text-4)" }}>
                 {COMPANY.industry} · {COMPANY.fy}
               </p>
             </div>

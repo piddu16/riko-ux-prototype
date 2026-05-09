@@ -33,44 +33,62 @@ export function RunwayTimeline() {
         border: "1px solid var(--border)",
       }}
     >
-      {/* Header: hairline below */}
+      {/* Header: just the section label. The number used to live here    */}
+      {/* (small, right-aligned). It's now the body hero — the answer to */}
+      {/* "am I OK?" should not be tucked in a corner.                    */}
       <div
-        className="flex items-baseline justify-between gap-3 px-4 py-3"
+        className="flex items-baseline gap-2 px-4 py-3"
         style={{ borderBottom: "1px solid var(--border)" }}
       >
-        <div className="flex items-baseline gap-2 min-w-0">
-          <h3
-            className="text-sm font-semibold leading-tight tracking-tight"
-            style={{ color: "var(--text-1)" }}
-          >
-            {t.runwayLeft}
-          </h3>
-          <p className="text-xs" style={{ color: "var(--text-4)" }}>
-            Cash Runway
-          </p>
-        </div>
-        <div className="text-right flex-shrink-0">
+        <h3
+          className="text-sm font-semibold leading-tight tracking-tight"
+          style={{ color: "var(--text-1)" }}
+        >
+          {t.runwayLeft}
+        </h3>
+        <p className="text-xs" style={{ color: "var(--text-4)" }}>
+          Cash Runway
+        </p>
+      </div>
+
+      {/* Body */}
+      <div className="px-4 py-5">
+        {/* Hero number: the runway days are the headline answer to "am  */}
+        {/* I OK?" — sized accordingly. 60px mobile / 96px desktop, in   */}
+        {/* Space Grotesk display tier with severity color.              */}
+        <div className="flex items-baseline gap-3 mb-2">
           <span
-            className="text-2xl font-semibold leading-none tabular-nums"
+            className="text-6xl md:text-8xl font-semibold leading-none tabular-nums"
             style={{
               color: severity,
               fontFamily: "'Space Grotesk', sans-serif",
-              letterSpacing: "-0.02em",
+              letterSpacing: "-0.04em",
             }}
           >
             {RUNWAY.daysLeft}
           </span>
           <span
-            className="text-[11px] ml-1.5 font-medium"
-            style={{ color: "var(--text-4)" }}
+            className="text-base md:text-lg font-medium"
+            style={{ color: "var(--text-3)" }}
           >
             {t.daysRemaining}
           </span>
         </div>
-      </div>
 
-      {/* Body */}
-      <div className="px-4 py-4">
+        {/* Cash-zero date caption — sits right under the hero number    */}
+        {/* so the "what does that mean?" follow-up is one glance away.  */}
+        <p className="text-xs leading-relaxed mb-5" style={{ color: "var(--text-3)" }}>
+          At current burn{" "}
+          <span className="tabular-nums font-medium" style={{ color: "var(--text-2)" }}>
+            ₹{fL(RUNWAY.monthlyBurn)}L/mo
+          </span>
+          , cash hits zero around{" "}
+          <span className="tabular-nums font-medium" style={{ color: severity }}>
+            {RUNWAY.zeroDate}
+          </span>
+          .
+        </p>
+
         {/* Track: hairline + segmented fill at current position. No rainbow. */}
         <div className="relative" style={{ paddingTop: 8, paddingBottom: 14 }}>
           {/* Base track (1px hairline) */}
@@ -127,20 +145,9 @@ export function RunwayTimeline() {
           </div>
         </div>
 
-        {/* Single muted line — was a tinted card */}
-        <p className="text-xs leading-relaxed" style={{ color: "var(--text-3)" }}>
-          At current burn{" "}
-          <span className="tabular-nums font-medium" style={{ color: "var(--text-2)" }}>
-            ₹{fL(RUNWAY.monthlyBurn)}L/mo
-          </span>
-          , cash hits zero around{" "}
-          <span className="tabular-nums font-medium" style={{ color: severity }}>
-            {RUNWAY.zeroDate}
-          </span>
-          .
-        </p>
-
-        {/* Suggested actions — text-buttons with chevron, no green pills */}
+        {/* Suggested actions — text-buttons with chevron, no green pills.   */}
+        {/* The cash-zero context line moved above the hero number so the   */}
+        {/* answer + its meaning land together at the top of the card.     */}
         <div className="mt-4 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
           <p
             className="text-[10px] uppercase tracking-wider font-medium mb-2"
