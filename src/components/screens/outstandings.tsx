@@ -16,6 +16,7 @@ import {
 import { Pill } from "@/components/ui/pill";
 import { WhatsAppModal } from "@/components/ui/whatsapp-modal";
 import { Party360Drawer } from "@/components/ui/party-360-drawer";
+import { AutoReminderCatchUpModal } from "@/components/ui/auto-reminder-catchup-modal";
 import {
   RECEIVABLES,
   PAYABLES,
@@ -28,9 +29,11 @@ import {
   REMINDER_LIST_FILTERS,
   REMINDER_AUTOMATION_DEFAULTS,
   computeReminderAttribution,
+  computeCatchUpBuckets,
   type ReminderListFilter,
   getPartyReminderHistory,
 } from "@/lib/data";
+import { useAutoReminderEnabled } from "@/lib/use-auto-reminder";
 
 /* Stable "today" for the demo — keeps filters purity-safe (React 19's
    purity rule forbids Date.now() in useMemo/render). Aligned with the
@@ -143,19 +146,20 @@ const rowVariants = {
 /* ------------------------------------------------------------------ */
 function AutoReminderHero({
   remindersOn,
-  totalParties,
-  readyToRemindCount,
-  recoverableAmount,
   onClick,
 }: {
   remindersOn: boolean;
-  totalParties: number;
-  readyToRemindCount: number;
-  recoverableAmount: number;
+  /** Called on click. OFF → opens catch-up modal. ON → opens settings. */
   onClick: () => void;
 }) {
   const accent = remindersOn ? "var(--green)" : "var(--orange)";
   const attribution = remindersOn ? computeReminderAttribution() : null;
+  // Bucket counts drive the OFF-state stats line. Memoize since the
+  // buckets are a pure function of static RECEIVABLES + rules.
+  const buckets = useMemo(
+    () => computeCatchUpBuckets(REMINDER_AUTOMATION_DEFAULTS),
+    [],
+  );
 
   // Cadence preview: derive a clean "1d after due" / "3d before due" / etc.
   const cadenceLabel = (() => {
@@ -218,7 +222,11 @@ function AutoReminderHero({
               </span>
             </div>
 
-            {/* Stats line: ON shows attribution, OFF shows recovery opportunity */}
+            {/* Stats line: ON shows attribution, OFF shows the bucket
+                breakdown — auto / review / locked. This is the headline
+                differentiator vs Biz Analyst / Credflow: we surface the
+                "we'll handle these, you confirm those, leave those alone"
+                math up front, not buried in a configuration screen. */}
             {remindersOn && attribution ? (
               <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
                 <strong className="tabular-nums">{attribution.remindersSent}</strong>{" "}
@@ -239,23 +247,32 @@ function AutoReminderHero({
               </p>
             ) : (
               <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
-                <strong className="tabular-nums">{totalParties}</strong>{" "}
-                <span style={{ color: "var(--text-4)" }}>parties</span>
-                <span style={{ color: "var(--text-4)" }}> · </span>
-                <strong className="tabular-nums">{readyToRemindCount}</strong>{" "}
+                <strong className="tabular-nums" style={{ color: "var(--green)" }}>
+                  {buckets.totals.autoEnroll}
+                </strong>{" "}
                 <span style={{ color: "var(--text-4)" }}>ready</span>
                 <span style={{ color: "var(--text-4)" }}> · </span>
-                <strong className="tabular-nums" style={{ color: accent }}>
-                  {formatINR(recoverableAmount)}
+                <strong className="tabular-nums" style={{ color: "var(--yellow)" }}>
+                  {buckets.totals.needsReview}
                 </strong>{" "}
-                <span style={{ color: "var(--text-4)" }}>recoverable</span>
+                <span style={{ color: "var(--text-4)" }}>need review</span>
+                <span style={{ color: "var(--text-4)" }}> · </span>
+                <strong className="tabular-nums" style={{ color: "var(--text-3)" }}>
+                  {buckets.totals.locked}
+                </strong>{" "}
+                <span style={{ color: "var(--text-4)" }}>locked</span>
               </p>
             )}
 
             <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
               {remindersOn
                 ? <>Email + SMS · sends {cadenceLabel}</>
-                : <>Will send Email + SMS · {cadenceLabel}</>}
+                : (
+                  <>
+                    {formatINR(buckets.totals.collectibleAmount)} collectible ·
+                    sends Email + SMS {cadenceLabel}
+                  </>
+                )}
             </p>
           </div>
         </div>
@@ -266,7 +283,7 @@ function AutoReminderHero({
           style={{ background: accent, color: "#fff" }}
           aria-hidden
         >
-          {remindersOn ? "Manage rules" : "Set up auto reminders"}
+          {remindersOn ? "Manage rules" : "Review & turn on"}
           <ArrowRight size={12} />
         </div>
       </div>
@@ -290,9 +307,16 @@ export default function OutstandingsScreen() {
 
   // Reminder-list state (PRD Priority 2 enhancements)
   const [reminderFilter, setReminderFilter] = useState<ReminderListFilter>("all");
-  // Reminder enable state — read from defaults for prototype display.
-  // Real product would persist this server-side per company.
-  const remindersOn = REMINDER_AUTOMATION_DEFAULTS.enabled;
+
+  // Reminder enable state — persists via localStorage so flipping ON
+  // on Outstanding propagates to the Settings master toggle (same hook).
+  const [remindersOn, setRemindersOn] = useAutoReminderEnabled();
+
+  // Catch-up modal — fires when user clicks the Hero with reminders OFF.
+  // The first toggle ON moment is the informed-consent gate: we show
+  // every party bucketed by eligibility before any reminder fires.
+  const [catchUpOpen, setCatchUpOpen] = useState(false);
+
   const goToReminderSettings = () => {
     window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "settings" }));
     // SettingsScreen mounts on the next tick, so defer the sub-tab
@@ -300,6 +324,32 @@ export default function OutstandingsScreen() {
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent("riko:settings-tab", { detail: "reminders" }));
     }, 60);
+  };
+
+  /** Hero click handler — branches by state.
+   *  OFF → open the catch-up modal so user reviews the buckets first.
+   *  ON  → jump to Settings → Reminders to manage rules / templates. */
+  const handleHeroClick = () => {
+    if (remindersOn) {
+      goToReminderSettings();
+    } else {
+      setCatchUpOpen(true);
+    }
+  };
+
+  /** Called when the catch-up modal commits. Currently just flips the
+   *  master toggle ON — per-party enrollment state would be persisted
+   *  in a v2 (the prototype recomputes buckets each visit, which is
+   *  deterministic given static data + rules). */
+  const handleCatchUpCommit = (enrolledPartyNames: string[]) => {
+    setRemindersOn(true);
+    // Demo: log enrollment for visibility. Production would persist.
+    if (enrolledPartyNames.length > 0) {
+      console.info(
+        `[auto-reminder] enrolled ${enrolledPartyNames.length} parties:`,
+        enrolledPartyNames,
+      );
+    }
   };
   // Toast shown after clicking WA/Email/SMS in the bulk bar — pure demo.
   const [bulkToast, setBulkToast] = useState<string | null>(null);
@@ -567,21 +617,12 @@ export default function OutstandingsScreen() {
 
             {/* Auto-reminder hero — own row, accent border, real CTA.
                 Replaces the previous chip-shaped pill that conflated
-                "filter the table" with "toggle the whole feature on". */}
+                "filter the table" with "toggle the whole feature on".
+                OFF state shows the bucket breakdown (X ready, Y review,
+                Z locked) — the headline differentiator vs competitors. */}
             <AutoReminderHero
               remindersOn={remindersOn}
-              totalParties={RECEIVABLES.length}
-              readyToRemindCount={
-                RECEIVABLES.filter(
-                  (r) => r.days > 0 && getPartyContact(r.name).source !== "none",
-                ).length
-              }
-              recoverableAmount={
-                RECEIVABLES.filter(
-                  (r) => r.days > 0 && getPartyContact(r.name).source !== "none",
-                ).reduce((s, r) => s + r.amount, 0)
-              }
-              onClick={goToReminderSettings}
+              onClick={handleHeroClick}
             />
 
             {/* Reminder filter chips — slice the table below. */}
@@ -1083,6 +1124,15 @@ export default function OutstandingsScreen() {
               open={partyDrawer !== null}
               onClose={() => setPartyDrawer(null)}
               partyName={partyDrawer ?? ""}
+            />
+
+            {/* Auto-reminder catch-up modal — fires when user clicks the
+                Hero with reminders OFF. Shows the 3-bucket eligibility
+                breakdown and lets them confirm before any reminder fires. */}
+            <AutoReminderCatchUpModal
+              open={catchUpOpen}
+              onClose={() => setCatchUpOpen(false)}
+              onCommit={handleCatchUpCommit}
             />
 
             {/* Bulk Contact Import lives in Settings → Reminders → Step 1.

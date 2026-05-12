@@ -110,28 +110,73 @@ export function compactINR(v: number): string {
   return `${sign}${(abs / 1e7).toFixed(2)}Cr`;
 }
 
-export const RECEIVABLES = [
+/** Each receivable row now carries Tally-aware fields the auto-reminder
+ *  eligibility engine reads. `amount` is the NET outstanding (Tally's
+ *  closing Dr balance — already post-on-account, per Snehal's 12 May
+ *  correction). `onAccount` is the unmatched receipts/credits sitting
+ *  unallocated on the party ledger — relevant for the contra-detection
+ *  lock. `avgPayDays` is null when no payment history exists in Tally
+ *  receipts (signals "first-time customer" or "contra-only relationship").
+ *  `daysSinceLastActivity` is days since the most recent voucher on the
+ *  party ledger (proxy for "is this relationship alive?"). */
+export interface Receivable {
+  name: string;
+  amount: number;          // Net outstanding (Tally closing Dr balance)
+  days: number;            // Oldest unpaid bill age in days
+  bills: number;           // Count of unpaid bills (from Tally bill-wise)
+  priority: "P1" | "P2" | "P3";
+  /** On-account credit sitting unallocated in Tally party ledger. */
+  onAccount?: number;
+  /** Average days from invoice to receipt — null when no payment history. */
+  avgPayDays?: number | null;
+  /** Days since the most recent voucher in the party ledger. */
+  daysSinceLastActivity?: number;
+  /** True for aggregated ledgers (Website Debtors, generic Sales) that
+   *  can't be reminded — no single recipient. */
+  isAggregatedLedger?: boolean;
+}
+
+export const RECEIVABLES: Receivable[] = [
   // ── Fresh demo parties (May 7 mtg deliverable) ──
   // Exercise the Monitor's primary use-cases: queued today, queued tomorrow,
   // paused (promise-to-pay), and a near-threshold firm-stage party. All have
   // contacts so they pass the gate; days are < maxOverdueThresholdDays (180)
   // so they don't fall into manual-handoff. Place at top so the demo reads
   // automation-first instead of red-noise-first.
-  { name: "Mehra Trading Co",            amount:  85000, days:  18, bills:  4, priority: "P3" },
-  { name: "FreshKart Wholesale Pvt Ltd", amount: 240000, days:   5, bills:  8, priority: "P3" },
-  { name: "Pune Pharmacy Distributors",  amount: 110000, days: 152, bills:  6, priority: "P2" },
-  { name: "Surat Apparel Hub",           amount: 620000, days:  67, bills: 12, priority: "P2" },
+  //
+  // The 4 fresh parties are AUTO-ENROLL candidates (clean active relationships).
+  { name: "Mehra Trading Co",            amount:  85000, days:  18, bills:  4, priority: "P3",
+    onAccount: 0,      avgPayDays: 22, daysSinceLastActivity:   8 },
+  { name: "FreshKart Wholesale Pvt Ltd", amount: 240000, days:   5, bills:  8, priority: "P3",
+    onAccount: 8000,   avgPayDays: 18, daysSinceLastActivity:   3 },
+  { name: "Pune Pharmacy Distributors",  amount: 110000, days: 152, bills:  6, priority: "P2",
+    onAccount: 25000,  avgPayDays: 78, daysSinceLastActivity:  45 },
+  { name: "Surat Apparel Hub",           amount: 620000, days:  67, bills: 12, priority: "P2",
+    onAccount: 12000,  avgPayDays: 38, daysSinceLastActivity:  21 },
+
   // ── Existing super-overdue tail (manual handoff) ──
-  { name: "Nykaa E-Retail Pvt Ltd", amount: 1261337, days: 2195, bills: 298, priority: "P1" },
-  { name: "Website Debtors", amount: 1251122, days: 1431, bills: 548, priority: "P1" },
-  { name: "LLC Olimpiya", amount: 449626, days: 1107, bills: 1, priority: "P2" },
-  { name: "One97 Communications (Paytm)", amount: 355000, days: 2132, bills: 180, priority: "P1" },
-  { name: "Prodsol Biotech Pvt Ltd", amount: 289756, days: 1593, bills: 17, priority: "P3" },
-  { name: "Nykaa E-Retail (2)", amount: 306667, days: 2132, bills: 60, priority: "P2" },
-  { name: "Scale Global Debtors", amount: 270334, days: 1078, bills: 9, priority: "P3" },
-  { name: "Buy More (Counfreedise)", amount: 257865, days: 954, bills: 63, priority: "P3" },
-  { name: "NYKAA Mumbai 2", amount: 292810, days: 2132, bills: 35, priority: "P2" },
-  { name: "Bigfoot/Shiprocket", amount: 177730, days: 2166, bills: 173, priority: "P3" },
+  // These exercise the LOCK and REVIEW buckets — old relationships, on-account
+  // ratios > 1, aggregated ledgers, no payment history.
+  { name: "Nykaa E-Retail Pvt Ltd",       amount: 1261337, days: 2195, bills: 298, priority: "P1",
+    onAccount: 400000, avgPayDays: null, daysSinceLastActivity: 380 },
+  { name: "Website Debtors",              amount: 1251122, days: 1431, bills: 548, priority: "P1",
+    onAccount: 0,      avgPayDays: null, daysSinceLastActivity: 200, isAggregatedLedger: true },
+  { name: "LLC Olimpiya",                 amount:  449626, days: 1107, bills:   1, priority: "P2",
+    onAccount: 510000, avgPayDays: null, daysSinceLastActivity: 1107 },
+  { name: "One97 Communications (Paytm)", amount:  355000, days: 2132, bills: 180, priority: "P1",
+    onAccount: 410000, avgPayDays: null, daysSinceLastActivity: 720 },
+  { name: "Prodsol Biotech Pvt Ltd",      amount:  289756, days: 1593, bills:  17, priority: "P3",
+    onAccount: 95000,  avgPayDays: null, daysSinceLastActivity: 150 },
+  { name: "Nykaa E-Retail (2)",           amount:  306667, days: 2132, bills:  60, priority: "P2",
+    onAccount: 0,      avgPayDays: null, daysSinceLastActivity: 800 },
+  { name: "Scale Global Debtors",         amount:  270334, days: 1078, bills:   9, priority: "P3",
+    onAccount: 310000, avgPayDays: null, daysSinceLastActivity: 600 },
+  { name: "Buy More (Counfreedise)",      amount:  257865, days:  954, bills:  63, priority: "P3",
+    onAccount: 230000, avgPayDays: null, daysSinceLastActivity:  90 },
+  { name: "NYKAA Mumbai 2",               amount:  292810, days: 2132, bills:  35, priority: "P2",
+    onAccount: 180000, avgPayDays: null, daysSinceLastActivity: 250 },
+  { name: "Bigfoot/Shiprocket",           amount:  177730, days: 2166, bills: 173, priority: "P3",
+    onAccount:  50000, avgPayDays: null, daysSinceLastActivity: 900 },
 ];
 
 export const DAYBOOK = [
@@ -3728,6 +3773,257 @@ export function computeReminderSetupGate(rules: ReminderAutomationRules) {
     /** Convenience: cron will fire if at least one party is reachable + on. */
     canFire: contactsImported && rules.enabled,
   };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Eligibility engine — the rule layer that decides which parties
+   get auto-reminded, which need owner review, and which are locked
+   out (manual-only).
+
+   Built around Tally's reality:
+   - Net outstanding is Tally's closing Dr balance — already
+     subtracts on-account (per Snehal correction).
+   - On-account is the unmatched receipts balance — a smell of
+     incomplete reconciliation, NOT a credit to re-subtract.
+   - When on-account ≥ outstanding, the customer paid more than
+     they owe net. Reminding them is wrong — reconciliation in
+     Tally fixes it. Riko surfaces the case, Tally fixes it.
+   ═══════════════════════════════════════════════════════════════ */
+
+/** Verdict bucket for the catch-up sweep. Drives the per-party
+ *  reminder-enabled toggle's default state. */
+export type ReminderEligibilityVerdict =
+  | "enabled"      // Auto-enroll. Default ON. User can flip OFF on party-360.
+  | "needs-review" // Default OFF, but the user can flip ON per party.
+  | "locked";      // Default OFF, dimmed. Manual reminders only via WAMe.
+
+/** Specific reason codes for why a party landed in its verdict bucket.
+ *  Used to drive the explanation copy in the catch-up modal + the
+ *  party-360 tooltip. */
+export type ReminderLockReason =
+  | "no-contact"            // Party has no phone or email
+  | "small-amount"          // Net outstanding ≤ ₹500 threshold
+  | "blacklisted"           // Party on blacklist
+  | "aggregated-ledger"     // Generic ledger like "Website Debtors"
+  | "on-account-exceeds"    // On-account ≥ outstanding (contra)
+  | "dead-relationship"     // > 180 days inactive AND no payment history
+  | "on-account-significant"// On-account / outstanding > 0.5 — needs review
+  | "old-overdue-no-history"// Oldest unpaid > 180d AND no payment history
+  | "old-overdue-known"     // Oldest unpaid > 180d but has payment history
+  | "stale-activity"        // No activity 90-180d, has contact + history
+  | "key-account"           // On the key-accounts list — owner approves each touch
+  | "clean";                // No flags — auto-enrolled
+
+/** Thresholds. Tally-aware defaults — informed by 12 May audit of
+ *  Bandra Soap's 16 parties and Snehal's contra-settlement walkthrough. */
+export const REMINDER_ELIGIBILITY_THRESHOLDS = {
+  /** Below this net amount, not worth chasing. */
+  minOutstanding: 500,
+  /** On-account ratio (onAccount / outstanding) above which we LOCK
+   *  the party — their unmatched receipts already cover or exceed
+   *  what they owe net. */
+  onAccountLockRatio: 1.0,
+  /** On-account ratio above which we send to REVIEW (user opts in
+   *  per party) — significant unmatched cash, reconciliation should
+   *  happen before reminding. */
+  onAccountReviewRatio: 0.5,
+  /** Days inactive after which a party without payment history is
+   *  considered a dead relationship — LOCK. */
+  deadRelationshipDays: 180,
+  /** Days inactive after which a party with payment history needs
+   *  REVIEW (not auto). */
+  staleActivityDays: 90,
+  /** Oldest-unpaid-bill age above which we LOCK or require REVIEW
+   *  depending on payment history. */
+  oldestUnpaidLockDays: 180,
+} as const;
+
+/** Human-readable label for a lock/review reason. Used in the
+ *  catch-up modal and party-360 tooltips. */
+export const REMINDER_LOCK_LABELS: Record<ReminderLockReason, string> = {
+  "no-contact":             "No phone or email on file",
+  "small-amount":           "Net outstanding ≤ ₹500",
+  "blacklisted":            "Party is on your blacklist",
+  "aggregated-ledger":      "Aggregated ledger — no single recipient",
+  "on-account-exceeds":     "On-account credit ≥ outstanding (reconcile first)",
+  "dead-relationship":      "No activity in 180+ days + no payment history",
+  "on-account-significant": "On-account is >50% of outstanding (review)",
+  "old-overdue-no-history": "Oldest bill > 180d + no payment history",
+  "old-overdue-known":      "Oldest bill > 180d (review)",
+  "stale-activity":         "No activity in 90+ days (review)",
+  "key-account":            "Key account — confirm each send",
+  "clean":                  "Active relationship, ready to auto-remind",
+};
+
+/** Result of evaluating a single party against the eligibility rules.
+ *  Returned by computePartyEligibility. */
+export interface PartyEligibility {
+  partyName: string;
+  verdict: ReminderEligibilityVerdict;
+  reason: ReminderLockReason;
+  label: string;            // Human-readable, from REMINDER_LOCK_LABELS
+  onAccountRatio: number;   // For UI display
+  netOutstanding: number;
+  oldestUnpaidDays: number;
+  hasContact: boolean;
+  hasPaymentHistory: boolean;
+  daysSinceLastActivity: number;
+}
+
+/** Pure function — evaluates one party against the rules.
+ *  No side effects. Drive the catch-up modal off this. */
+export function computePartyEligibility(
+  party: Receivable,
+  rules: ReminderAutomationRules = REMINDER_AUTOMATION_DEFAULTS,
+): PartyEligibility {
+  const t = REMINDER_ELIGIBILITY_THRESHOLDS;
+  const contact = getPartyContact(party.name);
+  const hasContact = !!contact.phone || !!contact.email;
+  const hasPaymentHistory = party.avgPayDays != null;
+  const onAccount = party.onAccount ?? 0;
+  const onAccountRatio = party.amount > 0 ? onAccount / party.amount : 0;
+  const daysSince = party.daysSinceLastActivity ?? party.days;
+  const oldestUnpaidDays = party.days;
+
+  const base = {
+    partyName: party.name,
+    onAccountRatio,
+    netOutstanding: party.amount,
+    oldestUnpaidDays,
+    hasContact,
+    hasPaymentHistory,
+    daysSinceLastActivity: daysSince,
+  };
+
+  // ── HARD LOCKS (no override possible) ──────────────────────────
+
+  if (party.isAggregatedLedger) {
+    return { ...base, verdict: "locked", reason: "aggregated-ledger",
+      label: REMINDER_LOCK_LABELS["aggregated-ledger"] };
+  }
+  if (!hasContact) {
+    return { ...base, verdict: "locked", reason: "no-contact",
+      label: REMINDER_LOCK_LABELS["no-contact"] };
+  }
+  if (party.amount <= t.minOutstanding) {
+    return { ...base, verdict: "locked", reason: "small-amount",
+      label: REMINDER_LOCK_LABELS["small-amount"] };
+  }
+  if (rules.blacklistedParties.includes(party.name)) {
+    return { ...base, verdict: "locked", reason: "blacklisted",
+      label: REMINDER_LOCK_LABELS.blacklisted };
+  }
+
+  // Contra-settlement: customer's unmatched cash already covers what they owe net.
+  // This is the "Klub Works" case from the 12 May audit.
+  if (onAccountRatio >= t.onAccountLockRatio) {
+    return { ...base, verdict: "locked", reason: "on-account-exceeds",
+      label: REMINDER_LOCK_LABELS["on-account-exceeds"] };
+  }
+
+  // Dead relationship: long inactivity + no payment history we can lean on.
+  if (daysSince > t.deadRelationshipDays && !hasPaymentHistory) {
+    return { ...base, verdict: "locked", reason: "dead-relationship",
+      label: REMINDER_LOCK_LABELS["dead-relationship"] };
+  }
+
+  // ── REVIEW (default OFF, user can flip ON per party) ───────────
+
+  if (rules.keyAccountParties.includes(party.name)) {
+    return { ...base, verdict: "needs-review", reason: "key-account",
+      label: REMINDER_LOCK_LABELS["key-account"] };
+  }
+
+  if (onAccountRatio > t.onAccountReviewRatio) {
+    return { ...base, verdict: "needs-review", reason: "on-account-significant",
+      label: REMINDER_LOCK_LABELS["on-account-significant"] };
+  }
+
+  if (oldestUnpaidDays > t.oldestUnpaidLockDays) {
+    if (!hasPaymentHistory) {
+      return { ...base, verdict: "needs-review", reason: "old-overdue-no-history",
+        label: REMINDER_LOCK_LABELS["old-overdue-no-history"] };
+    }
+    return { ...base, verdict: "needs-review", reason: "old-overdue-known",
+      label: REMINDER_LOCK_LABELS["old-overdue-known"] };
+  }
+
+  if (daysSince > t.staleActivityDays) {
+    return { ...base, verdict: "needs-review", reason: "stale-activity",
+      label: REMINDER_LOCK_LABELS["stale-activity"] };
+  }
+
+  // ── AUTO-ENROLL ────────────────────────────────────────────────
+  return { ...base, verdict: "enabled", reason: "clean",
+    label: REMINDER_LOCK_LABELS.clean };
+}
+
+/** Three-bucket aggregate for the catch-up sweep modal. */
+export interface CatchUpBuckets {
+  autoEnroll: PartyEligibility[];
+  needsReview: PartyEligibility[];
+  locked: PartyEligibility[];
+  totals: {
+    autoEnroll: number;
+    needsReview: number;
+    locked: number;
+    collectibleAmount: number;     // Sum of net outstanding for auto + review
+    lockedAmount: number;          // Sum locked out — visibility for reconciliation
+    unallocatedOnAccount: number;  // Sum of on-account across locked parties
+  };
+}
+
+/** Bucket every receivable into auto-enroll / review / locked.
+ *  Sorted within each bucket by net outstanding descending. */
+export function computeCatchUpBuckets(
+  rules: ReminderAutomationRules = REMINDER_AUTOMATION_DEFAULTS,
+): CatchUpBuckets {
+  const evals = RECEIVABLES.map((r) => computePartyEligibility(r, rules));
+
+  const autoEnroll  = evals.filter((e) => e.verdict === "enabled")
+    .sort((a, b) => b.netOutstanding - a.netOutstanding);
+  const needsReview = evals.filter((e) => e.verdict === "needs-review")
+    .sort((a, b) => b.netOutstanding - a.netOutstanding);
+  const locked      = evals.filter((e) => e.verdict === "locked")
+    .sort((a, b) => b.netOutstanding - a.netOutstanding);
+
+  const sum = (arr: PartyEligibility[]) =>
+    arr.reduce((s, e) => s + e.netOutstanding, 0);
+
+  // Unallocated on-account sum from the locked bucket — the reconciliation
+  // surface area. Surface this in the catch-up modal so the user sees the
+  // unblocking work, not just the lock.
+  const unallocatedOnAccount = locked.reduce(
+    (s, e) => s + (e.onAccountRatio * e.netOutstanding),
+    0,
+  );
+
+  return {
+    autoEnroll,
+    needsReview,
+    locked,
+    totals: {
+      autoEnroll: autoEnroll.length,
+      needsReview: needsReview.length,
+      locked: locked.length,
+      collectibleAmount: sum(autoEnroll) + sum(needsReview),
+      lockedAmount: sum(locked),
+      unallocatedOnAccount,
+    },
+  };
+}
+
+/** Pick the right tone for a party based on the oldest unpaid bill's age.
+ *  Breakpoints tuned per 13 May competitive analysis — Indian B2B payment
+ *  terms run 30-90 days, so the original 7d gentle was too aggressive.
+ *
+ *  Final tone (180+) is NEVER returned for auto-sending. Callers must
+ *  treat "final" as a manual-confirmation-required state. */
+export function pickToneByAge(oldestUnpaidDays: number): ReminderTone {
+  if (oldestUnpaidDays <= 14)  return "gentle";
+  if (oldestUnpaidDays <= 45)  return "standard";
+  if (oldestUnpaidDays <= 120) return "firm";
+  return "final"; // Manual confirm required, never auto
 }
 
 /** ROI attribution for the dashboard tile + monthly reports.
