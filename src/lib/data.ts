@@ -3834,8 +3834,12 @@ export const REMINDER_ELIGIBILITY_THRESHOLDS = {
    *  REVIEW (not auto). */
   staleActivityDays: 90,
   /** Oldest-unpaid-bill age above which we LOCK or require REVIEW
-   *  depending on payment history. */
-  oldestUnpaidLockDays: 180,
+   *  depending on payment history. Aligned with the tone-ladder
+   *  cutoff (120d = boundary between firm and final). Past this,
+   *  the only applicable tone is final, which never auto-fires —
+   *  so the party belongs in REVIEW (or LOCK if no payment history),
+   *  not auto-enroll. */
+  oldestUnpaidLockDays: 120,
 } as const;
 
 /** Human-readable label for a lock/review reason. Used in the
