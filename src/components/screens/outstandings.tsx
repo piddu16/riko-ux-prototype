@@ -322,7 +322,10 @@ const AGING_BUCKET_COLORS: Record<number, string> = {
 
 export default function OutstandingsScreen() {
   const [activeTab, setActiveTab] = useState<"receivables" | "payables">("receivables");
-  const [density, setDensity] = useState<Density>("regular");
+  // Density was a Compact/Regular/Relaxed toggle in the toolbar. Removed
+  // after the View toggle (Detailed/Ageing) covered the meaningful axis;
+  // density was redundant chrome. Regular is locked as the default.
+  const density: Density = "regular";
   // View mode — Detailed (default) vs Ageing pivot. Borrowed from
   // Credflow's tab pattern; same data, different columns.
   const [viewMode, setViewMode] = useState<ViewMode>("detailed");
@@ -719,24 +722,6 @@ export default function OutstandingsScreen() {
                 ))}
               </div>
 
-              {/* Density toggle — row height for the table. */}
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] mr-1.5" style={{ color: "var(--text-4)" }}>Density:</span>
-                {(["compact", "regular", "relaxed"] as Density[]).map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => setDensity(d)}
-                    className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
-                    style={{
-                      background: density === d ? "var(--bg-hover)" : "transparent",
-                      color: density === d ? "var(--text-1)" : "var(--text-4)",
-                      border: `1px solid ${density === d ? "var(--text-3)" : "var(--border)"}`,
-                    }}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Data Table (desktop) / Card List (mobile) */}
@@ -1572,25 +1557,6 @@ export default function OutstandingsScreen() {
                 ))}
               </div>
             </motion.div>
-
-            {/* Density toggle */}
-            <div className="hidden sm:flex items-center justify-end gap-1 mb-2">
-              <span className="text-[10px] mr-1.5" style={{ color: "var(--text-4)" }}>Density:</span>
-              {(["compact", "regular", "relaxed"] as Density[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDensity(d)}
-                  className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
-                  style={{
-                    background: density === d ? "var(--bg-hover)" : "transparent",
-                    color: density === d ? "var(--text-1)" : "var(--text-4)",
-                    border: `1px solid ${density === d ? "var(--text-3)" : "var(--border)"}`,
-                  }}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
 
             {/* Payables table (desktop) / cards (mobile) */}
             <div
