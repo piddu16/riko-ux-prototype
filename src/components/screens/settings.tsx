@@ -4050,9 +4050,10 @@ function FollowUpCadenceControls({
   ) => void;
 }) {
   const FREQ_PRESETS = [
-    { days: 3,  label: "Every 3 days", subtitle: "Aggressive — top 10 collections", color: "var(--red)" },
-    { days: 7,  label: "Every 7 days", subtitle: "Standard — best balance",          color: "var(--green)", recommended: true },
+    { days: 3,  label: "Every 3 days",  subtitle: "Aggressive — top 10 collections", color: "var(--red)" },
+    { days: 7,  label: "Every 7 days",  subtitle: "Standard — best balance",         color: "var(--green)", recommended: true },
     { days: 14, label: "Every 14 days", subtitle: "Gentle — relationship-first",     color: "var(--blue)" },
+    { days: 30, label: "Every 30 days", subtitle: "Monthly — long-cycle / retainers", color: "var(--purple)" },
   ];
 
   const schedule = computeReminderSchedule(rules);
@@ -4060,7 +4061,7 @@ function FollowUpCadenceControls({
   return (
     <div className="flex flex-col gap-3">
       {/* Knobs row 1 — frequency presets + custom */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         {FREQ_PRESETS.map((p) => {
           const active = rules.defaultFrequencyDays === p.days;
           return (
