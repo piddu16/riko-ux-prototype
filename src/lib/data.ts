@@ -101,6 +101,23 @@ export function formatINR(
   return `${sign}₹${(abs / 1e7).toFixed(p)}Cr`;
 }
 
+/** Format ISO yyyy-mm-dd as "5 Apr 2026" (with year) or "5 Apr"
+ *  (without year, if includeYear is false). Returns "—" for null /
+ *  undefined / unparseable inputs — caller doesn't need to null-check. */
+export function formatDate(
+  iso: string | null | undefined,
+  opts: { includeYear?: boolean } = {},
+): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    ...(opts.includeYear !== false ? { year: "numeric" } : {}),
+  });
+}
+
 /** Shortcut: compact lakhs/crores badge without ₹ prefix (for places where ₹ is separate) */
 export function compactINR(v: number): string {
   const abs = Math.abs(v);
@@ -134,6 +151,23 @@ export interface Receivable {
   /** True for aggregated ledgers (Website Debtors, generic Sales) that
    *  can't be reminded — no single recipient. */
   isAggregatedLedger?: boolean;
+  // ── Credflow-parity fields (May 2026 comp analysis additions) ──
+  /** Date of most recent payment received (ISO yyyy-mm-dd). Null
+   *  for parties with no payment history. */
+  lastPaymentDate?: string | null;
+  /** Per-party payment terms in days, overriding the global default.
+   *  Surfaces as "Credit Period" on the customer-facing card. */
+  paymentTermsDays?: number;
+  /** Manually scheduled follow-up date (ISO yyyy-mm-dd). Operator
+   *  sets it when a party says "call me back next week." */
+  nextFollowUpDate?: string;
+  /** Promise-to-pay amount the customer committed to. Auto-reminders
+   *  pause until promiseDate when this is set. */
+  promiseAmount?: number;
+  /** Promise-to-pay committed date (ISO yyyy-mm-dd). */
+  promiseDate?: string;
+  /** Free-text operator note. Visible on the row + drillable. */
+  remark?: string;
 }
 
 export const RECEIVABLES: Receivable[] = [
@@ -146,37 +180,53 @@ export const RECEIVABLES: Receivable[] = [
   //
   // The 4 fresh parties are AUTO-ENROLL candidates (clean active relationships).
   { name: "Mehra Trading Co",            amount:  85000, days:  18, bills:  4, priority: "P3",
-    onAccount: 0,      avgPayDays: 22, daysSinceLastActivity:   8 },
+    onAccount: 0,      avgPayDays: 22, daysSinceLastActivity:   8,
+    lastPaymentDate: "2026-04-22", paymentTermsDays: 30 },
   { name: "FreshKart Wholesale Pvt Ltd", amount: 240000, days:   5, bills:  8, priority: "P3",
-    onAccount: 8000,   avgPayDays: 18, daysSinceLastActivity:   3 },
+    onAccount: 8000,   avgPayDays: 18, daysSinceLastActivity:   3,
+    lastPaymentDate: "2026-05-02", paymentTermsDays: 30 },
   { name: "Pune Pharmacy Distributors",  amount: 110000, days: 152, bills:  6, priority: "P2",
-    onAccount: 25000,  avgPayDays: 78, daysSinceLastActivity:  45 },
+    onAccount: 25000,  avgPayDays: 78, daysSinceLastActivity:  45,
+    lastPaymentDate: "2025-12-01", paymentTermsDays: 60,
+    promiseAmount: 50000, promiseDate: "2026-05-25", remark: "Promise via WA on 10 May" },
   { name: "Surat Apparel Hub",           amount: 620000, days:  67, bills: 12, priority: "P2",
-    onAccount: 12000,  avgPayDays: 38, daysSinceLastActivity:  21 },
+    onAccount: 12000,  avgPayDays: 38, daysSinceLastActivity:  21,
+    lastPaymentDate: "2026-02-10", paymentTermsDays: 45,
+    nextFollowUpDate: "2026-05-20", remark: "Awaiting GST credit note" },
 
   // ── Existing super-overdue tail (manual handoff) ──
   // These exercise the LOCK and REVIEW buckets — old relationships, on-account
   // ratios > 1, aggregated ledgers, no payment history.
   { name: "Nykaa E-Retail Pvt Ltd",       amount: 1261337, days: 2195, bills: 298, priority: "P1",
-    onAccount: 400000, avgPayDays: null, daysSinceLastActivity: 380 },
+    onAccount: 400000, avgPayDays: null, daysSinceLastActivity: 380,
+    lastPaymentDate: null, remark: "Dispute since Apr 2023 — legal review" },
   { name: "Website Debtors",              amount: 1251122, days: 1431, bills: 548, priority: "P1",
-    onAccount: 0,      avgPayDays: null, daysSinceLastActivity: 200, isAggregatedLedger: true },
+    onAccount: 0,      avgPayDays: null, daysSinceLastActivity: 200, isAggregatedLedger: true,
+    lastPaymentDate: null, remark: "Aggregated D2C ledger" },
   { name: "LLC Olimpiya",                 amount:  449626, days: 1107, bills:   1, priority: "P2",
-    onAccount: 510000, avgPayDays: null, daysSinceLastActivity: 1107 },
+    onAccount: 510000, avgPayDays: null, daysSinceLastActivity: 1107,
+    lastPaymentDate: null, remark: "Contra reconciliation pending" },
   { name: "One97 Communications (Paytm)", amount:  355000, days: 2132, bills: 180, priority: "P1",
-    onAccount: 410000, avgPayDays: null, daysSinceLastActivity: 720 },
+    onAccount: 410000, avgPayDays: null, daysSinceLastActivity: 720,
+    lastPaymentDate: "2024-05-15", remark: "Settlement under review" },
   { name: "Prodsol Biotech Pvt Ltd",      amount:  289756, days: 1593, bills:  17, priority: "P3",
-    onAccount: 95000,  avgPayDays: null, daysSinceLastActivity: 150 },
+    onAccount: 95000,  avgPayDays: null, daysSinceLastActivity: 150,
+    lastPaymentDate: null, nextFollowUpDate: "2026-06-01" },
   { name: "Nykaa E-Retail (2)",           amount:  306667, days: 2132, bills:  60, priority: "P2",
-    onAccount: 0,      avgPayDays: null, daysSinceLastActivity: 800 },
+    onAccount: 0,      avgPayDays: null, daysSinceLastActivity: 800,
+    lastPaymentDate: null, remark: "No contact — closed account?" },
   { name: "Scale Global Debtors",         amount:  270334, days: 1078, bills:   9, priority: "P3",
-    onAccount: 310000, avgPayDays: null, daysSinceLastActivity: 600 },
+    onAccount: 310000, avgPayDays: null, daysSinceLastActivity: 600,
+    lastPaymentDate: null },
   { name: "Buy More (Counfreedise)",      amount:  257865, days:  954, bills:  63, priority: "P3",
-    onAccount: 230000, avgPayDays: null, daysSinceLastActivity:  90 },
+    onAccount: 230000, avgPayDays: null, daysSinceLastActivity:  90,
+    lastPaymentDate: "2024-12-12", remark: "Contra reconciliation pending" },
   { name: "NYKAA Mumbai 2",               amount:  292810, days: 2132, bills:  35, priority: "P2",
-    onAccount: 180000, avgPayDays: null, daysSinceLastActivity: 250 },
+    onAccount: 180000, avgPayDays: null, daysSinceLastActivity: 250,
+    lastPaymentDate: null, remark: "Likely write-off" },
   { name: "Bigfoot/Shiprocket",           amount:  177730, days: 2166, bills: 173, priority: "P3",
-    onAccount:  50000, avgPayDays: null, daysSinceLastActivity: 900 },
+    onAccount:  50000, avgPayDays: null, daysSinceLastActivity: 900,
+    lastPaymentDate: null },
 ];
 
 export const DAYBOOK = [

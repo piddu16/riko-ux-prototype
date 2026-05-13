@@ -24,6 +24,7 @@ import {
   K,
   fL,
   formatINR,
+  formatDate,
   getPartyContact,
   lastRemindedLabel,
   agingColor5,
@@ -289,6 +290,42 @@ function AutoReminderHero({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  MobileMetric — label/value cell used in the mobile card 4-col     */
+/*  grid (Oldest Due / Avg Coll / Credit Pd / Last Pmt). Borrowed     */
+/*  from Credflow's mobile UX pattern.                                */
+/* ------------------------------------------------------------------ */
+function MobileMetric({
+  label,
+  value,
+  valueColor,
+  muted,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-start min-w-0">
+      <span
+        className="text-[9px] uppercase tracking-wider truncate w-full"
+        style={{ color: "var(--text-4)" }}
+      >
+        {label}
+      </span>
+      <span
+        className="text-[11px] font-semibold tabular-nums truncate w-full"
+        style={{
+          color: muted ? "var(--text-4)" : valueColor ?? "var(--text-2)",
+        }}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -758,10 +795,13 @@ export default function OutstandingsScreen() {
                       <th className="py-2.5 px-3 text-left font-medium sticky left-0" style={{ background: "var(--bg-secondary)" }}>Party</th>
                       {viewMode === "detailed" ? (
                         <>
-                          <th className="py-2.5 px-3 text-right font-medium">Outstanding</th>
-                          <th className="py-2.5 px-3 text-right font-medium">Days</th>
-                          <th className="py-2.5 px-3 text-right font-medium">Bills</th>
-                          <th className="py-2.5 px-3 text-right font-medium">Last reminded</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Total Due</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Last Payment</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Avg Collection</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Oldest Due</th>
+                          <th className="py-2.5 px-3 text-left font-medium">Next Follow-Up</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Promises</th>
+                          <th className="py-2.5 px-3 text-left font-medium">Remark</th>
                         </>
                       ) : (
                         <>
@@ -847,6 +887,7 @@ export default function OutstandingsScreen() {
 
                         {viewMode === "detailed" ? (
                           <>
+                            {/* Total Due */}
                             <td
                               className={`${DENSITY_PY[density]} px-3 text-right font-bold tabular-nums`}
                               style={{
@@ -857,6 +898,31 @@ export default function OutstandingsScreen() {
                               {fmt(r.amount)}
                             </td>
 
+                            {/* Last Payment — null when no payment history. */}
+                            <td
+                              className={`${DENSITY_PY[density]} px-3 text-right text-[11px] tabular-nums`}
+                              style={{
+                                color: r.lastPaymentDate
+                                  ? "var(--text-2)"
+                                  : "var(--text-4)",
+                              }}
+                            >
+                              {r.lastPaymentDate ? formatDate(r.lastPaymentDate) : "—"}
+                            </td>
+
+                            {/* Avg Collection (days). Null = no payment history. */}
+                            <td
+                              className={`${DENSITY_PY[density]} px-3 text-right text-[11px] tabular-nums`}
+                              style={{
+                                color: r.avgPayDays != null
+                                  ? "var(--text-2)"
+                                  : "var(--text-4)",
+                              }}
+                            >
+                              {r.avgPayDays != null ? `${r.avgPayDays}d` : "—"}
+                            </td>
+
+                            {/* Oldest Due (renamed from "Days"). Aging color. */}
                             <td className={`${DENSITY_PY[density]} px-3 text-right`}>
                               {(() => {
                                 const ag = agingColor5(r.days);
@@ -871,29 +937,74 @@ export default function OutstandingsScreen() {
                                       className="inline-block flex-shrink-0"
                                       style={{ width: 5, height: 5, borderRadius: 999, background: ag.fg }}
                                     />
-                                    {r.days.toLocaleString()}
+                                    {r.days.toLocaleString()}d
                                   </span>
                                 );
                               })()}
                             </td>
 
+                            {/* Next Follow-Up — manually scheduled. "+ Add"
+                                placeholder for unset values, matching
+                                Credflow's affordance pattern. */}
                             <td
-                              className={`${DENSITY_PY[density]} px-3 text-right tabular-nums`}
-                              style={{ color: "var(--text-3)" }}
+                              className={`${DENSITY_PY[density]} px-3 text-left text-[11px] tabular-nums`}
                             >
-                              {r.bills}
+                              {r.nextFollowUpDate ? (
+                                <span style={{ color: "var(--text-2)" }}>
+                                  {formatDate(r.nextFollowUpDate)}
+                                </span>
+                              ) : (
+                                <span
+                                  className="cursor-pointer hover:underline"
+                                  style={{ color: "var(--text-4)" }}
+                                  title="Schedule a follow-up date"
+                                >
+                                  + Add
+                                </span>
+                              )}
                             </td>
 
+                            {/* Promises to Pay — amount + date when set. */}
                             <td
                               className={`${DENSITY_PY[density]} px-3 text-right text-[11px] tabular-nums`}
-                              style={{
-                                color:
-                                  lastRemindedLabel(r.name) === "Never"
-                                    ? "var(--text-4)"
-                                    : "var(--text-2)",
-                              }}
                             >
-                              {lastRemindedLabel(r.name)}
+                              {r.promiseAmount && r.promiseDate ? (
+                                <div className="flex flex-col items-end leading-tight">
+                                  <span
+                                    className="font-semibold"
+                                    style={{ color: "var(--blue)" }}
+                                  >
+                                    {fmt(r.promiseAmount)}
+                                  </span>
+                                  <span
+                                    className="text-[10px]"
+                                    style={{ color: "var(--text-4)" }}
+                                  >
+                                    by {formatDate(r.promiseDate, { includeYear: false })}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ color: "var(--text-4)" }}>—</span>
+                              )}
+                            </td>
+
+                            {/* Remark — free-text note, truncated. */}
+                            <td
+                              className={`${DENSITY_PY[density]} px-3 text-left text-[11px]`}
+                              style={{ color: "var(--text-3)", maxWidth: 160 }}
+                            >
+                              {r.remark ? (
+                                <span className="truncate block" title={r.remark}>
+                                  {r.remark}
+                                </span>
+                              ) : (
+                                <span
+                                  className="cursor-pointer hover:underline"
+                                  style={{ color: "var(--text-4)" }}
+                                >
+                                  + Add
+                                </span>
+                              )}
                             </td>
                           </>
                         ) : (
@@ -1135,7 +1246,6 @@ export default function OutstandingsScreen() {
               <div className="sm:hidden flex flex-col">
                 {filteredReceivables.map((r, rowIdx) => {
                   const ag = agingColor5(r.days);
-                  const last = lastRemindedLabel(r.name);
                   const contact = getPartyContact(r.name);
                   return (
                     <motion.div
@@ -1154,92 +1264,139 @@ export default function OutstandingsScreen() {
                         borderBottom: "1px solid var(--border)",
                       }}
                     >
-                      <div className="flex items-center justify-between mb-2">
+                      {/* Row 1: Party name + Priority pill (Credflow-mobile pattern) */}
+                      <div className="flex items-center justify-between mb-2 gap-2">
                         <button
                           type="button"
                           onClick={() => setPartyDrawer(r.name)}
-                          className="text-xs font-medium truncate flex-1 mr-2 text-left cursor-pointer transition-colors"
-                          style={{ color: "var(--text-2)" }}
+                          className="text-[13px] font-semibold truncate flex-1 text-left cursor-pointer transition-colors"
+                          style={{ color: "var(--text-1)" }}
                         >
                           {r.name}
                         </button>
                         <Pill color={priorityColor[r.priority]}>{r.priority}</Pill>
                       </div>
 
-                      <div className="flex items-center justify-between mb-2">
-                        <span
-                          className="text-sm font-bold"
-                          style={{
-                            color: "var(--text-1)",
-                            fontFamily: "'Space Grotesk', sans-serif",
-                          }}
-                        >
-                          {fmt(r.amount)}
-                        </span>
-                        <span
-                          className="text-[11px] font-semibold px-2 py-0.5 rounded-md tabular-nums"
-                          style={{ background: ag.bg, color: ag.fg }}
-                        >
-                          {r.days}d · {ag.label}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
-                            {r.bills} bills
-                          </span>
-                          <span className="text-[10px]" style={{ color: "var(--text-4)" }}>
-                            ·
+                      {/* Row 2: Total Due (prominent) + no-contact warning */}
+                      <div className="flex items-baseline justify-between mb-2.5">
+                        <div className="flex items-baseline gap-1.5">
+                          <span
+                            className="text-[10px] uppercase tracking-wider"
+                            style={{ color: "var(--text-4)" }}
+                          >
+                            Due
                           </span>
                           <span
-                            className="text-[10px]"
-                            style={{ color: last === "Never" ? "var(--text-4)" : "var(--text-3)" }}
+                            className="text-base font-bold tabular-nums"
+                            style={{
+                              color: "var(--text-1)",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
                           >
-                            Reminded: {last}
+                            {fmt(r.amount)}
                           </span>
-                          {contact.source === "none" && (
+                        </div>
+                        {contact.source === "none" && (
+                          <span
+                            className="text-[9px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+                            style={{
+                              background: "color-mix(in srgb, var(--yellow) 18%, transparent)",
+                              color: "var(--yellow)",
+                            }}
+                            title="No contact on file"
+                          >
+                            no contact
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Row 3: 4-column metadata grid — Credflow's mobile pattern */}
+                      <div
+                        className="grid grid-cols-4 gap-1.5 mb-2.5 pb-2.5"
+                        style={{ borderBottom: "1px solid var(--border)" }}
+                      >
+                        <MobileMetric label="Oldest Due" value={`${r.days}d`} valueColor={ag.fg} />
+                        <MobileMetric
+                          label="Avg Coll."
+                          value={r.avgPayDays != null ? `${r.avgPayDays}d` : "—"}
+                          muted={r.avgPayDays == null}
+                        />
+                        <MobileMetric
+                          label="Credit Pd."
+                          value={r.paymentTermsDays != null ? `${r.paymentTermsDays}d` : "—"}
+                          muted={r.paymentTermsDays == null}
+                        />
+                        <MobileMetric
+                          label="Last Pmt"
+                          value={r.lastPaymentDate ? formatDate(r.lastPaymentDate, { includeYear: false }) : "—"}
+                          muted={!r.lastPaymentDate}
+                        />
+                      </div>
+
+                      {/* Row 4 (conditional): Follow-up / promise / remark badges */}
+                      {(r.nextFollowUpDate || r.promiseAmount || r.remark) && (
+                        <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
+                          {r.nextFollowUpDate && (
                             <span
-                              className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                              className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded"
                               style={{
-                                background: "color-mix(in srgb, var(--yellow) 18%, transparent)",
-                                color: "var(--yellow)",
+                                background: "color-mix(in srgb, var(--blue) 12%, transparent)",
+                                color: "var(--blue)",
                               }}
-                              title="No contact on file — add via bulk import or party panel"
                             >
-                              no contact
+                              Follow-up {formatDate(r.nextFollowUpDate, { includeYear: false })}
+                            </span>
+                          )}
+                          {r.promiseAmount && r.promiseDate && (
+                            <span
+                              className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
+                              style={{
+                                background: "color-mix(in srgb, var(--purple) 12%, transparent)",
+                                color: "var(--purple)",
+                              }}
+                            >
+                              Promise {fmt(r.promiseAmount)} by {formatDate(r.promiseDate, { includeYear: false })}
+                            </span>
+                          )}
+                          {r.remark && (
+                            <span
+                              className="text-[9.5px] truncate"
+                              style={{ color: "var(--text-3)", maxWidth: 220 }}
+                              title={r.remark}
+                            >
+                              {r.remark}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer flex items-center gap-1"
-                            style={{
-                              color: "var(--text-2)",
-                              background: "transparent",
-                              border: "1px solid var(--border)",
-                            }}
-                            onClick={() => setAutoReminderTarget(r.name)}
-                            title="Configure auto-reminders for this party"
-                          >
-                            <BellRing size={10} />
-                            Auto
-                          </button>
-                          <button
-                            className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer disabled:opacity-40"
-                            disabled={!contact.phone}
-                            style={{
-                              color: "var(--green)",
-                              background:
-                                "color-mix(in srgb, var(--green) 12%, transparent)",
-                            }}
-                            onClick={() =>
-                              setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days })
-                            }
-                          >
-                            {"\uD83D\uDCF2"} Remind
-                          </button>
-                        </div>
+                      )}
+
+                      {/* Row 5: Actions — Auto + Remind */}
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          className="text-[11px] font-semibold px-2.5 py-1.5 rounded-md cursor-pointer flex items-center gap-1.5"
+                          style={{
+                            color: "var(--text-2)",
+                            background: "transparent",
+                            border: "1px solid var(--border)",
+                          }}
+                          onClick={() => setAutoReminderTarget(r.name)}
+                        >
+                          <BellRing size={11} />
+                          Auto
+                        </button>
+                        <button
+                          className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
+                          disabled={!contact.phone}
+                          style={{
+                            color: "#fff",
+                            background: "var(--green)",
+                          }}
+                          onClick={() =>
+                            setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days })
+                          }
+                        >
+                          📲 Remind
+                        </button>
                       </div>
                     </motion.div>
                   );
