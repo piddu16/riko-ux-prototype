@@ -32,6 +32,7 @@ import {
   MessageCircle,
   MessageSquare,
   User,
+  Info,
 } from "lucide-react";
 import {
   computePartyEligibility,
@@ -92,6 +93,7 @@ export function SetAutoReminderModal({
   const [draftFrequency, setDraftFrequency] = useState<string>("");
   const [draftChannels, setDraftChannels] = useState<ReminderChannel[]>([]);
   const [draftAccountManager, setDraftAccountManager] = useState<string>("");
+  const [showPaymentTermsHelp, setShowPaymentTermsHelp] = useState(false);
 
   // Re-seed drafts whenever the modal opens for a different party so
   // we don't show stale state from the previous edit.
@@ -464,30 +466,83 @@ export function SetAutoReminderModal({
                           className="px-3 py-3 flex flex-col gap-3"
                           style={{ borderTop: "1px solid var(--border)" }}
                         >
-                          {/* Payment terms override */}
-                          <div className="flex items-center justify-between gap-2">
-                            <label
-                              className="text-[10.5px] font-medium"
-                              style={{ color: "var(--text-3)" }}
-                              htmlFor="adv-payment-terms"
-                            >
-                              Payment terms (days)
-                            </label>
-                            <input
-                              id="adv-payment-terms"
-                              type="number"
-                              min={1}
-                              max={365}
-                              placeholder={String(party.paymentTermsDays ?? 45)}
-                              value={draftPaymentTerms}
-                              onChange={(e) => setDraftPaymentTerms(e.target.value)}
-                              className="w-20 text-[11.5px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
-                              style={{
-                                background: "var(--bg-surface)",
-                                color: "var(--text-1)",
-                                border: "1px solid var(--border)",
-                              }}
-                            />
+                          {/* Payment terms override — with Tally-priority
+                              help tooltip (Credflow pattern). Makes the
+                              fallback ladder explicit so the operator
+                              knows Tally always wins. */}
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <label
+                                className="flex items-center gap-1 text-[10.5px] font-medium"
+                                style={{ color: "var(--text-3)" }}
+                                htmlFor="adv-payment-terms"
+                              >
+                                Payment terms (days)
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPaymentTermsHelp((v) => !v)}
+                                  aria-label="What is the priority order?"
+                                  className="cursor-pointer"
+                                  style={{ color: "var(--text-4)" }}
+                                >
+                                  <Info size={11} />
+                                </button>
+                              </label>
+                              <input
+                                id="adv-payment-terms"
+                                type="number"
+                                min={1}
+                                max={365}
+                                placeholder={String(party.paymentTermsDays ?? 45)}
+                                value={draftPaymentTerms}
+                                onChange={(e) => setDraftPaymentTerms(e.target.value)}
+                                className="w-20 text-[11.5px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+                                style={{
+                                  background: "var(--bg-surface)",
+                                  color: "var(--text-1)",
+                                  border: "1px solid var(--border)",
+                                }}
+                              />
+                            </div>
+                            <AnimatePresence initial={false}>
+                              {showPaymentTermsHelp && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.18 }}
+                                  style={{ overflow: "hidden" }}
+                                >
+                                  <div
+                                    className="rounded-md p-2.5 text-[10.5px] leading-relaxed"
+                                    style={{
+                                      background: "color-mix(in srgb, var(--blue) 8%, transparent)",
+                                      border: "1px solid color-mix(in srgb, var(--blue) 22%, transparent)",
+                                      color: "var(--text-2)",
+                                    }}
+                                  >
+                                    <p className="font-semibold mb-1" style={{ color: "var(--blue)" }}>
+                                      Tally is the source of truth.
+                                    </p>
+                                    <p className="mb-1.5">Priority when resolving payment terms:</p>
+                                    <ol className="list-decimal list-inside space-y-0.5">
+                                      <li>Voucher-level terms on the invoice in Tally</li>
+                                      <li>Ledger-level terms on the party master in Tally</li>
+                                      <li>This per-party override (set here)</li>
+                                      <li>Global fallback (
+                                        <strong>{REMINDER_AUTOMATION_DEFAULTS.paymentTermsFallbackDays}d</strong>)
+                                      </li>
+                                    </ol>
+                                    <p
+                                      className="mt-1.5 italic"
+                                      style={{ color: "var(--text-3)" }}
+                                    >
+                                      To change a due date already set in Tally, change it in Tally — Riko respects the voucher.
+                                    </p>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
 
                           {/* Frequency override */}
