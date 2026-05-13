@@ -17,6 +17,7 @@ import { Pill } from "@/components/ui/pill";
 import { WhatsAppModal } from "@/components/ui/whatsapp-modal";
 import { Party360Drawer } from "@/components/ui/party-360-drawer";
 import { AutoReminderCatchUpModal } from "@/components/ui/auto-reminder-catchup-modal";
+import { SetAutoReminderModal } from "@/components/ui/set-auto-reminder-modal";
 import {
   RECEIVABLES,
   PAYABLES,
@@ -316,6 +317,13 @@ export default function OutstandingsScreen() {
   // The first toggle ON moment is the informed-consent gate: we show
   // every party bucketed by eligibility before any reminder fires.
   const [catchUpOpen, setCatchUpOpen] = useState(false);
+
+  // Per-party Set auto-reminder modal target. When set to a party name,
+  // the modal opens for that specific party. Credflow-style simple
+  // form: see the verdict, see contacts, flip the toggle, done.
+  // Complements the catch-up sweep (used for first-time bulk enroll)
+  // by giving operators a fast per-party flow for everything after.
+  const [autoReminderTarget, setAutoReminderTarget] = useState<string | null>(null);
 
   const goToReminderSettings = () => {
     window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "settings" }));
@@ -844,30 +852,54 @@ export default function OutstandingsScreen() {
                         </td>
 
                         <td className={`${DENSITY_PY[density]} px-3 text-center`}>
-                          <button
-                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition-all cursor-pointer"
-                            style={{
-                              color: "var(--text-2)",
-                              background: "transparent",
-                              border: "1px solid var(--border)",
-                              opacity: isHovered || isSelected ? 1 : 0.6,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = "var(--bg-hover)";
-                              e.currentTarget.style.color = "var(--text-1)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                              e.currentTarget.style.color = "var(--text-2)";
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days });
-                            }}
-                          >
-                            <MessageSquareIcon size={11} />
-                            Remind
-                          </button>
+                          <div className="inline-flex items-center gap-1.5">
+                            {/* Auto-reminder config — Credflow-style
+                                per-party simple flow. Always available,
+                                even if no contact (modal explains why
+                                it's locked). */}
+                            <button
+                              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition-all cursor-pointer"
+                              style={{
+                                color: "var(--text-3)",
+                                background: "transparent",
+                                border: "1px solid var(--border)",
+                                opacity: isHovered || isSelected ? 1 : 0.5,
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAutoReminderTarget(r.name);
+                              }}
+                              title="Configure auto-reminders for this party"
+                            >
+                              <BellRing size={11} />
+                              Auto
+                            </button>
+                            {/* Manual one-off Remind — opens WAMe modal. */}
+                            <button
+                              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md transition-all cursor-pointer"
+                              style={{
+                                color: "var(--text-2)",
+                                background: "transparent",
+                                border: "1px solid var(--border)",
+                                opacity: isHovered || isSelected ? 1 : 0.6,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "var(--bg-hover)";
+                                e.currentTarget.style.color = "var(--text-1)";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent";
+                                e.currentTarget.style.color = "var(--text-2)";
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days });
+                              }}
+                            >
+                              <MessageSquareIcon size={11} />
+                              Remind
+                            </button>
+                          </div>
                         </td>
                       </motion.tr>
                       );
@@ -1090,20 +1122,35 @@ export default function OutstandingsScreen() {
                             </span>
                           )}
                         </div>
-                        <button
-                          className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer disabled:opacity-40"
-                          disabled={!contact.phone}
-                          style={{
-                            color: "var(--green)",
-                            background:
-                              "color-mix(in srgb, var(--green) 12%, transparent)",
-                          }}
-                          onClick={() =>
-                            setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days })
-                          }
-                        >
-                          {"\uD83D\uDCF2"} Remind
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            className="text-[10px] font-semibold px-2 py-1 rounded-md cursor-pointer flex items-center gap-1"
+                            style={{
+                              color: "var(--text-2)",
+                              background: "transparent",
+                              border: "1px solid var(--border)",
+                            }}
+                            onClick={() => setAutoReminderTarget(r.name)}
+                            title="Configure auto-reminders for this party"
+                          >
+                            <BellRing size={10} />
+                            Auto
+                          </button>
+                          <button
+                            className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer disabled:opacity-40"
+                            disabled={!contact.phone}
+                            style={{
+                              color: "var(--green)",
+                              background:
+                                "color-mix(in srgb, var(--green) 12%, transparent)",
+                            }}
+                            onClick={() =>
+                              setWhatsappTarget({ name: r.name, amount: fmt(r.amount), days: r.days })
+                            }
+                          >
+                            {"\uD83D\uDCF2"} Remind
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -1133,6 +1180,19 @@ export default function OutstandingsScreen() {
               open={catchUpOpen}
               onClose={() => setCatchUpOpen(false)}
               onCommit={handleCatchUpCommit}
+            />
+
+            {/* Per-party Set auto-reminder modal — Credflow-style
+                simple flow. Opens when the user taps the auto-reminder
+                button on a specific row. ~3 fields, ~10 seconds, done. */}
+            <SetAutoReminderModal
+              open={autoReminderTarget !== null}
+              onClose={() => setAutoReminderTarget(null)}
+              partyName={autoReminderTarget ?? ""}
+              onAdvanced={() => {
+                setAutoReminderTarget(null);
+                goToReminderSettings();
+              }}
             />
 
             {/* Bulk Contact Import lives in Settings → Reminders → Step 1.
