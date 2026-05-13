@@ -81,6 +81,13 @@ export function SetAutoReminderModal({
     if (t.triggerType === "n-days-after-due") return `${t.triggerOffsetDays}d after due`;
     if (t.triggerType === "n-days-before-due") return `${t.triggerOffsetDays}d before due`;
     if (t.triggerType === "weekly") return "weekly batch";
+    if (t.triggerType === "monthly") {
+      const d = t.triggerDayOfMonth;
+      const s = ["th", "st", "nd", "rd"];
+      const v = d % 100;
+      const ord = d + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+      return `monthly · ${ord}`;
+    }
     return "on invoice create";
   })();
 

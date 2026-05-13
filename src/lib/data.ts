@@ -3474,6 +3474,7 @@ export function computeBulkImportTemplateStats() {
 export type ReminderTriggerType =
   | "on-create"          // Send the moment an invoice is created (post-RERA E-invoice)
   | "weekly"             // Weekly batch — scoops every overdue party once a week
+  | "monthly"            // Monthly batch — fires on `triggerDayOfMonth` each month (Biz Analyst-style)
   | "n-days-before-due"  // N days before the due date (gentle nudge)
   | "n-days-after-due";  // N days after the due date (default + safest)
 
@@ -3496,6 +3497,11 @@ export interface ReminderAutomationRules {
   triggerType: ReminderTriggerType;
   /** N for the trigger types that need it (-before-due, -after-due). */
   triggerOffsetDays: number;
+  /** Day of month (1-31) for the "monthly" trigger. Days >28 silently
+   *  cap to the last day of the current month at send time. Inspired
+   *  by Biz Analyst's Monthly scheduler — common SMB pattern is "1st
+   *  of every month" for round-up reminders. */
+  triggerDayOfMonth: number;
   /** Days to wait before payment terms fall back to default. 45 per
    *  the May 7 meeting (industry-standard SMB term). */
   paymentTermsFallbackDays: number;
@@ -3626,6 +3632,7 @@ export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
   enabled: false,                  // OFF by default — must opt in
   triggerType: "n-days-after-due", // Safest default
   triggerOffsetDays: 1,            // 1 day after the due date
+  triggerDayOfMonth: 1,            // Default 1st of month if user switches to monthly
   paymentTermsFallbackDays: 45,    // 45-day fallback per meeting
   defaultRecipient: "owner",       // (legacy — kept for back-compat)
   defaultRecipientStrategy: { kind: "primary-only" }, // ← new — simple default
@@ -4359,10 +4366,16 @@ export function buildReminderMonitor(
     }
 
     // Trigger reason — derived from rules
+    const ordinal = (n: number) => {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+    };
     let triggerReason: string;
     switch (rules.triggerType) {
       case "on-create": triggerReason = "On invoice create"; break;
       case "weekly": triggerReason = "Weekly batch"; break;
+      case "monthly": triggerReason = `Monthly · ${ordinal(rules.triggerDayOfMonth)}`; break;
       case "n-days-before-due": triggerReason = `${rules.triggerOffsetDays}d before due`; break;
       case "n-days-after-due": triggerReason = `${rules.triggerOffsetDays}d after due`; break;
     }
@@ -4462,5 +4475,53 @@ export const REMINDER_TRIGGER_PRESETS: Array<{
   { id: "n-days-after-due",  label: "N days after due",   blurb: "Wait until a bill goes overdue, then nudge daily.", recommended: true },
   { id: "n-days-before-due", label: "N days before due",  blurb: "Pre-emptive — soft reminder before the deadline." },
   { id: "weekly",            label: "Weekly batch",       blurb: "Every Monday 10am, scoop everything overdue." },
+  { id: "monthly",           label: "Monthly batch",      blurb: "Pick a date — 1st of every month, etc. (Biz Analyst-style)." },
 ];
+
+/** 1st → "1st", 2nd → "2nd", … 11th → "11th". English ordinals for
+ *  the Monthly cadence preview. */
+export function ordinalDay(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0]);
+}
+
+/** Compute the next batch firing date label for the cadence preview.
+ *  Uses the demo's stable "today" (20 Apr 2026) so the prototype shows
+ *  predictable output regardless of when it's opened.
+ *
+ *  Returns formatted strings like:
+ *  - "tomorrow"                       → daily/after-due/before-due/weekly
+ *  - "May 1" / "today" / "1st of next month" → monthly
+ */
+export function nextBatchDateLabel(rules: ReminderAutomationRules): string {
+  // Stable demo today: keeps the prototype's preview text predictable.
+  const today = new Date("2026-04-20T00:00:00+05:30");
+  if (rules.triggerType !== "monthly") return "tomorrow";
+
+  const day = Math.max(1, Math.min(31, rules.triggerDayOfMonth));
+  // Find next occurrence of day-of-month.
+  const tryThisMonth = new Date(today);
+  tryThisMonth.setDate(day);
+  // If day > last-day-of-month, JS rolls over; clamp to actual month-end.
+  if (tryThisMonth.getMonth() !== today.getMonth()) {
+    tryThisMonth.setDate(0); // Rolls back to last day of original month.
+  }
+
+  let target: Date;
+  if (tryThisMonth.getTime() > today.getTime()) {
+    target = tryThisMonth;
+  } else {
+    // Next month — handle Dec→Jan rollover, also clamp Feb 30 → Feb 28/29.
+    const nextMonth = new Date(today);
+    nextMonth.setMonth(today.getMonth() + 1);
+    nextMonth.setDate(day);
+    if (nextMonth.getMonth() !== (today.getMonth() + 1) % 12) {
+      nextMonth.setDate(0);
+    }
+    target = nextMonth;
+  }
+
+  return target.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
 

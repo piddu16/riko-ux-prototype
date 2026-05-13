@@ -74,6 +74,8 @@ import {
   REMINDER_MONITOR_FILTERS,
   REMINDER_TONE_PRESETS,
   REMINDER_TRIGGER_PRESETS,
+  ordinalDay,
+  nextBatchDateLabel,
   CONTACT_ROLE_LABELS,
   CONTACT_ROLE_COLORS,
   COMPANY,
@@ -3084,7 +3086,7 @@ function RemindersTab() {
       >
         <p className="text-[11px]" style={{ color: "var(--text-4)" }}>
           {rules.enabled
-            ? <>Active. Next cron <span style={{ color: "var(--text-2)" }}>{rules.cronTimeIst}</span> IST tomorrow.</>
+            ? <>Active. Next cron <span style={{ color: "var(--text-2)" }}>{rules.cronTimeIst}</span> IST {nextBatchDateLabel(rules)}.</>
             : <>Reminders are paused. Toggle on above to start.</>}
         </p>
         <div className="flex items-center gap-3">
@@ -3450,7 +3452,7 @@ function DefaultsSection({
           label="When to chase overdue invoices"
           help="One cadence. Per-event sends are independent — see below."
         >
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
             {REMINDER_TRIGGER_PRESETS.map((t) => {
               const active = rules.triggerType === t.id;
               return (
@@ -3518,6 +3520,47 @@ function DefaultsSection({
                 day{rules.triggerOffsetDays === 1 ? "" : "s"}{" "}
                 {rules.triggerType === "n-days-after-due" ? "after" : "before"} due date
               </span>
+            </div>
+          )}
+
+          {/* Day-of-month picker — only when Monthly. Inspired by Biz
+              Analyst's 7-col grid. Days 29-31 silently fall back to
+              month-end (Feb 30 → Feb 28/29, etc.). */}
+          {rules.triggerType === "monthly" && (
+            <div className="flex flex-col gap-2 mt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11.5px]" style={{ color: "var(--text-3)" }}>
+                  Send on day
+                </span>
+                <span className="text-[10.5px]" style={{ color: "var(--text-4)" }}>
+                  {rules.triggerDayOfMonth > 28
+                    ? `Days 29-31 fall back to month-end if the month is shorter`
+                    : `${ordinalDay(rules.triggerDayOfMonth)} of every month · ${rules.cronTimeIst} IST`}
+                </span>
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                  const active = rules.triggerDayOfMonth === d;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => update("triggerDayOfMonth", d)}
+                      className="text-[11px] py-1.5 rounded-md cursor-pointer tabular-nums transition-colors"
+                      style={{
+                        background: active
+                          ? "var(--blue)"
+                          : "var(--bg-primary)",
+                        color: active ? "#fff" : "var(--text-2)",
+                        border: `1px solid ${active ? "var(--blue)" : "var(--border)"}`,
+                        fontWeight: active ? 700 : 400,
+                      }}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </DefaultRow>
@@ -4263,6 +4306,7 @@ function SchedulePreview({
           {rules.triggerType === "n-days-after-due" && `${rules.triggerOffsetDays}d after due`}
           {rules.triggerType === "n-days-before-due" && `${rules.triggerOffsetDays}d before due`}
           {rules.triggerType === "weekly" && "in the next Monday batch"}
+          {rules.triggerType === "monthly" && `on the ${ordinalDay(rules.triggerDayOfMonth)} of each month`}
           {rules.triggerType === "on-create" && "when the invoice posts"}
         </strong>
         , then every <strong style={{ color: "var(--text-1)" }}>{rules.defaultFrequencyDays}{" "}
@@ -4672,6 +4716,7 @@ function MonitorSection({ rules }: { rules: ReminderAutomationRules }) {
             {rules.triggerType === "n-days-after-due" && `${rules.triggerOffsetDays}d after due`}
             {rules.triggerType === "n-days-before-due" && `${rules.triggerOffsetDays}d before due`}
             {rules.triggerType === "weekly" && "Weekly batch"}
+            {rules.triggerType === "monthly" && `Monthly · ${ordinalDay(rules.triggerDayOfMonth)}`}
             {rules.triggerType === "on-create" && "On invoice create"}
           </span>
           {" · "}cron {rules.cronTimeIst} IST
@@ -5115,7 +5160,7 @@ function LiveStateHero({ rules }: { rules: ReminderAutomationRules }) {
         style={{ color: "var(--text-4)" }}
       >
         <span>
-          Next batch <strong style={{ color: "var(--text-2)" }}>tomorrow {rules.cronTimeIst} IST</strong>
+          Next batch <strong style={{ color: "var(--text-2)" }}>{nextBatchDateLabel(rules)} {rules.cronTimeIst} IST</strong>
           {state.queued > 0 && <> · {state.queued} queued</>}
         </span>
         <span style={{ color: "var(--text-4)" }}>·</span>
