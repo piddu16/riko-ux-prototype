@@ -298,9 +298,34 @@ function AutoReminderHero({
 type Density = "compact" | "regular" | "relaxed";
 const DENSITY_PY: Record<Density, string> = { compact: "py-1.5", regular: "py-2.5", relaxed: "py-3.5" };
 
+/** View modes for the receivables/payables table.
+ *  - detailed: current table (Outstanding · Days · Bills · LastReminded · Priority · Actions)
+ *  - ageing:   pivot view (0-30 · 30-90 · 90-180 · 180+ buckets · Priority · Actions)
+ *  Same data, different lens. Borrowed from Credflow's tabbed pattern. */
+type ViewMode = "detailed" | "ageing";
+
+/** Aging bucket index 0-3 mapped from oldest-unpaid-days.
+ *  Tuned for Indian B2B (terms run 30-90 days). */
+const AGING_BUCKETS = ["0-30", "30-90", "90-180", "180+"] as const;
+function agingBucketIndex(days: number): 0 | 1 | 2 | 3 {
+  if (days <= 30) return 0;
+  if (days <= 90) return 1;
+  if (days <= 180) return 2;
+  return 3;
+}
+const AGING_BUCKET_COLORS: Record<number, string> = {
+  0: "var(--green)",
+  1: "var(--yellow)",
+  2: "var(--orange)",
+  3: "var(--red)",
+};
+
 export default function OutstandingsScreen() {
   const [activeTab, setActiveTab] = useState<"receivables" | "payables">("receivables");
   const [density, setDensity] = useState<Density>("regular");
+  // View mode — Detailed (default) vs Ageing pivot. Borrowed from
+  // Credflow's tab pattern; same data, different columns.
+  const [viewMode, setViewMode] = useState<ViewMode>("detailed");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const [whatsappTarget, setWhatsappTarget] = useState<{ name: string; amount: string; days: number } | null>(null);
@@ -668,22 +693,50 @@ export default function OutstandingsScreen() {
             </div>
 
             {/* Density toggle */}
-            <div className="hidden sm:flex items-center justify-end gap-1 mb-2">
-              <span className="text-[10px] mr-1.5" style={{ color: "var(--text-4)" }}>Density:</span>
-              {(["compact", "regular", "relaxed"] as Density[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDensity(d)}
-                  className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
-                  style={{
-                    background: density === d ? "var(--bg-hover)" : "transparent",
-                    color: density === d ? "var(--text-1)" : "var(--text-4)",
-                    border: `1px solid ${density === d ? "var(--text-3)" : "var(--border)"}`,
-                  }}
-                >
-                  {d}
-                </button>
-              ))}
+            <div className="hidden sm:flex items-center justify-end gap-4 mb-2 flex-wrap">
+              {/* View toggle — Detailed vs Ageing pivot. Same data,
+                  different columns. Borrowed from Credflow's tab
+                  pattern but kept inline here so it sits next to
+                  the existing Density control. */}
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] mr-1.5" style={{ color: "var(--text-4)" }}>View:</span>
+                {([
+                  { id: "detailed" as const, label: "Detailed Summary" },
+                  { id: "ageing"   as const, label: "Ageing Summary" },
+                ]).map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => setViewMode(v.id)}
+                    className="text-[10px] px-2.5 py-0.5 rounded transition-colors"
+                    style={{
+                      background: viewMode === v.id ? "var(--bg-hover)" : "transparent",
+                      color: viewMode === v.id ? "var(--text-1)" : "var(--text-4)",
+                      border: `1px solid ${viewMode === v.id ? "var(--text-3)" : "var(--border)"}`,
+                    }}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Density toggle — row height for the table. */}
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] mr-1.5" style={{ color: "var(--text-4)" }}>Density:</span>
+                {(["compact", "regular", "relaxed"] as Density[]).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDensity(d)}
+                    className="text-[10px] px-2 py-0.5 rounded capitalize transition-colors"
+                    style={{
+                      background: density === d ? "var(--bg-hover)" : "transparent",
+                      color: density === d ? "var(--text-1)" : "var(--text-4)",
+                      border: `1px solid ${density === d ? "var(--text-3)" : "var(--border)"}`,
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Data Table (desktop) / Card List (mobile) */}
@@ -718,10 +771,21 @@ export default function OutstandingsScreen() {
                         </div>
                       </th>
                       <th className="py-2.5 px-3 text-left font-medium sticky left-0" style={{ background: "var(--bg-secondary)" }}>Party</th>
-                      <th className="py-2.5 px-3 text-right font-medium">Outstanding</th>
-                      <th className="py-2.5 px-3 text-right font-medium">Days</th>
-                      <th className="py-2.5 px-3 text-right font-medium">Bills</th>
-                      <th className="py-2.5 px-3 text-right font-medium">Last reminded</th>
+                      {viewMode === "detailed" ? (
+                        <>
+                          <th className="py-2.5 px-3 text-right font-medium">Outstanding</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Days</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Bills</th>
+                          <th className="py-2.5 px-3 text-right font-medium">Last reminded</th>
+                        </>
+                      ) : (
+                        <>
+                          {AGING_BUCKETS.map((label) => (
+                            <th key={label} className="py-2.5 px-3 text-right font-medium">{label}d</th>
+                          ))}
+                          <th className="py-2.5 px-3 text-right font-medium">Total</th>
+                        </>
+                      )}
                       <th className="py-2.5 px-3 text-center font-medium">Priority</th>
                       <th className="py-2.5 px-3 text-center font-medium">Action</th>
                     </tr>
@@ -796,54 +860,94 @@ export default function OutstandingsScreen() {
                           </button>
                         </td>
 
-                        <td
-                          className={`${DENSITY_PY[density]} px-3 text-right font-bold tabular-nums`}
-                          style={{
-                            color: "var(--text-1)",
-                            fontFamily: "'Space Grotesk', sans-serif",
-                          }}
-                        >
-                          {fmt(r.amount)}
-                        </td>
+                        {viewMode === "detailed" ? (
+                          <>
+                            <td
+                              className={`${DENSITY_PY[density]} px-3 text-right font-bold tabular-nums`}
+                              style={{
+                                color: "var(--text-1)",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              {fmt(r.amount)}
+                            </td>
 
-                        <td className={`${DENSITY_PY[density]} px-3 text-right`}>
-                          {(() => {
-                            const ag = agingColor5(r.days);
-                            return (
-                              <span
-                                className="inline-flex items-center gap-1.5 text-[11px] font-semibold tabular-nums"
-                                style={{ color: ag.fg }}
-                                title={ag.label}
-                              >
-                                <span
-                                  aria-hidden
-                                  className="inline-block flex-shrink-0"
-                                  style={{ width: 5, height: 5, borderRadius: 999, background: ag.fg }}
-                                />
-                                {r.days.toLocaleString()}
-                              </span>
-                            );
-                          })()}
-                        </td>
+                            <td className={`${DENSITY_PY[density]} px-3 text-right`}>
+                              {(() => {
+                                const ag = agingColor5(r.days);
+                                return (
+                                  <span
+                                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold tabular-nums"
+                                    style={{ color: ag.fg }}
+                                    title={ag.label}
+                                  >
+                                    <span
+                                      aria-hidden
+                                      className="inline-block flex-shrink-0"
+                                      style={{ width: 5, height: 5, borderRadius: 999, background: ag.fg }}
+                                    />
+                                    {r.days.toLocaleString()}
+                                  </span>
+                                );
+                              })()}
+                            </td>
 
-                        <td
-                          className={`${DENSITY_PY[density]} px-3 text-right tabular-nums`}
-                          style={{ color: "var(--text-3)" }}
-                        >
-                          {r.bills}
-                        </td>
+                            <td
+                              className={`${DENSITY_PY[density]} px-3 text-right tabular-nums`}
+                              style={{ color: "var(--text-3)" }}
+                            >
+                              {r.bills}
+                            </td>
 
-                        <td
-                          className={`${DENSITY_PY[density]} px-3 text-right text-[11px] tabular-nums`}
-                          style={{
-                            color:
-                              lastRemindedLabel(r.name) === "Never"
-                                ? "var(--text-4)"
-                                : "var(--text-2)",
-                          }}
-                        >
-                          {lastRemindedLabel(r.name)}
-                        </td>
+                            <td
+                              className={`${DENSITY_PY[density]} px-3 text-right text-[11px] tabular-nums`}
+                              style={{
+                                color:
+                                  lastRemindedLabel(r.name) === "Never"
+                                    ? "var(--text-4)"
+                                    : "var(--text-2)",
+                              }}
+                            >
+                              {lastRemindedLabel(r.name)}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            {/* Ageing pivot: party's full amount lands
+                                in the bucket their oldest-unpaid-days
+                                falls into. Other buckets show "—". */}
+                            {AGING_BUCKETS.map((label, bucketIdx) => {
+                              const partyBucket = agingBucketIndex(r.days);
+                              const inThisBucket = bucketIdx === partyBucket;
+                              return (
+                                <td
+                                  key={label}
+                                  className={`${DENSITY_PY[density]} px-3 text-right tabular-nums`}
+                                  style={{
+                                    color: inThisBucket
+                                      ? AGING_BUCKET_COLORS[bucketIdx]
+                                      : "var(--text-4)",
+                                    fontWeight: inThisBucket ? 700 : 400,
+                                    fontFamily: inThisBucket
+                                      ? "'Space Grotesk', sans-serif"
+                                      : undefined,
+                                  }}
+                                >
+                                  {inThisBucket ? fmt(r.amount) : "—"}
+                                </td>
+                              );
+                            })}
+                            <td
+                              className={`${DENSITY_PY[density]} px-3 text-right font-bold tabular-nums`}
+                              style={{
+                                color: "var(--text-1)",
+                                fontFamily: "'Space Grotesk', sans-serif",
+                              }}
+                            >
+                              {fmt(r.amount)}
+                            </td>
+                          </>
+                        )}
 
                         <td className={`${DENSITY_PY[density]} px-3 text-center`}>
                           <Pill color={priorityColor[r.priority]}>
