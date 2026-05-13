@@ -3703,6 +3703,74 @@ function DefaultsSection({
               onChange={(v) => update("sendOnlyDueBills", v)}
             />
 
+            {/* Email identity — Reply-to + Signature live here too, in
+                addition to the deeper Channels accordion. Biz Analyst's
+                Auto Reminder Settings puts all of this on one page, so
+                operators don't hunt for it. Both surfaces edit the same
+                React state — Channels stays the canonical channel-config
+                view, this is the contextual quick-edit. */}
+            <details
+              className="rounded-lg overflow-hidden"
+              style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+            >
+              <summary
+                className="text-[13px] font-semibold px-4 py-3 cursor-pointer flex items-center justify-between gap-2"
+                style={{ color: "var(--text-1)", listStyle: "none" }}
+              >
+                <span className="flex items-center gap-2">
+                  <Mail size={13} style={{ color: "var(--text-3)" }} />
+                  Email identity
+                </span>
+                <span className="text-[10.5px] truncate" style={{ color: "var(--text-4)" }}>
+                  Reply-to · Signature · From-address
+                </span>
+              </summary>
+              <div
+                className="flex flex-col gap-3 px-4 py-3"
+                style={{ borderTop: "1px solid var(--border)", background: "var(--bg-surface)" }}
+              >
+                <div>
+                  <p className="text-[10.5px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: "var(--text-4)" }}>
+                    From-address
+                  </p>
+                  <input
+                    type="email"
+                    value={rules.emailFromAddress}
+                    onChange={(e) => update("emailFromAddress", e.target.value)}
+                    className="w-full text-[12px] px-3 py-2 rounded-md"
+                    style={{ background: "var(--bg-primary)", border: "1px solid var(--border)", color: "var(--text-1)" }}
+                  />
+                </div>
+                <div>
+                  <p className="text-[10.5px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: "var(--text-4)" }}>
+                    Reply-to email
+                  </p>
+                  <input
+                    type="email"
+                    value={rules.emailReplyTo}
+                    onChange={(e) => update("emailReplyTo", e.target.value)}
+                    className="w-full text-[12px] px-3 py-2 rounded-md"
+                    style={{ background: "var(--bg-primary)", border: "1px solid var(--border)", color: "var(--text-1)" }}
+                  />
+                  <p className="text-[10px] mt-1" style={{ color: "var(--text-4)" }}>
+                    Replies route here. Usually <code style={{ color: "var(--blue)" }}>accounts@</code> while sends come from the owner's address.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10.5px] uppercase tracking-wider font-semibold mb-1.5" style={{ color: "var(--text-4)" }}>
+                    Signature
+                  </p>
+                  <textarea
+                    value={rules.emailSignature}
+                    onChange={(e) => update("emailSignature", e.target.value)}
+                    rows={3}
+                    className="w-full text-[12px] px-3 py-2 rounded-md resize-none"
+                    style={{ background: "var(--bg-primary)", border: "1px solid var(--border)", color: "var(--text-1)" }}
+                  />
+                </div>
+              </div>
+            </details>
+
             {/* Add Bank Account (Biz Analyst) — when ON, appends bank
                 details from Tally's company master to the footer so the
                 recipient can settle directly. Preview shows what gets
