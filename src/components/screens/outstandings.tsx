@@ -19,6 +19,7 @@ import { Party360Drawer } from "@/components/ui/party-360-drawer";
 import { AutoReminderCatchUpModal } from "@/components/ui/auto-reminder-catchup-modal";
 import { SetAutoReminderModal } from "@/components/ui/set-auto-reminder-modal";
 import { FollowUpModal } from "@/components/ui/follow-up-modal";
+import { LedgerPickerModal } from "@/components/ui/ledger-picker-modal";
 import {
   RECEIVABLES,
   PAYABLES,
@@ -151,10 +152,15 @@ const rowVariants = {
 function AutoReminderHero({
   remindersOn,
   onClick,
+  onPickParties,
 }: {
   remindersOn: boolean;
   /** Called on click. OFF → opens catch-up modal. ON → opens settings. */
   onClick: () => void;
+  /** Optional — when present and reminders are ON, surfaces a "Pick
+   *  parties" sub-action button so the operator can adjust enrollment
+   *  without leaving Outstanding. */
+  onPickParties?: () => void;
 }) {
   const accent = remindersOn ? "var(--green)" : "var(--orange)";
   const attribution = remindersOn ? computeReminderAttribution() : null;
@@ -288,14 +294,37 @@ function AutoReminderHero({
           </div>
         </div>
 
-        {/* Right: CTA button — full-width on mobile, inline on desktop */}
-        <div
-          className="flex items-center justify-center gap-1.5 text-[12px] font-semibold px-4 py-2.5 rounded-md w-full sm:w-auto flex-shrink-0"
-          style={{ background: accent, color: "#fff" }}
-          aria-hidden
-        >
-          {remindersOn ? "Manage rules" : "Review & turn on"}
-          <ArrowRight size={12} />
+        {/* Right: CTA cluster — primary "Manage rules" + secondary
+            "Pick parties" sub-action when reminders are ON. The picker
+            opens the Biz Analyst-style flat-list multi-select. */}
+        <div className="flex items-center gap-1.5 w-full sm:w-auto flex-shrink-0">
+          {remindersOn && onPickParties && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPickParties();
+              }}
+              className="hidden sm:flex items-center gap-1 text-[11.5px] font-semibold px-3 py-2.5 rounded-md cursor-pointer"
+              style={{
+                background: "transparent",
+                color: "var(--text-2)",
+                border: "1px solid var(--border)",
+              }}
+              title="Adjust which parties are enrolled in auto-reminder"
+            >
+              <BellRing size={11} />
+              Pick parties
+            </button>
+          )}
+          <div
+            className="flex items-center justify-center gap-1.5 text-[12px] font-semibold px-4 py-2.5 rounded-md w-full sm:w-auto flex-shrink-0"
+            style={{ background: accent, color: "#fff" }}
+            aria-hidden
+          >
+            {remindersOn ? "Manage rules" : "Review & turn on"}
+            <ArrowRight size={12} />
+          </div>
         </div>
       </div>
     </motion.div>
@@ -405,6 +434,11 @@ export default function OutstandingsScreen() {
   // mock data so user edits survive a refresh.
   const [followUpTarget, setFollowUpTarget] = useState<string | null>(null);
   const [followUpMap, setFollowUp] = usePartyFollowUpMap();
+
+  // Bulk ledger picker — Biz Analyst-style flat-list multi-select.
+  // Opens from the AutoReminderHero "Pick parties" sub-action when
+  // reminders are ON, so the operator can adjust enrollment quickly.
+  const [ledgerPickerOpen, setLedgerPickerOpen] = useState(false);
 
   const goToReminderSettings = () => {
     window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "settings" }));
@@ -712,6 +746,7 @@ export default function OutstandingsScreen() {
             <AutoReminderHero
               remindersOn={remindersOn}
               onClick={handleHeroClick}
+              onPickParties={() => setLedgerPickerOpen(true)}
             />
 
             {/* Reminder filter chips — slice the table below. */}
@@ -1536,6 +1571,17 @@ export default function OutstandingsScreen() {
                 />
               );
             })()}
+
+            {/* Bulk ledger picker — Biz Analyst-style flat-list multi-select
+                for adjusting auto-reminder enrollment without leaving
+                the Outstanding screen. */}
+            <LedgerPickerModal
+              open={ledgerPickerOpen}
+              onClose={() => setLedgerPickerOpen(false)}
+              onSave={(count) => {
+                showBulkToast(`Enrolled ${count} part${count === 1 ? "y" : "ies"} in auto-reminder.`);
+              }}
+            />
 
             {/* Bulk Contact Import lives in Settings → Reminders → Step 1.
                 Outstanding's button now jumps there directly via Auto reminder. */}

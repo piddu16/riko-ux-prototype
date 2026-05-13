@@ -96,6 +96,7 @@ import {
 } from "@/lib/data";
 import { BulkImportModal } from "@/components/ui/bulk-import-modal";
 import { ContactManagerDrawer } from "@/components/ui/contact-manager-drawer";
+import { LedgerPickerModal } from "@/components/ui/ledger-picker-modal";
 import { useRbac } from "@/lib/rbac-context";
 
 /* ------------------------------------------------------------------ */
@@ -3023,6 +3024,8 @@ function RemindersTab() {
   const [saved, setSaved] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [contactManagerOpen, setContactManagerOpen] = useState(false);
+  const [ledgerPickerOpen, setLedgerPickerOpen] = useState(false);
+  const [pickerToast, setPickerToast] = useState<string | null>(null);
 
   const update = <K extends keyof ReminderAutomationRules>(
     key: K,
@@ -3061,6 +3064,7 @@ function RemindersTab() {
         update={update}
         onImportClick={() => setBulkImportOpen(true)}
         onManageContacts={() => setContactManagerOpen(true)}
+        onPickParties={() => setLedgerPickerOpen(true)}
       />
 
       {/* ─── 2. Defaults ─────────────────────────────────────── */}
@@ -3117,6 +3121,31 @@ function RemindersTab() {
       {/* Modals */}
       <BulkImportModal open={bulkImportOpen} onClose={() => setBulkImportOpen(false)} />
       <ContactManagerDrawer open={contactManagerOpen} onClose={() => setContactManagerOpen(false)} />
+      <LedgerPickerModal
+        open={ledgerPickerOpen}
+        onClose={() => setLedgerPickerOpen(false)}
+        onSave={(count) => {
+          setPickerToast(`Enrolled ${count} part${count === 1 ? "y" : "ies"} in auto-reminder.`);
+          window.setTimeout(() => setPickerToast(null), 2500);
+        }}
+      />
+      <AnimatePresence>
+        {pickerToast && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-md text-[12px] font-semibold"
+            style={{
+              background: "var(--green)",
+              color: "#fff",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+            }}
+          >
+            ✓ {pickerToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -3133,6 +3162,7 @@ function SetupGateSection({
   update,
   onImportClick,
   onManageContacts,
+  onPickParties,
 }: {
   gate: ReturnType<typeof computeReminderSetupGate>;
   rules: ReminderAutomationRules;
@@ -3142,6 +3172,7 @@ function SetupGateSection({
   ) => void;
   onImportClick: () => void;
   onManageContacts: () => void;
+  onPickParties: () => void;
 }) {
   const [showInfo, setShowInfo] = useState(false);
 
@@ -3262,6 +3293,26 @@ function SetupGateSection({
               />
             </button>
           }
+        />
+
+        {/* Checklist row 3 — Pick which parties get enrolled. Biz Analyst-
+             style flat-list ledger picker with search + select-all-applicable.
+             Disabled until contacts are imported (otherwise the picker would
+             show parties without contacts as locked, which is right but
+             discouraging on a first-time empty state). */}
+        <GateRow
+          done={false}
+          disabled={!gate.contactsImported}
+          icon={<Users size={14} />}
+          title="Pick parties to enroll"
+          subtitle={
+            gate.contactsImported
+              ? "Multi-select from your full party list with search. Locked parties (no contact, blacklisted, etc.) are shown but can't be enrolled."
+              : "Available once contacts are imported."
+          }
+          actionLabel="Pick parties"
+          actionVariant="ghost"
+          onAction={onPickParties}
         />
 
         {/* Info popover */}
