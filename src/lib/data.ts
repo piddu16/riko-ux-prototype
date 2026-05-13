@@ -3483,6 +3483,28 @@ export type ReminderTriggerType =
  *  Defaults card. */
 export type PaymentTermsSource = "voucher" | "ledger" | "default";
 
+/** Which columns the reminder body lists per outstanding bill. Mirrors
+ *  Biz Analyst's "Choose columns to share" picker — operator picks any
+ *  subset; "amount" + "dueOn" are usually mandatory in practice. */
+export type ReminderColumnId =
+  | "date"        // Invoice date
+  | "refNo"       // Reference / voucher number
+  | "amount"      // Pending amount (after on-account)
+  | "dueOn"       // Due date
+  | "overdueDays"; // Days overdue (computed)
+
+export const REMINDER_COLUMN_PRESETS: Array<{
+  id: ReminderColumnId;
+  label: string;
+  blurb: string;
+}> = [
+  { id: "date",        label: "Date",          blurb: "Invoice date" },
+  { id: "refNo",       label: "Ref No.",       blurb: "Voucher number" },
+  { id: "amount",      label: "Pending Amount", blurb: "Net outstanding" },
+  { id: "dueOn",       label: "Due On",        blurb: "Bill due date" },
+  { id: "overdueDays", label: "Overdue Days",  blurb: "Days past due" },
+];
+
 /** Who the reminder gets sent to. Default = invoice owner per meeting
  *  consensus (accounting will ignore repeated mails). */
 export type ReminderRecipient = "owner" | "accounting" | "both";
@@ -3582,6 +3604,14 @@ export interface ReminderAutomationRules {
   // ── Auto-stop rules ───────────────────────────────────────────
   /** Stop reminders when a receipt voucher lands for the party. */
   stopOnPaymentReceived: boolean;
+  /** Window in days: skip a reminder if a payment landed within the
+   *  last N days. Credflow's "No reminders if paid recently" pattern —
+   *  adds a configurable window to the existing boolean. Default 7d. */
+  stopOnPaymentReceivedWindowDays: number;
+  /** Suppress reminders when a Post-Dated Cheque is on file for the
+   *  party. PDC handling is universal in India SMB B2B; Credflow's
+   *  "No reminders if PDC Received" toggle. */
+  stopOnPDCReceived: boolean;
   /** Honor WhatsApp STOP replies by auto-disabling. */
   stopOnOptOut: boolean;
   /** Detect "paying soon", "will clear", "promise" in replies and
@@ -3591,6 +3621,21 @@ export interface ReminderAutomationRules {
    *  outstanding. 0.8 = stop after 80% paid. */
   stopOnPartialPayment: boolean;
   partialPaymentThreshold: number;
+
+  // ── Message content controls (Biz Analyst + Credflow parity) ──
+  /** When true, only outstanding bills past their due date are
+   *  included in the reminder. When false (default), all open bills
+   *  are listed including pre-due. Biz Analyst's "Send Due Bills only"
+   *  toggle — useful when operators want a strict "you're late" tone. */
+  sendOnlyDueBills: boolean;
+  /** Whether to attach a ledger summary (running balance, recent
+   *  vouchers) to the reminder. Credflow's "Show Ledger In Reminders"
+   *  pattern — gives the recipient the full context, but inflates
+   *  message length. Default ON. */
+  showLedgerInReminders: boolean;
+  /** Which invoice columns to include in the bill list inside the
+   *  reminder body. Biz Analyst's "Columns to Share" pattern. */
+  includeColumnsInReminder: ReminderColumnId[];
 
   // ── WABA approval status per tone ─────────────────────────────
   /** Per-tone approval state at Meta (via WAMe). Automated WA sends
@@ -3661,10 +3706,16 @@ export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
   slaAfterFinalDays: 30,
   // Auto-stop
   stopOnPaymentReceived: true,
+  stopOnPaymentReceivedWindowDays: 7,  // Credflow default
+  stopOnPDCReceived: true,             // Common practice in Indian SMB B2B
   stopOnOptOut: true,
   stopOnPromiseToPay: true,
   stopOnPartialPayment: true,
   partialPaymentThreshold: 0.8,
+  // Message content (Biz Analyst + Credflow patterns)
+  sendOnlyDueBills: false,             // Default: include pre-due bills too
+  showLedgerInReminders: true,         // Default: attach ledger snapshot
+  includeColumnsInReminder: ["date", "refNo", "amount", "dueOn"],
   // WABA
   wabaApproved: true,
   wabaApprovalByTone: {

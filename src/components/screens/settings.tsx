@@ -74,6 +74,7 @@ import {
   REMINDER_MONITOR_FILTERS,
   REMINDER_TONE_PRESETS,
   REMINDER_TRIGGER_PRESETS,
+  REMINDER_COLUMN_PRESETS,
   ordinalDay,
   nextBatchDateLabel,
   CONTACT_ROLE_LABELS,
@@ -3601,6 +3602,79 @@ function DefaultsSection({
           <FollowUpCadenceControls rules={rules} update={update} />
         </DefaultRow>
 
+        {/* B2. Message content — Biz Analyst "Choose columns to share" +
+              Credflow "Show Ledger" pattern. Operator picks what shows up
+              in the bill list inside the reminder body. Defaults match
+              the common case (Date + Ref + Amount + Due). */}
+        <DefaultRow
+          label="What goes in the message"
+          help="Which invoice columns to include + ledger snapshot toggle."
+        >
+          <div className="flex flex-col gap-3">
+            {/* Columns multi-select */}
+            <div>
+              <p
+                className="text-[10.5px] uppercase tracking-wider font-semibold mb-1.5"
+                style={{ color: "var(--text-4)" }}
+              >
+                Columns to include
+              </p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {REMINDER_COLUMN_PRESETS.map((c) => {
+                  const active = rules.includeColumnsInReminder.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        const next = active
+                          ? rules.includeColumnsInReminder.filter((x) => x !== c.id)
+                          : [...rules.includeColumnsInReminder, c.id];
+                        update("includeColumnsInReminder", next);
+                      }}
+                      className="text-[11px] font-medium px-2.5 py-1 rounded-md cursor-pointer flex items-center gap-1.5"
+                      style={{
+                        background: active
+                          ? "color-mix(in srgb, var(--green) 12%, transparent)"
+                          : "var(--bg-primary)",
+                        color: active ? "var(--green)" : "var(--text-3)",
+                        border: `1px solid ${active ? "color-mix(in srgb, var(--green) 35%, transparent)" : "var(--border)"}`,
+                      }}
+                      title={c.blurb}
+                    >
+                      {active ? "✓" : "+"} {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p
+                className="text-[10px] mt-1.5"
+                style={{ color: "var(--text-4)" }}
+              >
+                {rules.includeColumnsInReminder.length === 0
+                  ? "⚠ At least one column recommended — message body will be empty otherwise."
+                  : `${rules.includeColumnsInReminder.length} of ${REMINDER_COLUMN_PRESETS.length} columns`}
+              </p>
+            </div>
+
+            {/* Show ledger toggle (Credflow) */}
+            <ToggleRow
+              title="Attach ledger summary"
+              desc="Append a brief ledger snapshot (running balance + last 5 vouchers) to the reminder. Helps the party reconcile but inflates message length."
+              checked={rules.showLedgerInReminders}
+              onChange={(v) => update("showLedgerInReminders", v)}
+            />
+
+            {/* Send only due bills (Biz Analyst) */}
+            <ToggleRow
+              title="Send only due bills"
+              desc="Limit the bill list to invoices that are past their due date. Pre-due invoices are excluded — useful when you want a strict 'you're late' tone."
+              checked={rules.sendOnlyDueBills}
+              onChange={(v) => update("sendOnlyDueBills", v)}
+            />
+          </div>
+        </DefaultRow>
+
         {/* C. Tone + payment terms — collapsed by default. Configure-once
               settings whose defaults (voucher → ledger → 45d, Auto tone)
               are correct out-of-the-box. Hidden behind one expander to
@@ -6180,11 +6254,71 @@ function StopRulesSection({
       subtitle="When reminders should stop automatically — prevents awkward follow-ups after intent-to-pay signals."
     >
       <div className="flex flex-col gap-3">
+        {/* Stop on payment received — Credflow's "No reminders if paid
+            recently" pattern adds a configurable window so an early
+            payment doesn't suppress later overdue bills indefinitely. */}
+        <div
+          className="flex items-start gap-3 px-4 py-3 rounded-lg flex-wrap"
+          style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+        >
+          <div className="flex-1 min-w-[220px]">
+            <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+              Stop on payment received
+            </p>
+            <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+              When Tally syncs a receipt voucher for the party, skip reminders for{" "}
+              <strong style={{ color: "var(--text-2)" }}>
+                {rules.stopOnPaymentReceivedWindowDays}d
+              </strong>{" "}
+              after the receipt date.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => update("stopOnPaymentReceived", !rules.stopOnPaymentReceived)}
+              className="relative inline-flex h-5 w-9 rounded-full transition-colors cursor-pointer"
+              style={{
+                background: rules.stopOnPaymentReceived ? "var(--green)" : "var(--bg-surface)",
+                border: "1px solid var(--border)",
+              }}
+              aria-label="Toggle stop-on-payment-received"
+            >
+              <motion.span
+                animate={{ x: rules.stopOnPaymentReceived ? 16 : 2 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-0.5 w-3.5 h-3.5 rounded-full"
+                style={{ background: rules.stopOnPaymentReceived ? "#fff" : "var(--text-4)" }}
+              />
+            </button>
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={rules.stopOnPaymentReceivedWindowDays}
+              disabled={!rules.stopOnPaymentReceived}
+              onChange={(e) =>
+                update(
+                  "stopOnPaymentReceivedWindowDays",
+                  Math.max(1, Math.min(90, parseInt(e.target.value, 10) || 7)),
+                )
+              }
+              className="w-14 text-[12px] font-semibold px-2 py-1 rounded-md tabular-nums text-right disabled:opacity-50"
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--text-1)",
+                border: "1px solid var(--border)",
+              }}
+            />
+            <span className="text-[11px]" style={{ color: "var(--text-3)" }}>
+              day{rules.stopOnPaymentReceivedWindowDays === 1 ? "" : "s"}
+            </span>
+          </div>
+        </div>
         <ToggleRow
-          title="Stop on payment received"
-          desc="When Tally sync brings in a receipt voucher for a party, disable their reminders automatically and log the reason."
-          checked={rules.stopOnPaymentReceived}
-          onChange={(v) => update("stopOnPaymentReceived", v)}
+          title="Stop on PDC received"
+          desc="If a Post-Dated Cheque is logged against the party in Tally, suppress reminders until the cheque clears or bounces. Common SMB B2B practice."
+          checked={rules.stopOnPDCReceived}
+          onChange={(v) => update("stopOnPDCReceived", v)}
         />
         <ToggleRow
           title="Stop on STOP reply"
