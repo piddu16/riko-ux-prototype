@@ -17,7 +17,7 @@
    after — quickly enabling a single party, or flipping one off.
    ═══════════════════════════════════════════════════════════════ */
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -28,6 +28,10 @@ import {
   ArrowUpRight,
   Mail,
   Phone,
+  ChevronDown,
+  MessageCircle,
+  MessageSquare,
+  User,
 } from "lucide-react";
 import {
   computePartyEligibility,
@@ -35,8 +39,14 @@ import {
   getPartyContact,
   RECEIVABLES,
   REMINDER_AUTOMATION_DEFAULTS,
+  type ReminderChannel,
 } from "@/lib/data";
 import { usePartyReminderEnrollment } from "@/lib/use-auto-reminder";
+import {
+  usePartyReminderOverridesMap,
+  type PartyReminderOverride,
+} from "@/lib/use-party-reminder-overrides";
+import { TEAM_MEMBERS } from "@/lib/rbac";
 
 interface SetAutoReminderModalProps {
   open: boolean;
@@ -72,7 +82,67 @@ export function SetAutoReminderModal({
     verdict,
   );
 
+  // Per-party advanced overrides (Credflow-style Advance Settings).
+  // Local state mirrors the persisted override so the operator can
+  // edit, see live updates in the body, and save when done.
+  const [overrideMap, setOverride] = usePartyReminderOverridesMap();
+  const persisted: PartyReminderOverride = overrideMap[partyName] ?? {};
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [draftPaymentTerms, setDraftPaymentTerms] = useState<string>("");
+  const [draftFrequency, setDraftFrequency] = useState<string>("");
+  const [draftChannels, setDraftChannels] = useState<ReminderChannel[]>([]);
+  const [draftAccountManager, setDraftAccountManager] = useState<string>("");
+
+  // Re-seed drafts whenever the modal opens for a different party so
+  // we don't show stale state from the previous edit.
+  useEffect(() => {
+    if (!open) return;
+    setDraftPaymentTerms(
+      persisted.paymentTermsDays != null
+        ? String(persisted.paymentTermsDays)
+        : party?.paymentTermsDays != null
+        ? String(party.paymentTermsDays)
+        : "",
+    );
+    setDraftFrequency(
+      persisted.frequencyDays != null ? String(persisted.frequencyDays) : "",
+    );
+    setDraftChannels(persisted.channels ?? []);
+    setDraftAccountManager(persisted.accountManagerId ?? "");
+    // Auto-open Advanced if the party already has an override saved
+    setAdvancedOpen(
+      !!(persisted.paymentTermsDays ||
+        persisted.frequencyDays ||
+        (persisted.channels && persisted.channels.length > 0) ||
+        persisted.accountManagerId),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, partyName]);
+
   if (!party || !eligibility) return null;
+
+  const toggleChannel = (ch: ReminderChannel) => {
+    setDraftChannels((prev) =>
+      prev.includes(ch) ? prev.filter((c) => c !== ch) : [...prev, ch],
+    );
+  };
+
+  const handleSaveAdvanced = () => {
+    const next: PartyReminderOverride = {};
+    const ptd = parseInt(draftPaymentTerms, 10);
+    if (!isNaN(ptd) && ptd > 0) next.paymentTermsDays = ptd;
+    const fd = parseInt(draftFrequency, 10);
+    if (!isNaN(fd) && fd > 0) next.frequencyDays = fd;
+    if (draftChannels.length > 0) next.channels = draftChannels;
+    if (draftAccountManager) next.accountManagerId = draftAccountManager;
+    setOverride(partyName, next);
+  };
+
+  const hasAdvancedOverrides =
+    persisted.paymentTermsDays != null ||
+    persisted.frequencyDays != null ||
+    (persisted.channels && persisted.channels.length > 0) ||
+    !!persisted.accountManagerId;
 
   // Cadence preview: matches the global default for now. Per-party
   // override would live in Advanced (handled by the caller).
@@ -324,16 +394,226 @@ export function SetAutoReminderModal({
                   </p>
                 )}
 
-                {/* Advanced link */}
-                <button
-                  onClick={onAdvanced}
-                  className="flex items-center justify-center gap-1.5 text-[11px] font-medium cursor-pointer"
-                  style={{ color: "var(--blue)" }}
+                {/* Per-party Advance Settings — Credflow-style expander.
+                    Opens inline (not navigating away) so the operator can
+                    set party-specific overrides for payment terms,
+                    cadence, channels, and account manager without
+                    leaving the row. Auto-opens when the party already
+                    has at least one override persisted. */}
+                <div
+                  className="rounded-md overflow-hidden"
+                  style={{
+                    background: "var(--bg-primary)",
+                    border: "1px solid var(--border)",
+                  }}
                 >
-                  <Settings size={11} />
-                  Advanced settings
-                  <ArrowUpRight size={10} />
-                </button>
+                  <div className="flex items-center justify-between px-3 py-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAdvancedOpen((o) => !o)}
+                      aria-expanded={advancedOpen}
+                      className="flex items-center gap-2 min-w-0 cursor-pointer text-left flex-1"
+                    >
+                      <ChevronDown
+                        size={12}
+                        style={{
+                          color: "var(--text-3)",
+                          transform: advancedOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                          transition: "transform 200ms",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Settings size={11} style={{ color: "var(--text-3)" }} />
+                      <span className="text-[11.5px] font-semibold" style={{ color: "var(--text-1)" }}>
+                        Advance settings
+                      </span>
+                      {hasAdvancedOverrides && (
+                        <span
+                          className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{
+                            background: "color-mix(in srgb, var(--blue) 14%, transparent)",
+                            color: "var(--blue)",
+                          }}
+                        >
+                          Custom
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onAdvanced}
+                      className="flex items-center gap-1 text-[10px] cursor-pointer hover:underline"
+                      style={{ color: "var(--text-4)" }}
+                      title="Open global Settings → Reminders"
+                    >
+                      Global
+                      <ArrowUpRight size={9} />
+                    </button>
+                  </div>
+
+                  <AnimatePresence initial={false}>
+                    {advancedOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                        style={{ overflow: "hidden" }}
+                      >
+                        <div
+                          className="px-3 py-3 flex flex-col gap-3"
+                          style={{ borderTop: "1px solid var(--border)" }}
+                        >
+                          {/* Payment terms override */}
+                          <div className="flex items-center justify-between gap-2">
+                            <label
+                              className="text-[10.5px] font-medium"
+                              style={{ color: "var(--text-3)" }}
+                              htmlFor="adv-payment-terms"
+                            >
+                              Payment terms (days)
+                            </label>
+                            <input
+                              id="adv-payment-terms"
+                              type="number"
+                              min={1}
+                              max={365}
+                              placeholder={String(party.paymentTermsDays ?? 45)}
+                              value={draftPaymentTerms}
+                              onChange={(e) => setDraftPaymentTerms(e.target.value)}
+                              className="w-20 text-[11.5px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+                              style={{
+                                background: "var(--bg-surface)",
+                                color: "var(--text-1)",
+                                border: "1px solid var(--border)",
+                              }}
+                            />
+                          </div>
+
+                          {/* Frequency override */}
+                          <div className="flex items-center justify-between gap-2">
+                            <label
+                              className="text-[10.5px] font-medium"
+                              style={{ color: "var(--text-3)" }}
+                              htmlFor="adv-frequency"
+                            >
+                              Reminder frequency (days)
+                            </label>
+                            <input
+                              id="adv-frequency"
+                              type="number"
+                              min={1}
+                              max={60}
+                              placeholder={String(REMINDER_AUTOMATION_DEFAULTS.defaultFrequencyDays)}
+                              value={draftFrequency}
+                              onChange={(e) => setDraftFrequency(e.target.value)}
+                              className="w-20 text-[11.5px] font-semibold px-2 py-1 rounded-md tabular-nums text-right"
+                              style={{
+                                background: "var(--bg-surface)",
+                                color: "var(--text-1)",
+                                border: "1px solid var(--border)",
+                              }}
+                            />
+                          </div>
+
+                          {/* Channel preferences */}
+                          <div>
+                            <p
+                              className="text-[10.5px] font-medium mb-1.5"
+                              style={{ color: "var(--text-3)" }}
+                            >
+                              Primary channels for this party
+                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {([
+                                { id: "whatsapp" as const, label: "WhatsApp", Icon: MessageCircle },
+                                { id: "email" as const, label: "Email", Icon: Mail },
+                                { id: "sms" as const, label: "SMS", Icon: MessageSquare },
+                              ]).map(({ id, label, Icon: ChIcon }) => {
+                                const active = draftChannels.includes(id);
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    onClick={() => toggleChannel(id)}
+                                    className="text-[10.5px] font-medium px-2 py-1 rounded-md cursor-pointer flex items-center gap-1.5"
+                                    style={{
+                                      background: active
+                                        ? "color-mix(in srgb, var(--green) 12%, transparent)"
+                                        : "var(--bg-surface)",
+                                      color: active ? "var(--green)" : "var(--text-3)",
+                                      border: `1px solid ${active ? "color-mix(in srgb, var(--green) 35%, transparent)" : "var(--border)"}`,
+                                    }}
+                                  >
+                                    <ChIcon size={10} />
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {draftChannels.length === 0 && (
+                              <p
+                                className="text-[9.5px] italic mt-1"
+                                style={{ color: "var(--text-4)" }}
+                              >
+                                Empty = use global default channels
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Account Manager */}
+                          <div className="flex items-center justify-between gap-2">
+                            <label
+                              className="flex items-center gap-1.5 text-[10.5px] font-medium"
+                              style={{ color: "var(--text-3)" }}
+                              htmlFor="adv-account-manager"
+                            >
+                              <User size={11} />
+                              Account manager
+                            </label>
+                            <select
+                              id="adv-account-manager"
+                              value={draftAccountManager}
+                              onChange={(e) => setDraftAccountManager(e.target.value)}
+                              className="text-[11.5px] px-2 py-1 rounded-md cursor-pointer max-w-[160px] truncate"
+                              style={{
+                                background: "var(--bg-surface)",
+                                color: "var(--text-1)",
+                                border: "1px solid var(--border)",
+                              }}
+                            >
+                              <option value="">Unassigned</option>
+                              {TEAM_MEMBERS.filter((m) => m.status === "active").map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name} · {m.role}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleSaveAdvanced}
+                            className="text-[11px] font-semibold px-3 py-1.5 rounded-md cursor-pointer self-end"
+                            style={{
+                              background: "var(--blue)",
+                              color: "#fff",
+                            }}
+                          >
+                            Save overrides
+                          </button>
+
+                          <p
+                            className="text-[9.5px] italic"
+                            style={{ color: "var(--text-4)" }}
+                          >
+                            Empty fields fall back to global defaults at send time.
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
 
               {/* Footer */}
