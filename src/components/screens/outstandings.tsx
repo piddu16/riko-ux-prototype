@@ -18,6 +18,7 @@ import { WhatsAppModal } from "@/components/ui/whatsapp-modal";
 import { Party360Drawer } from "@/components/ui/party-360-drawer";
 import { AutoReminderCatchUpModal } from "@/components/ui/auto-reminder-catchup-modal";
 import { SetAutoReminderModal } from "@/components/ui/set-auto-reminder-modal";
+import { FollowUpModal } from "@/components/ui/follow-up-modal";
 import {
   RECEIVABLES,
   PAYABLES,
@@ -36,6 +37,7 @@ import {
   getPartyReminderHistory,
 } from "@/lib/data";
 import { useAutoReminderEnabled } from "@/lib/use-auto-reminder";
+import { usePartyFollowUpMap, resolveFollowUp } from "@/lib/use-party-followup";
 
 /* Stable "today" for the demo — keeps filters purity-safe (React 19's
    purity rule forbids Date.now() in useMemo/render). Aligned with the
@@ -389,6 +391,13 @@ export default function OutstandingsScreen() {
   // Complements the catch-up sweep (used for first-time bulk enroll)
   // by giving operators a fast per-party flow for everything after.
   const [autoReminderTarget, setAutoReminderTarget] = useState<string | null>(null);
+
+  // Per-party Follow-up edit modal target. Same pattern as autoReminderTarget
+  // — null = closed, set = open for that party. Overrides land in
+  // localStorage via usePartyFollowUpMap and overlay the static RECEIVABLES
+  // mock data so user edits survive a refresh.
+  const [followUpTarget, setFollowUpTarget] = useState<string | null>(null);
+  const [followUpMap, setFollowUp] = usePartyFollowUpMap();
 
   const goToReminderSettings = () => {
     window.dispatchEvent(new CustomEvent("riko:navigate", { detail: "settings" }));
@@ -824,6 +833,14 @@ export default function OutstandingsScreen() {
                       void rowIdx;
                       const isSelected = selected.has(i);
                       const isHovered = hoveredRow === i;
+                      // Effective follow-up state = static RECEIVABLES default,
+                      // overlaid by any localStorage override the operator saved
+                      // via the FollowUpModal. resolveFollowUp() handles the
+                      // "empty string = explicitly cleared" semantic.
+                      const fu = resolveFollowUp(
+                        { nextFollowUpDate: r.nextFollowUpDate, remark: r.remark },
+                        followUpMap[r.name],
+                      );
                       return (
                       <motion.tr
                         key={r.name}
@@ -943,25 +960,28 @@ export default function OutstandingsScreen() {
                               })()}
                             </td>
 
-                            {/* Next Follow-Up — manually scheduled. "+ Add"
-                                placeholder for unset values, matching
-                                Credflow's affordance pattern. */}
+                            {/* Next Follow-Up — manually scheduled. Click to
+                                edit the date (or "+ Add" placeholder when
+                                unset). FollowUpModal handles both fields
+                                together so the operator can capture context
+                                in one flow. */}
                             <td
                               className={`${DENSITY_PY[density]} px-3 text-left text-[11px] tabular-nums`}
                             >
-                              {r.nextFollowUpDate ? (
-                                <span style={{ color: "var(--text-2)" }}>
-                                  {formatDate(r.nextFollowUpDate)}
-                                </span>
-                              ) : (
-                                <span
-                                  className="cursor-pointer hover:underline"
-                                  style={{ color: "var(--text-4)" }}
-                                  title="Schedule a follow-up date"
-                                >
-                                  + Add
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFollowUpTarget(r.name);
+                                }}
+                                className="hover:underline cursor-pointer tabular-nums text-left"
+                                style={{
+                                  color: fu.nextFollowUpDate ? "var(--text-2)" : "var(--text-4)",
+                                }}
+                                title={fu.nextFollowUpDate ? "Edit follow-up" : "Schedule a follow-up date"}
+                              >
+                                {fu.nextFollowUpDate ? formatDate(fu.nextFollowUpDate) : "+ Add"}
+                              </button>
                             </td>
 
                             {/* Promises to Pay — amount + date when set. */}
@@ -988,23 +1008,31 @@ export default function OutstandingsScreen() {
                               )}
                             </td>
 
-                            {/* Remark — free-text note, truncated. */}
+                            {/* Remark — free-text note, truncated. Click to
+                                edit (opens the same FollowUpModal — single
+                                editor for both fields keeps the surface small). */}
                             <td
                               className={`${DENSITY_PY[density]} px-3 text-left text-[11px]`}
                               style={{ color: "var(--text-3)", maxWidth: 160 }}
                             >
-                              {r.remark ? (
-                                <span className="truncate block" title={r.remark}>
-                                  {r.remark}
-                                </span>
-                              ) : (
-                                <span
-                                  className="cursor-pointer hover:underline"
-                                  style={{ color: "var(--text-4)" }}
-                                >
-                                  + Add
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFollowUpTarget(r.name);
+                                }}
+                                className="hover:underline cursor-pointer text-left block w-full"
+                                style={{
+                                  color: fu.remark ? "var(--text-3)" : "var(--text-4)",
+                                }}
+                                title={fu.remark ?? "Add a remark"}
+                              >
+                                {fu.remark ? (
+                                  <span className="truncate block">{fu.remark}</span>
+                                ) : (
+                                  "+ Add"
+                                )}
+                              </button>
                             </td>
                           </>
                         ) : (
@@ -1247,6 +1275,12 @@ export default function OutstandingsScreen() {
                 {filteredReceivables.map((r, rowIdx) => {
                   const ag = agingColor5(r.days);
                   const contact = getPartyContact(r.name);
+                  // Same merge as desktop — overlay any localStorage edits
+                  // on top of the static RECEIVABLES defaults.
+                  const fu = resolveFollowUp(
+                    { nextFollowUpDate: r.nextFollowUpDate, remark: r.remark },
+                    followUpMap[r.name],
+                  );
                   return (
                     <motion.div
                       key={r.name}
@@ -1333,42 +1367,62 @@ export default function OutstandingsScreen() {
                         />
                       </div>
 
-                      {/* Row 4 (conditional): Follow-up / promise / remark badges */}
-                      {(r.nextFollowUpDate || r.promiseAmount || r.remark) && (
-                        <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
-                          {r.nextFollowUpDate && (
-                            <span
-                              className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded"
-                              style={{
-                                background: "color-mix(in srgb, var(--blue) 12%, transparent)",
-                                color: "var(--blue)",
-                              }}
-                            >
-                              Follow-up {formatDate(r.nextFollowUpDate, { includeYear: false })}
-                            </span>
-                          )}
-                          {r.promiseAmount && r.promiseDate && (
-                            <span
-                              className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
-                              style={{
-                                background: "color-mix(in srgb, var(--purple) 12%, transparent)",
-                                color: "var(--purple)",
-                              }}
-                            >
-                              Promise {fmt(r.promiseAmount)} by {formatDate(r.promiseDate, { includeYear: false })}
-                            </span>
-                          )}
-                          {r.remark && (
-                            <span
-                              className="text-[9.5px] truncate"
-                              style={{ color: "var(--text-3)", maxWidth: 220 }}
-                              title={r.remark}
-                            >
-                              {r.remark}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      {/* Row 4: Follow-up / promise / remark badges.
+                          Always renders so the operator has a tappable
+                          entry point even when nothing's set yet.
+                          Follow-up + remark are clickable → opens
+                          FollowUpModal pre-filled with current values. */}
+                      <div className="flex items-center gap-1.5 mb-2.5 flex-wrap">
+                        {fu.nextFollowUpDate ? (
+                          <button
+                            type="button"
+                            onClick={() => setFollowUpTarget(r.name)}
+                            className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded cursor-pointer"
+                            style={{
+                              background: "color-mix(in srgb, var(--blue) 12%, transparent)",
+                              color: "var(--blue)",
+                            }}
+                          >
+                            Follow-up {formatDate(fu.nextFollowUpDate, { includeYear: false })}
+                          </button>
+                        ) : null}
+                        {r.promiseAmount && r.promiseDate && (
+                          <span
+                            className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
+                            style={{
+                              background: "color-mix(in srgb, var(--purple) 12%, transparent)",
+                              color: "var(--purple)",
+                            }}
+                          >
+                            Promise {fmt(r.promiseAmount)} by {formatDate(r.promiseDate, { includeYear: false })}
+                          </span>
+                        )}
+                        {fu.remark ? (
+                          <button
+                            type="button"
+                            onClick={() => setFollowUpTarget(r.name)}
+                            className="text-[9.5px] truncate text-left cursor-pointer"
+                            style={{ color: "var(--text-3)", maxWidth: 220 }}
+                            title={fu.remark}
+                          >
+                            {fu.remark}
+                          </button>
+                        ) : null}
+                        {!fu.nextFollowUpDate && !fu.remark && (
+                          <button
+                            type="button"
+                            onClick={() => setFollowUpTarget(r.name)}
+                            className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded cursor-pointer"
+                            style={{
+                              background: "transparent",
+                              color: "var(--text-4)",
+                              border: "1px dashed var(--border)",
+                            }}
+                          >
+                            + Follow-up
+                          </button>
+                        )}
+                      </div>
 
                       {/* Row 5: Actions — Auto + Remind */}
                       <div className="flex items-center justify-end gap-1.5">
@@ -1440,6 +1494,41 @@ export default function OutstandingsScreen() {
                 goToReminderSettings();
               }}
             />
+
+            {/* Per-party Follow-up modal — date + remark editor. Opens from
+                the desktop "+ Add" cells, the existing-value cells, and
+                the mobile follow-up chip. Saves through usePartyFollowUpMap
+                so edits survive a refresh and stay in sync across rows. */}
+            {(() => {
+              if (followUpTarget === null) return null;
+              const target = RECEIVABLES.find((x) => x.name === followUpTarget);
+              const fu = resolveFollowUp(
+                {
+                  nextFollowUpDate: target?.nextFollowUpDate,
+                  remark: target?.remark,
+                },
+                followUpMap[followUpTarget],
+              );
+              return (
+                <FollowUpModal
+                  open={true}
+                  onClose={() => setFollowUpTarget(null)}
+                  partyName={followUpTarget}
+                  initial={{
+                    nextFollowUpDate: fu.nextFollowUpDate,
+                    remark: fu.remark,
+                  }}
+                  context={{
+                    amount: target?.amount,
+                    oldestDays: target?.days,
+                  }}
+                  onSave={(next) => {
+                    setFollowUp(followUpTarget, next);
+                    setFollowUpTarget(null);
+                  }}
+                />
+              );
+            })()}
 
             {/* Bulk Contact Import lives in Settings → Reminders → Step 1.
                 Outstanding's button now jumps there directly via Auto reminder. */}
