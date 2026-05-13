@@ -6,6 +6,16 @@ export const COMPANY = {
   industry: "D2C Skincare",
   fy: "FY 2024-25",
   tag: "D2C",
+  /** Bank details surfaced in the reminder footer when
+   *  `addBankAccount` is on (Biz Analyst pattern). In production
+   *  these would be read from the Tally company master. */
+  bankDetails: {
+    bankName: "HDFC Bank",
+    accountHolder: "Bandra Soap Pvt Ltd",
+    accountNumber: "50200012345678",
+    ifsc: "HDFC0001234",
+    branch: "Bandra West, Mumbai",
+  },
 };
 
 export const R = {
@@ -3636,6 +3646,15 @@ export interface ReminderAutomationRules {
   /** Which invoice columns to include in the bill list inside the
    *  reminder body. Biz Analyst's "Columns to Share" pattern. */
   includeColumnsInReminder: ReminderColumnId[];
+  /** Greeting line prepended to the message body. Supports
+   *  `{partyName}` placeholder. Biz Analyst's "Greeting" customization
+   *  row — small touch that makes the message feel less robotic. */
+  customGreeting: string;
+  /** When true, appends the company's bank account block to the
+   *  reminder footer (account number, IFSC, branch). Biz Analyst's
+   *  "Add Bank Account" toggle — gives the recipient one less step
+   *  to settle. Default ON. */
+  addBankAccount: boolean;
 
   // ── WABA approval status per tone ─────────────────────────────
   /** Per-tone approval state at Meta (via WAMe). Automated WA sends
@@ -3716,6 +3735,8 @@ export const REMINDER_AUTOMATION_DEFAULTS: ReminderAutomationRules = {
   sendOnlyDueBills: false,             // Default: include pre-due bills too
   showLedgerInReminders: true,         // Default: attach ledger snapshot
   includeColumnsInReminder: ["date", "refNo", "amount", "dueOn"],
+  customGreeting: "Dear {partyName} team,",
+  addBankAccount: true,                // Useful 95% of the time, default ON
   // WABA
   wabaApproved: true,
   wabaApprovalByTone: {

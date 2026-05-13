@@ -3603,14 +3603,44 @@ function DefaultsSection({
         </DefaultRow>
 
         {/* B2. Message content — Biz Analyst "Choose columns to share" +
-              Credflow "Show Ledger" pattern. Operator picks what shows up
-              in the bill list inside the reminder body. Defaults match
-              the common case (Date + Ref + Amount + Due). */}
+              "Greeting" + "Add Bank Account" + Credflow "Show Ledger"
+              patterns. Operator controls greeting, body columns, ledger
+              snapshot, due-bills filter, and bank footer in one row. */}
         <DefaultRow
           label="What goes in the message"
-          help="Which invoice columns to include + ledger snapshot toggle."
+          help="Greeting · columns · ledger · bank account · due-bills filter."
         >
           <div className="flex flex-col gap-3">
+            {/* Greeting — supports {partyName} placeholder */}
+            <div>
+              <p
+                className="text-[10.5px] uppercase tracking-wider font-semibold mb-1.5"
+                style={{ color: "var(--text-4)" }}
+              >
+                Greeting
+              </p>
+              <input
+                type="text"
+                value={rules.customGreeting}
+                onChange={(e) => update("customGreeting", e.target.value)}
+                placeholder="Dear {partyName} team,"
+                maxLength={120}
+                className="w-full text-[12px] px-3 py-2 rounded-md"
+                style={{
+                  background: "var(--bg-primary)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-1)",
+                }}
+              />
+              <p
+                className="text-[10px] mt-1"
+                style={{ color: "var(--text-4)" }}
+              >
+                Use <code style={{ color: "var(--blue)" }}>{"{partyName}"}</code> to insert the party name.
+                Preview: <span style={{ color: "var(--text-3)" }}>{rules.customGreeting.replace("{partyName}", "Nykaa")}</span>
+              </p>
+            </div>
+
             {/* Columns multi-select */}
             <div>
               <p
@@ -3672,6 +3702,77 @@ function DefaultsSection({
               checked={rules.sendOnlyDueBills}
               onChange={(v) => update("sendOnlyDueBills", v)}
             />
+
+            {/* Add Bank Account (Biz Analyst) — when ON, appends bank
+                details from Tally's company master to the footer so the
+                recipient can settle directly. Preview shows what gets
+                attached so the operator can confirm before saving. */}
+            <div
+              className="rounded-lg overflow-hidden"
+              style={{ background: "var(--bg-hover)", border: "1px solid var(--border)" }}
+            >
+              <div className="flex items-start gap-3 px-4 py-3 flex-wrap">
+                <div className="flex-1 min-w-[220px]">
+                  <p className="text-[13px] font-semibold" style={{ color: "var(--text-1)" }}>
+                    Add bank account to footer
+                  </p>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>
+                    Appends your company bank details so the recipient can settle directly.
+                    Pulled from your Tally company master.
+                  </p>
+                </div>
+                <button
+                  onClick={() => update("addBankAccount", !rules.addBankAccount)}
+                  className="relative inline-flex h-5 w-9 rounded-full transition-colors cursor-pointer flex-shrink-0"
+                  style={{
+                    background: rules.addBankAccount ? "var(--green)" : "var(--bg-surface)",
+                    border: "1px solid var(--border)",
+                  }}
+                  aria-label="Toggle add bank account"
+                >
+                  <motion.span
+                    animate={{ x: rules.addBankAccount ? 16 : 2 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-0.5 w-3.5 h-3.5 rounded-full"
+                    style={{ background: rules.addBankAccount ? "#fff" : "var(--text-4)" }}
+                  />
+                </button>
+              </div>
+              <AnimatePresence initial={false}>
+                {rules.addBankAccount && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <div
+                      className="px-4 py-3 text-[10.5px] leading-relaxed tabular-nums"
+                      style={{
+                        borderTop: "1px solid var(--border)",
+                        background: "var(--bg-surface)",
+                        color: "var(--text-3)",
+                      }}
+                    >
+                      <p
+                        className="text-[9.5px] uppercase tracking-wider font-semibold mb-1.5"
+                        style={{ color: "var(--text-4)" }}
+                      >
+                        Footer preview
+                      </p>
+                      <div style={{ color: "var(--text-2)" }}>
+                        <p style={{ fontWeight: 600 }}>
+                          {COMPANY.bankDetails.accountHolder}
+                        </p>
+                        <p>{COMPANY.bankDetails.bankName} · {COMPANY.bankDetails.branch}</p>
+                        <p>A/c: {COMPANY.bankDetails.accountNumber} · IFSC: {COMPANY.bankDetails.ifsc}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </DefaultRow>
 
