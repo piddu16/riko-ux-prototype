@@ -34,6 +34,9 @@ import {
   REMINDER_AUTOMATION_DEFAULTS,
   computeReminderAttribution,
   computeCatchUpBuckets,
+  computePayableTds,
+  computePayableCashImpact,
+  computeMsmeDaysRemaining,
   type ReminderListFilter,
   getPartyReminderHistory,
 } from "@/lib/data";
@@ -99,6 +102,34 @@ const payableP1Count = PAYABLES.filter((p) => p.priority === "P1").length;
 const payableMsmeCount = PAYABLES.filter((p) => p.msme).length;
 const payableMsmeTotal = PAYABLES.filter((p) => p.msme).reduce((s, p) => s + p.amount, 0);
 const payableAvgDpo = 71; // per spec
+
+/* Cash-impact splits (Ramp-style preview).
+   This week    = bills <= 7d to due (computed: paymentTermsDays - days <= 7)
+   Next 30d     = bills <= 30d to due
+   Already due  = bills past their paymentTermsDays */
+const payableCashSlices = (() => {
+  const thisWeek: typeof PAYABLES = [];
+  const next30: typeof PAYABLES = [];
+  const overdue: typeof PAYABLES = [];
+  for (const p of PAYABLES) {
+    const terms = p.paymentTermsDays ?? 45;
+    const daysToDue = terms - p.days;
+    if (daysToDue <= 0) overdue.push(p);
+    else if (daysToDue <= 7) thisWeek.push(p);
+    else if (daysToDue <= 30) next30.push(p);
+  }
+  return { thisWeek, next30, overdue };
+})();
+const payableCashAll = computePayableCashImpact(PAYABLES);
+const payableCashThisWeek = computePayableCashImpact([
+  ...payableCashSlices.overdue,
+  ...payableCashSlices.thisWeek,
+]);
+const payableCashNext30 = computePayableCashImpact([
+  ...payableCashSlices.overdue,
+  ...payableCashSlices.thisWeek,
+  ...payableCashSlices.next30,
+]);
 
 function daysColorPayable(d: number): string {
   // For payables: >60 is red (overdue or near-overdue), 30-60 blue, <30 green/text-2
@@ -1728,6 +1759,137 @@ export default function OutstandingsScreen() {
             {/*  PAYABLES TAB                                              */}
             {/* ========================================================== */}
 
+            {/* Cash Impact preview (Ramp-style) — shows what THIS WEEK
+                actually costs the cash account vs the full payables stack.
+                The number that matters isn't gross payable — it's
+                "how much cash leaves this week if I clear urgents." */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.4 }}
+              className="rounded-md p-4"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--blue) 5%, var(--bg-surface))",
+                border: "1px solid color-mix(in srgb, var(--blue) 22%, var(--border))",
+              }}
+            >
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded"
+                  style={{
+                    background: "color-mix(in srgb, var(--blue) 14%, transparent)",
+                    color: "var(--blue)",
+                  }}
+                >
+                  Cash Impact
+                </span>
+                <p className="text-[11px]" style={{ color: "var(--text-3)" }}>
+                  Net payable post-TDS · 3 time horizons
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  {
+                    label: "This week",
+                    sub: `${payableCashSlices.thisWeek.length + payableCashSlices.overdue.length} bills · ${payableCashSlices.overdue.length} already due`,
+                    gross: payableCashThisWeek.gross,
+                    tds: payableCashThisWeek.tds,
+                    net: payableCashThisWeek.net,
+                    color: "var(--red)",
+                  },
+                  {
+                    label: "Next 30 days",
+                    sub: `${payableCashSlices.thisWeek.length + payableCashSlices.next30.length + payableCashSlices.overdue.length} bills cumulative`,
+                    gross: payableCashNext30.gross,
+                    tds: payableCashNext30.tds,
+                    net: payableCashNext30.net,
+                    color: "var(--blue)",
+                  },
+                  {
+                    label: "All payables",
+                    sub: `${PAYABLES.length} vendors · gross stack`,
+                    gross: payableCashAll.gross,
+                    tds: payableCashAll.tds,
+                    net: payableCashAll.net,
+                    color: "var(--text-2)",
+                  },
+                ].map((slice) => (
+                  <div
+                    key={slice.label}
+                    className="rounded-md p-3"
+                    style={{
+                      background: "var(--bg-primary)",
+                      border: `1px solid color-mix(in srgb, ${slice.color} 18%, var(--border))`,
+                      borderLeft: `3px solid ${slice.color}`,
+                    }}
+                  >
+                    <p
+                      className="text-[10px] uppercase tracking-wider font-semibold mb-1"
+                      style={{ color: "var(--text-4)" }}
+                    >
+                      {slice.label}
+                    </p>
+                    <p
+                      className="text-xl font-bold tabular-nums"
+                      style={{
+                        color: slice.color,
+                        fontFamily: "'Space Grotesk', sans-serif",
+                      }}
+                    >
+                      {fmt(slice.net)}
+                    </p>
+                    <p
+                      className="text-[10px] tabular-nums mt-0.5"
+                      style={{ color: "var(--text-4)" }}
+                    >
+                      {fmt(slice.gross)} gross · {fmt(slice.tds)} TDS withheld
+                    </p>
+                    <p
+                      className="text-[10px] mt-1"
+                      style={{ color: "var(--text-3)" }}
+                    >
+                      {slice.sub}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {payableCashThisWeek.msmeCount > 0 && (
+                <div
+                  className="mt-3 px-3 py-2 rounded-md flex items-start gap-2"
+                  style={{
+                    background:
+                      "color-mix(in srgb, var(--orange) 8%, transparent)",
+                    border:
+                      "1px solid color-mix(in srgb, var(--orange) 25%, transparent)",
+                  }}
+                >
+                  <AlertTriangle
+                    size={14}
+                    style={{ color: "var(--orange)", flexShrink: 0, marginTop: 2 }}
+                  />
+                  <p
+                    className="text-[11px] leading-snug"
+                    style={{ color: "var(--text-2)" }}
+                  >
+                    <strong style={{ color: "var(--orange)" }}>
+                      {payableCashThisWeek.msmeCount} MSME bill
+                      {payableCashThisWeek.msmeCount === 1 ? "" : "s"}
+                    </strong>{" "}
+                    due this week — total{" "}
+                    <span className="tabular-nums font-semibold">
+                      {fmt(payableCashThisWeek.msmeAmount)}
+                    </span>
+                    . Late on these triggers the 45-day rule under MSMED Act;
+                    interest accrues at 3× bank rate.
+                  </p>
+                </div>
+              )}
+            </motion.div>
+
             {/* Summary stats — 4 KPIs */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
@@ -1891,9 +2053,11 @@ export default function OutstandingsScreen() {
                       <th className="py-2.5 px-3 text-left font-medium sticky left-0" style={{ background: "var(--bg-secondary)" }}>Vendor</th>
                       <th className="py-2.5 px-3 text-left font-medium">GSTIN</th>
                       <th className="py-2.5 px-3 text-left font-medium">Category</th>
-                      <th className="py-2.5 px-3 text-right font-medium">Amount</th>
+                      <th className="py-2.5 px-3 text-right font-medium">Gross</th>
+                      <th className="py-2.5 px-3 text-right font-medium" title="Tax Deducted at Source — Section 194">TDS · Net</th>
                       <th className="py-2.5 px-3 text-right font-medium">Days</th>
                       <th className="py-2.5 px-3 text-center font-medium">MSME</th>
+                      <th className="py-2.5 px-3 text-center font-medium">Pay via</th>
                       <th className="py-2.5 px-3 text-center font-medium">Priority</th>
                       <th className="py-2.5 px-3 text-center font-medium">Action</th>
                     </tr>
@@ -1902,6 +2066,10 @@ export default function OutstandingsScreen() {
                     {PAYABLES.map((p, i) => {
                       const isSelected = payableSelected.has(i);
                       const isHovered = payableHoveredRow === i;
+                      const tdsRow = computePayableTds(p);
+                      const msmeDaysLeft = computeMsmeDaysRemaining(p.msmeDueDate);
+                      const msmeUrgent =
+                        msmeDaysLeft !== null && msmeDaysLeft <= 7;
                       return (
                         <motion.tr
                           key={p.name}
@@ -1967,6 +2135,38 @@ export default function OutstandingsScreen() {
                             {fmt(p.amount)}
                           </td>
 
+                          {/* TDS · Net — vendor doesn't actually receive
+                              the gross. Surfacing this prevents the
+                              founder from overpaying out of the bank. */}
+                          <td
+                            className={`${DENSITY_PY[density]} px-3 text-right tabular-nums`}
+                          >
+                            {tdsRow.rate > 0 ? (
+                              <div className="flex flex-col items-end leading-tight">
+                                <span
+                                  className="text-[11px] font-semibold"
+                                  style={{ color: "var(--text-2)" }}
+                                >
+                                  {fmt(tdsRow.net)}
+                                </span>
+                                <span
+                                  className="text-[9.5px]"
+                                  style={{ color: "var(--text-4)" }}
+                                >
+                                  {fmt(tdsRow.tds)} · {(tdsRow.rate * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            ) : (
+                              <span
+                                className="text-[10.5px]"
+                                style={{ color: "var(--text-4)" }}
+                                title="No TDS on goods purchase"
+                              >
+                                No TDS
+                              </span>
+                            )}
+                          </td>
+
                           <td
                             className={`${DENSITY_PY[density]} px-3 text-right font-semibold tabular-nums`}
                             style={{ color: daysColorPayable(p.days) }}
@@ -1974,22 +2174,79 @@ export default function OutstandingsScreen() {
                             {p.days}
                           </td>
 
+                          {/* MSME status + statutory countdown (Pazy
+                              pattern). The 45-day MSMED Act rule has
+                              real legal teeth — surface the remaining
+                              days inline so the operator doesn't have
+                              to compute against today's date. */}
                           <td className={`${DENSITY_PY[density]} px-3 text-center`}>
                             {p.msme ? (
-                              <span
-                                className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                                style={{
-                                  color: "var(--red)",
-                                  background: "color-mix(in srgb, var(--red) 15%, transparent)",
-                                  border: "1px solid color-mix(in srgb, var(--red) 25%, transparent)",
-                                }}
-                                title={p.msmeDueDate ? `Due by ${p.msmeDueDate}` : undefined}
-                              >
-                                MSME
-                              </span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                  style={{
+                                    color: "var(--red)",
+                                    background: "color-mix(in srgb, var(--red) 15%, transparent)",
+                                    border: "1px solid color-mix(in srgb, var(--red) 25%, transparent)",
+                                  }}
+                                  title={p.msmeDueDate ? `Statutory deadline ${p.msmeDueDate}` : undefined}
+                                >
+                                  MSME
+                                </span>
+                                {msmeDaysLeft !== null && (
+                                  <span
+                                    className="text-[9px] font-semibold tabular-nums"
+                                    style={{
+                                      color:
+                                        msmeDaysLeft < 0
+                                          ? "var(--red)"
+                                          : msmeUrgent
+                                          ? "var(--orange)"
+                                          : "var(--text-4)",
+                                    }}
+                                  >
+                                    {msmeDaysLeft < 0
+                                      ? `${Math.abs(msmeDaysLeft)}d breached`
+                                      : msmeDaysLeft === 0
+                                      ? "Due today"
+                                      : `${msmeDaysLeft}d left`}
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-[10px]" style={{ color: "var(--text-4)" }}>—</span>
                             )}
+                          </td>
+
+                          {/* Suggested payment method — Ramp shows method
+                              hint up front so the operator picks the
+                              right rail before the payment run. UPI cap
+                              is ₹5L per NPCI rules; larger goes NEFT/RTGS. */}
+                          <td className={`${DENSITY_PY[density]} px-3 text-center`}>
+                            <span
+                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
+                              style={{
+                                color:
+                                  p.suggestedPayMethod === "UPI"
+                                    ? "var(--green)"
+                                    : p.suggestedPayMethod === "NEFT"
+                                    ? "var(--blue)"
+                                    : "var(--text-3)",
+                                background:
+                                  p.suggestedPayMethod === "UPI"
+                                    ? "color-mix(in srgb, var(--green) 12%, transparent)"
+                                    : p.suggestedPayMethod === "NEFT"
+                                    ? "color-mix(in srgb, var(--blue) 12%, transparent)"
+                                    : "var(--bg-hover)",
+                              }}
+                              title={
+                                p.suggestedPayMethod === "UPI"
+                                  ? "UPI — under ₹5L NPCI cap"
+                                  : "NEFT — large-value bank transfer"
+                              }
+                            >
+                              {p.suggestedPayMethod ?? "—"}
+                            </span>
                           </td>
 
                           <td className={`${DENSITY_PY[density]} px-3 text-center`}>
@@ -2018,130 +2275,296 @@ export default function OutstandingsScreen() {
                 </table>
               </div>
 
-              {/* Floating bulk action bar (payables) */}
-              {payableSelected.size > 0 && (
-                <motion.div
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 20, opacity: 0 }}
-                  className="hidden sm:flex sticky bottom-0 items-center justify-between px-4 py-2.5 rounded-b-xl z-20"
-                  style={{
-                    background: "var(--bg-secondary)",
-                    borderTop: "1px solid var(--green)",
-                    boxShadow: "0 -4px 12px rgba(0,0,0,0.2)",
-                  }}
-                >
-                  <span className="text-xs font-medium" style={{ color: "var(--text-2)" }}>
-                    {payableSelected.size} {payableSelected.size === 1 ? "vendor" : "vendors"} selected
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      className="text-[11px] font-semibold px-3 py-1.5 rounded-md"
-                      style={{ color: "var(--green)", background: "var(--bg-hover)", border: "1px solid color-mix(in srgb, var(--green) 30%, transparent)" }}
+              {/* Payment Run sticky bar (Ramp-style batch pay).
+                  Replaces the bare counter with a full payment-run
+                  preview: gross + TDS + net + per-method routing chips.
+                  Lets the operator see exactly what's about to leave
+                  the bank before they commit. */}
+              <AnimatePresence>
+                {payableSelected.size > 0 && (() => {
+                  const selectedItems = Array.from(payableSelected).map(
+                    (idx) => PAYABLES[idx],
+                  );
+                  const runImpact = computePayableCashImpact(selectedItems);
+                  const methodCounts = selectedItems.reduce(
+                    (acc, p) => {
+                      const m = p.suggestedPayMethod ?? "Cheque";
+                      acc[m] = (acc[m] ?? 0) + 1;
+                      return acc;
+                    },
+                    {} as Record<string, number>,
+                  );
+                  return (
+                    <motion.div
+                      initial={{ y: 30, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 30, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="hidden sm:flex sticky bottom-0 items-center justify-between px-4 py-3 rounded-b-xl z-20 gap-4 flex-wrap"
+                      style={{
+                        background: "var(--bg-primary)",
+                        borderTop: "1px solid var(--green)",
+                        boxShadow: "0 -6px 18px rgba(0,0,0,0.28)",
+                      }}
                     >
-                      💳 Pay {payableSelected.size}
-                    </button>
-                    <button
-                      className="text-[11px] font-semibold px-3 py-1.5 rounded-md"
-                      style={{ color: "var(--blue)", background: "color-mix(in srgb, var(--blue) 15%, transparent)", border: "1px solid color-mix(in srgb, var(--blue) 30%, transparent)" }}
-                    >
-                      📤 Export Selected
-                    </button>
-                    <button
-                      onClick={() => setPayableSelected(new Set())}
-                      className="text-[11px] px-2 py-1.5 rounded-md"
-                      style={{ color: "var(--text-4)" }}
-                    >
-                      ✕ Clear
-                    </button>
-                  </div>
-                </motion.div>
-              )}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span
+                          className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded"
+                          style={{
+                            background: "color-mix(in srgb, var(--green) 14%, transparent)",
+                            color: "var(--green)",
+                          }}
+                        >
+                          Payment run · {payableSelected.size}
+                        </span>
+                        <div className="flex flex-col">
+                          <span
+                            className="text-[10.5px] uppercase tracking-wider"
+                            style={{ color: "var(--text-4)" }}
+                          >
+                            Net leaving bank
+                          </span>
+                          <span
+                            className="text-[15px] font-bold tabular-nums"
+                            style={{
+                              color: "var(--text-1)",
+                              fontFamily: "'Space Grotesk', sans-serif",
+                            }}
+                          >
+                            {fmt(runImpact.net)}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span
+                            className="text-[10.5px] uppercase tracking-wider"
+                            style={{ color: "var(--text-4)" }}
+                          >
+                            TDS withheld
+                          </span>
+                          <span
+                            className="text-[12px] font-semibold tabular-nums"
+                            style={{ color: "var(--text-2)" }}
+                          >
+                            {fmt(runImpact.tds)}
+                          </span>
+                        </div>
+                        {runImpact.msmeCount > 0 && (
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded flex items-center gap-1"
+                            style={{
+                              background:
+                                "color-mix(in srgb, var(--orange) 14%, transparent)",
+                              color: "var(--orange)",
+                            }}
+                            title="MSME bills in this run — statutory priority"
+                          >
+                            <AlertTriangle size={10} />
+                            {runImpact.msmeCount} MSME
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1">
+                          {(["UPI", "NEFT", "Cheque"] as const).map((m) =>
+                            methodCounts[m] ? (
+                              <span
+                                key={m}
+                                className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
+                                style={{
+                                  color:
+                                    m === "UPI"
+                                      ? "var(--green)"
+                                      : m === "NEFT"
+                                      ? "var(--blue)"
+                                      : "var(--text-3)",
+                                  background:
+                                    m === "UPI"
+                                      ? "color-mix(in srgb, var(--green) 12%, transparent)"
+                                      : m === "NEFT"
+                                      ? "color-mix(in srgb, var(--blue) 12%, transparent)"
+                                      : "var(--bg-hover)",
+                                }}
+                              >
+                                {methodCounts[m]} {m}
+                              </span>
+                            ) : null,
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            showBulkToast(
+                              `Scheduling payment run · ${fmt(runImpact.net)} net…`,
+                            )
+                          }
+                          className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg cursor-pointer"
+                          style={{
+                            background: "var(--green)",
+                            color: "#fff",
+                          }}
+                        >
+                          💳 Schedule pay run
+                        </button>
+                        <button
+                          onClick={() =>
+                            showBulkToast(
+                              `Exporting ${payableSelected.size} bills as MIS CSV…`,
+                            )
+                          }
+                          className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2 rounded-lg cursor-pointer"
+                          style={{
+                            background: "var(--blue)",
+                            color: "#fff",
+                          }}
+                        >
+                          📤 Export
+                        </button>
+                        <button
+                          onClick={() => setPayableSelected(new Set())}
+                          className="text-[11px] px-2 py-1.5 rounded-md cursor-pointer"
+                          style={{ color: "var(--text-4)" }}
+                          aria-label="Clear selection"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+              </AnimatePresence>
 
               {/* Mobile card layout (payables) */}
               <div className="sm:hidden flex flex-col">
-                {PAYABLES.map((p, i) => (
-                  <motion.div
-                    key={p.name}
-                    custom={i}
-                    variants={rowVariants}
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true, amount: 0.1 }}
-                    className="p-3"
-                    style={{
-                      background:
-                        i % 2 === 0
-                          ? "var(--bg-surface)"
-                          : "var(--bg-secondary)",
-                      borderBottom: "1px solid var(--border)",
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-1.5 gap-2">
-                      <span
-                        className="text-xs font-medium truncate flex-1"
-                        style={{ color: "var(--text-2)" }}
-                      >
-                        {p.name}
-                      </span>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        {p.msme && (
+                {PAYABLES.map((p, i) => {
+                  const tdsRow = computePayableTds(p);
+                  const msmeDaysLeft = computeMsmeDaysRemaining(p.msmeDueDate);
+                  const msmeUrgent =
+                    msmeDaysLeft !== null && msmeDaysLeft <= 7;
+                  return (
+                    <motion.div
+                      key={p.name}
+                      custom={i}
+                      variants={rowVariants}
+                      initial="hidden"
+                      whileInView="visible"
+                      viewport={{ once: true, amount: 0.1 }}
+                      className="p-3"
+                      style={{
+                        background:
+                          i % 2 === 0
+                            ? "var(--bg-surface)"
+                            : "var(--bg-secondary)",
+                        borderBottom: "1px solid var(--border)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-1.5 gap-2">
+                        <span
+                          className="text-xs font-medium truncate flex-1"
+                          style={{ color: "var(--text-2)" }}
+                        >
+                          {p.name}
+                        </span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {p.msme && (
+                            <span
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                              style={{
+                                color: "var(--red)",
+                                background: "color-mix(in srgb, var(--red) 15%, transparent)",
+                              }}
+                            >
+                              MSME
+                            </span>
+                          )}
+                          <Pill color={priorityColor[p.priority]}>{p.priority}</Pill>
+                        </div>
+                      </div>
+
+                      <p className="text-[10px] mb-1.5" style={{ color: "var(--text-4)" }}>
+                        {p.category} · {p.gstin}
+                      </p>
+
+                      <div className="flex items-baseline justify-between mb-1.5">
+                        <div className="flex flex-col">
                           <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            className="text-sm font-bold tabular-nums"
                             style={{
-                              color: "var(--red)",
-                              background: "color-mix(in srgb, var(--red) 15%, transparent)",
+                              color: "var(--text-1)",
+                              fontFamily: "'Space Grotesk', sans-serif",
                             }}
                           >
-                            MSME
+                            {fmt(p.amount)}
                           </span>
-                        )}
-                        <Pill color={priorityColor[p.priority]}>{p.priority}</Pill>
+                          {tdsRow.rate > 0 && (
+                            <span
+                              className="text-[10px] tabular-nums"
+                              style={{ color: "var(--text-4)" }}
+                            >
+                              Net {fmt(tdsRow.net)} · {fmt(tdsRow.tds)} TDS
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          className="text-xs font-semibold"
+                          style={{ color: daysColorPayable(p.days) }}
+                        >
+                          {p.days} days
+                        </span>
                       </div>
-                    </div>
 
-                    <p className="text-[10px] mb-1.5" style={{ color: "var(--text-4)" }}>
-                      {p.category} · {p.gstin}
-                    </p>
+                      {/* MSME statutory countdown — only when relevant */}
+                      {msmeDaysLeft !== null && (
+                        <p
+                          className="text-[10px] font-semibold mb-2"
+                          style={{
+                            color:
+                              msmeDaysLeft < 0
+                                ? "var(--red)"
+                                : msmeUrgent
+                                ? "var(--orange)"
+                                : "var(--text-3)",
+                          }}
+                        >
+                          {msmeDaysLeft < 0
+                            ? `⚠ ${Math.abs(msmeDaysLeft)}d past MSMED Act deadline`
+                            : msmeDaysLeft === 0
+                            ? "⚠ MSMED Act deadline today"
+                            : `${msmeDaysLeft}d to MSMED Act deadline · ${p.msmeDueDate}`}
+                        </p>
+                      )}
 
-                    <div className="flex items-center justify-between mb-2">
-                      <span
-                        className="text-sm font-bold"
-                        style={{
-                          color: "var(--text-1)",
-                          fontFamily: "'Space Grotesk', sans-serif",
-                        }}
-                      >
-                        {fmt(p.amount)}
-                      </span>
-                      <span
-                        className="text-xs font-semibold"
-                        style={{ color: daysColorPayable(p.days) }}
-                      >
-                        {p.days} days
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span
-                        className="text-[10px]"
-                        style={{ color: "var(--text-4)" }}
-                      >
-                        {p.bills} bills
-                      </span>
-                      <button
-                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer"
-                        style={{
-                          color: "var(--green)",
-                          background:
-                            "color-mix(in srgb, var(--green) 12%, transparent)",
-                        }}
-                      >
-                        💳 Pay Now
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
+                      <div className="flex items-center justify-between">
+                        <span
+                          className="text-[10px] tabular-nums"
+                          style={{ color: "var(--text-4)" }}
+                        >
+                          {p.bills} bills · pay via{" "}
+                          <span
+                            style={{
+                              color:
+                                p.suggestedPayMethod === "UPI"
+                                  ? "var(--green)"
+                                  : "var(--blue)",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {p.suggestedPayMethod ?? "—"}
+                          </span>
+                        </span>
+                        <button
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-md cursor-pointer"
+                          style={{
+                            color: "var(--green)",
+                            background:
+                              "color-mix(in srgb, var(--green) 12%, transparent)",
+                          }}
+                        >
+                          💳 Pay Now
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
 

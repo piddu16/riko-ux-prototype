@@ -1356,18 +1356,114 @@ export const BUILD_PHASES = [
    PAYABLES — vendors we owe (item 5)
    ============================================================ */
 
-export const PAYABLES = [
-  { name: "Amazon - Creations (Logistics)", gstin: "29AAHCA9099B1Z4", amount: 842300, days: 18, bills: 23, priority: "P3" as const, msme: false, category: "Logistics", contact: "+91 80 1234 5678" },
-  { name: "GOOGLE INDIA PVT LTD (Ads)", gstin: "29AACCG0527D1Z8", amount: 614200, days: 12, bills: 8, priority: "P3" as const, msme: false, category: "Marketing", contact: "ads-support@google.com" },
-  { name: "Shiprocket Logistics", gstin: "07AAGCS5867P1Z9", amount: 287500, days: 28, bills: 45, priority: "P2" as const, msme: false, category: "Logistics", contact: "+91 98100 22334" },
-  { name: "Mumbai Packaging Ltd", gstin: "27AAACM5555P1Z2", amount: 184200, days: 42, bills: 12, priority: "P1" as const, msme: true, category: "Raw Material", contact: "+91 98201 55667", msmeDueDate: "28 Apr 2026" },
-  { name: "Kiran Labels & Stickers", gstin: "27AAACK7777P1Z4", amount: 98500, days: 38, bills: 7, priority: "P1" as const, msme: true, category: "Raw Material", contact: "+91 98201 99887", msmeDueDate: "24 Apr 2026" },
-  { name: "Raw Material Supplier Co", gstin: "24AAACR1234P1Z2", amount: 156800, days: 22, bills: 9, priority: "P2" as const, msme: false, category: "Raw Material", contact: "+91 98765 44321" },
-  { name: "Instamojo Payments", gstin: "29AAACI8901P1Z3", amount: 45200, days: 8, bills: 3, priority: "P3" as const, msme: false, category: "Payment Gateway", contact: "support@instamojo.com" },
-  { name: "Facebook India (Ads)", gstin: "29AAACF1111F1Z2", amount: 328900, days: 15, bills: 6, priority: "P2" as const, msme: false, category: "Marketing", contact: "—" },
-  { name: "Zoho Corp (Tally licence)", gstin: "33AAACZ4123P1Z7", amount: 35000, days: 5, bills: 1, priority: "P3" as const, msme: false, category: "Software", contact: "+91 44 4996 5000" },
-  { name: "Bombay Printers", gstin: "27AAACB3366P1Z5", amount: 67400, days: 44, bills: 4, priority: "P1" as const, msme: true, category: "Raw Material", contact: "+91 98201 77665", msmeDueDate: "22 Apr 2026" },
+/** Indian TDS rates by category — Section 194 of the IT Act.
+ *  Goods purchases (Raw Material) attract 0% TDS by default; service
+ *  categories attract a category-specific rate that Riko applies
+ *  automatically when computing net-payable. */
+export const TDS_RATE_BY_CATEGORY: Record<string, number> = {
+  "Marketing": 0.10,        // 194J — professional services / ads on platform
+  "Software": 0.10,         // 194J — software licence fees
+  "Logistics": 0.02,        // 194C — transport / contractor work
+  "Payment Gateway": 0.05,  // 194J at concessional rate for IT services
+  "Raw Material": 0.0,      // Goods purchase — no TDS
+  "Professional Services": 0.10,
+  "Rent": 0.10,             // 194-I
+};
+
+/** Each payable row carries enough to compute net-payable and route
+ *  the suggested payment method. Inspired by Ramp's bill-pay shape
+ *  (vendor metadata, payment terms, method hint) + Pazy's Indian AP
+ *  reality (TDS, MSME statutory countdown). */
+export interface Payable {
+  name: string;
+  gstin: string;
+  amount: number;          // Gross outstanding (Tally closing Cr balance)
+  days: number;            // Oldest unpaid bill age
+  bills: number;
+  priority: "P1" | "P2" | "P3";
+  msme: boolean;
+  category: string;
+  contact: string;
+  msmeDueDate?: string;
+  /** Payment terms (days) — vendor-level default. Determines whether a
+   *  bill is "early," "due," or "overdue." */
+  paymentTermsDays?: number;
+  /** Suggested payment method based on amount + vendor metadata. UPI
+   *  for ≤₹5L (NPCI cap), NEFT for larger, Cheque as fallback for
+   *  vendors without bank details on file. */
+  suggestedPayMethod?: "UPI" | "NEFT" | "RTGS" | "Cheque";
+}
+
+export const PAYABLES: Payable[] = [
+  { name: "Amazon - Creations (Logistics)", gstin: "29AAHCA9099B1Z4", amount: 842300, days: 18, bills: 23, priority: "P3", msme: false, category: "Logistics", contact: "+91 80 1234 5678", paymentTermsDays: 30, suggestedPayMethod: "NEFT" },
+  { name: "GOOGLE INDIA PVT LTD (Ads)", gstin: "29AACCG0527D1Z8", amount: 614200, days: 12, bills: 8, priority: "P3", msme: false, category: "Marketing", contact: "ads-support@google.com", paymentTermsDays: 30, suggestedPayMethod: "NEFT" },
+  { name: "Shiprocket Logistics", gstin: "07AAGCS5867P1Z9", amount: 287500, days: 28, bills: 45, priority: "P2", msme: false, category: "Logistics", contact: "+91 98100 22334", paymentTermsDays: 30, suggestedPayMethod: "UPI" },
+  { name: "Mumbai Packaging Ltd", gstin: "27AAACM5555P1Z2", amount: 184200, days: 42, bills: 12, priority: "P1", msme: true, category: "Raw Material", contact: "+91 98201 55667", msmeDueDate: "28 Apr 2026", paymentTermsDays: 45, suggestedPayMethod: "UPI" },
+  { name: "Kiran Labels & Stickers", gstin: "27AAACK7777P1Z4", amount: 98500, days: 38, bills: 7, priority: "P1", msme: true, category: "Raw Material", contact: "+91 98201 99887", msmeDueDate: "24 Apr 2026", paymentTermsDays: 45, suggestedPayMethod: "UPI" },
+  { name: "Raw Material Supplier Co", gstin: "24AAACR1234P1Z2", amount: 156800, days: 22, bills: 9, priority: "P2", msme: false, category: "Raw Material", contact: "+91 98765 44321", paymentTermsDays: 60, suggestedPayMethod: "UPI" },
+  { name: "Instamojo Payments", gstin: "29AAACI8901P1Z3", amount: 45200, days: 8, bills: 3, priority: "P3", msme: false, category: "Payment Gateway", contact: "support@instamojo.com", paymentTermsDays: 15, suggestedPayMethod: "UPI" },
+  { name: "Facebook India (Ads)", gstin: "29AAACF1111F1Z2", amount: 328900, days: 15, bills: 6, priority: "P2", msme: false, category: "Marketing", contact: "—", paymentTermsDays: 30, suggestedPayMethod: "NEFT" },
+  { name: "Zoho Corp (Tally licence)", gstin: "33AAACZ4123P1Z7", amount: 35000, days: 5, bills: 1, priority: "P3", msme: false, category: "Software", contact: "+91 44 4996 5000", paymentTermsDays: 30, suggestedPayMethod: "UPI" },
+  { name: "Bombay Printers", gstin: "27AAACB3366P1Z5", amount: 67400, days: 44, bills: 4, priority: "P1", msme: true, category: "Raw Material", contact: "+91 98201 77665", msmeDueDate: "22 Apr 2026", paymentTermsDays: 45, suggestedPayMethod: "UPI" },
 ];
+
+/** Compute TDS for a payable row. Returns { rate, tds, net }.
+ *  Pure function — call inline anywhere. */
+export function computePayableTds(p: Payable): {
+  rate: number;
+  tds: number;
+  net: number;
+} {
+  const rate = TDS_RATE_BY_CATEGORY[p.category] ?? 0;
+  const tds = Math.round(p.amount * rate);
+  return { rate, tds, net: p.amount - tds };
+}
+
+/** Cash-impact summary across a set of payables. Powers the
+ *  Ramp-style "if you pay all these, here's what it costs" preview
+ *  card above the aging buckets. */
+export function computePayableCashImpact(items: Payable[]): {
+  gross: number;
+  tds: number;
+  net: number;
+  msmeCount: number;
+  msmeAmount: number;
+  p1Count: number;
+  p1Amount: number;
+} {
+  let gross = 0;
+  let tds = 0;
+  let msmeCount = 0;
+  let msmeAmount = 0;
+  let p1Count = 0;
+  let p1Amount = 0;
+  for (const p of items) {
+    const { tds: rowTds } = computePayableTds(p);
+    gross += p.amount;
+    tds += rowTds;
+    if (p.msme) {
+      msmeCount++;
+      msmeAmount += p.amount;
+    }
+    if (p.priority === "P1") {
+      p1Count++;
+      p1Amount += p.amount;
+    }
+  }
+  return { gross, tds, net: gross - tds, msmeCount, msmeAmount, p1Count, p1Amount };
+}
+
+/** Compute days remaining to a party's MSME statutory deadline
+ *  (45-day rule under MSMED Act). Returns negative if breached.
+ *  Anchored to the demo's stable "today" (20 Apr 2026). */
+export function computeMsmeDaysRemaining(msmeDueDate?: string): number | null {
+  if (!msmeDueDate) return null;
+  const due = new Date(msmeDueDate);
+  if (isNaN(due.getTime())) return null;
+  const today = new Date("2026-04-20T00:00:00+05:30");
+  const ms = due.getTime() - today.getTime();
+  return Math.floor(ms / (1000 * 60 * 60 * 24));
+}
 
 /* ============================================================
    TOP CUSTOMERS — for Sales > Customers tab (item 7)
