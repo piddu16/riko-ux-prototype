@@ -77,12 +77,13 @@ function readPalette(): RikoPalette {
   if (typeof window === "undefined") {
     // Server fallback — never actually rendered but keeps types happy.
     return {
-      bg1: "#0F1117", bg2: "#1A1F2E", bg3: "#242937",
-      border: "#334155",
-      text1: "#F8FAFC", text2: "#CBD5E1", text3: "#94A3B8", text4: "#64748B",
-      green: "#22C55E", greenDark: "#16A34A",
-      red: "#EF4444", yellow: "#F59E0B",
-      blue: "#3B82F6", orange: "#F97316", purple: "#A855F7",
+      // SSR fallback — brand-aligned light palette per Riko Brand Manual v1.0
+      bg1: "#FFFFFF", bg2: "#F6F9F6", bg3: "#FFFFFF",
+      border: "#E5EBE7",
+      text1: "#0B1F12", text2: "#243329", text3: "#4A5A50", text4: "#9AA69C",
+      green: "#16A34A", greenDark: "#065F46",
+      red: "#DC2626", yellow: "#F59E0B",
+      blue: "#2563EB", orange: "#F59E0B", purple: "#7C3AED",
     };
   }
   const root = getComputedStyle(document.documentElement);

@@ -1,70 +1,136 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════
+   Riko Brand Manual v1.0 (effective May 2026)
+   See: brand@rikoai.in · riko.ai/brand
+
+   Default is LIGHT (per the manual: "Ink on white = the cleanest
+   reading surface"). Dark theme override lives under
+   [data-theme="dark"] for screens that prefer it (e.g., demo mode).
+   ═══════════════════════════════════════════════════════════════ */
+
 @theme inline {
   --font-sans: var(--font-inter);
-  --color-riko-green: #22C55E;
-  --color-riko-green-dark: #15803D;
+  --font-serif: var(--font-instrument-serif);
+  --font-mono: var(--font-jetbrains-mono);
+  --color-riko-green: #16A34A;
+  --color-riko-bright-green: #22C55E;
+  --color-riko-deep-green: #065F46;
+  --color-riko-ink: #0B1F12;
 }
 
 :root {
-  --bg-primary: #0F1117;
-  --bg-secondary: #1A1F2E;
-  --bg-surface: #242937;
-  --bg-hover: #2D3548;
-  --border: #334155;
-  --text-1: #F8FAFC;
-  --text-2: #CBD5E1;
-  --text-3: #94A3B8;
-  --text-4: #64748B;
-  /* Brand palette — aligned with riko-website (piddu16/riko-website)
-     Primary #22C55E (green-500), secondary #16A34A (green-600). */
-  --green: #22C55E;
-  --green-dark: #16A34A;
-  --green-bg: #052E16;
-  --red: #EF4444;
-  --red-bg: rgba(239,68,68,.12);
-  --yellow: #F59E0B;
-  --yellow-bg: rgba(245,158,11,.12);
-  --blue: #3B82F6;
-  --blue-bg: rgba(59,130,246,.12);
-  --orange: #F97316;
-  --purple: #A855F7;
-}
+  /* ── Brand colors (theme-independent — direct manual references) ── */
+  --riko-green: #16A34A;        /* Riko Green — primary */
+  --riko-bright: #22C55E;       /* Bright Green — secondary accent */
+  --riko-deep: #065F46;          /* Deep Green — emphasis on tint */
+  --ink: #0B1F12;                /* Ink — body text default */
+  --ink-two: #243329;            /* Ink Two — strong borders / second ink */
+  --muted: #4A5A50;              /* Muted — secondary text */
+  --faint: #9AA69C;              /* Faint — tertiary text */
+  --line-strong: #D0D8D2;        /* Line Strong — visible borders */
+  --line: #E5EBE7;               /* Line — hairline borders */
+  --tint: #F6F9F6;               /* Tint — soft section backgrounds */
+  --tint-two: #EEF3EF;           /* Tint Two — second tier soft fills */
+  --tint-accent: #E8F5EC;        /* Tint Accent — feature halos, status pills */
 
-[data-theme="light"] {
-  --bg-primary: #F8FAFB;
-  --bg-secondary: #FFFFFF;
-  --bg-surface: #F1F5F9;
-  --bg-hover: #E2E8F0;
-  --border: #E2E8F0;
-  --text-1: #0F172A;
-  --text-2: #334155;
-  --text-3: #64748B;
-  --text-4: #94A3B8;
-  --green-bg: #F0FDF4;
+  /* ── Status (semantic) — reserved for UI state only ── */
+  --status-success: #16A34A;
+  --status-warn: #F59E0B;
+  --status-error: #DC2626;
+  --status-info: #2563EB;
+
+  /* ── Semantic aliases (theme-dependent — light defaults) ── */
+  --bg-primary: #FFFFFF;           /* page background */
+  --bg-secondary: #F6F9F6;         /* soft section bg (Tint) */
+  --bg-surface: #FFFFFF;           /* cards default to white */
+  --bg-hover: #EEF3EF;             /* Tint Two as hover */
+  --border: #E5EBE7;               /* hairline borders */
+  --text-1: #0B1F12;               /* Ink — body / primary */
+  --text-2: #243329;               /* Ink Two — secondary */
+  --text-3: #4A5A50;               /* Muted — tertiary */
+  --text-4: #9AA69C;               /* Faint — quaternary */
+
+  /* Brand alias tokens (legacy shape, brand-correct values) */
+  --green: #16A34A;
+  --green-dark: #065F46;
+  --green-bg: #E8F5EC;             /* Tint Accent for green halos */
+  --red: #DC2626;
   --red-bg: #FEF2F2;
+  --yellow: #F59E0B;
   --yellow-bg: #FFFBEB;
+  --blue: #2563EB;
   --blue-bg: #EFF6FF;
+  --orange: #F59E0B;               /* alias warn so old refs still work */
+  --purple: #7C3AED;               /* used by some screens — brand-adjacent */
+
+  /* ── Component radii (per brand manual one-pager) ── */
+  --radius-button: 9px;
+  --radius-card: 14px;
+  --radius-feature: 18px;
+  --radius-pill: 100px;
 }
 
-html { scroll-behavior: smooth; }
+[data-theme="dark"] {
+  /* Dark theme — uses Ink as primary surface (per manual: "White on ink") */
+  --bg-primary: #0B1F12;           /* Ink */
+  --bg-secondary: #243329;         /* Ink Two */
+  --bg-surface: #102B1A;           /* slightly raised from Ink */
+  --bg-hover: #1A3526;             /* hover state on ink */
+  --border: #243329;               /* Ink Two as border */
+  --text-1: #FFFFFF;
+  --text-2: #D0D8D2;               /* Line Strong as light text on dark */
+  --text-3: #9AA69C;               /* Faint */
+  --text-4: #4A5A50;               /* Muted */
+
+  --green-bg: #052E16;             /* darker tint accent for dark mode */
+  --red-bg: rgba(220, 38, 38, .14);
+  --yellow-bg: rgba(245, 158, 11, .14);
+  --blue-bg: rgba(37, 99, 235, .14);
+}
+
+html {
+  scroll-behavior: smooth;
+}
 
 body {
   background: var(--bg-primary);
   color: var(--text-1);
   font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
   transition: background 0.3s, color 0.3s;
+  /* Inter font features per brand manual: ss01, cv11 stylistic sets +
+     tabular-nums on data. */
+  font-feature-settings: "ss01", "cv11";
 }
 
-* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+/* Brand-specific utility classes — sparingly applied where Tailwind's
+   default doesn't carry the brand meaning. */
+.font-serif-accent {
+  font-family: var(--font-serif), "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.font-label {
+  font-family: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum", "cv11";
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 
 /* ── Accessibility: visible focus for keyboard users ─────────────────
-   Tab / Shift+Tab / arrow-key focus gets a clear green ring.
-   Mouse clicks don't show the ring (that's what :focus-visible does).
-   Reset only where we're providing a custom focus style. */
+   Tab / Shift+Tab / arrow-key focus gets a Riko Green ring.
+   Mouse clicks don't show the ring (that's what :focus-visible does). */
 *:focus { outline: none; }
 *:focus-visible {
-  outline: 2px solid var(--green);
+  outline: 2px solid var(--riko-green);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -72,16 +138,11 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--green);
+  box-shadow: 0 0 0 2px var(--riko-green);
   border-radius: 6px;
 }
 
-/* ── Respect prefers-reduced-motion ────────────────────────────────
-   Users with vestibular disorders, motion sensitivity, or ADHD can set
-   `Reduce motion` in OS settings. We honor that by shortening most
-   transitions to near-zero (keeping a tiny duration so layout shifts
-   aren't instant-jarring). Framer Motion's useReducedMotion() covers
-   the more complex animations inside components. */
+/* ── Respect prefers-reduced-motion ──────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
